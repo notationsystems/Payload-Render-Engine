@@ -29,6 +29,7 @@ const FRAG = /* glsl */ `
   uniform float uPulses;     // pulse count along route
   uniform float uStatus;     // 0 ok, 1 degraded, 2 disrupted
   uniform float uRisk;       // risk layer on/off
+  uniform float uHypo;       // hypothetical frame: 0 none, 1 perturbed, 2 spillover
   varying vec2 vUv;
 
   void main() {
@@ -63,6 +64,23 @@ const FRAG = /* glsl */ `
     }
 
     glow *= (1.0 - uDim * 0.88);
+
+    // hypothetical frame: violet DASHED treatment — deliberately unlike
+    // any real-state look, so a simulated outcome cannot read as one
+    if (uHypo > 0.5) {
+      vec3 hypo = vec3(0.85, 0.55, 1.0);
+      float dash = step(0.45, fract(u * uPulses * 5.0 + uTime * 0.15));
+      if (uHypo > 1.5) {
+        // spillover: tinted, lightly dashed
+        col = mix(col, hypo, 0.45);
+        glow *= 0.75 + 0.45 * dash;
+      } else {
+        // perturbed: fully violet, hard dashes
+        col = hypo;
+        glow = (0.9 + 1.1 * pulse) * dash * (1.0 - uDim * 0.88);
+      }
+    }
+
     gl_FragColor = vec4(col * glow, 1.0);
   }
 `;
@@ -126,6 +144,7 @@ export class RoutesLayer {
           uPulses: { value: Math.max(2, Math.round(path.lengthKm / 900)) },
           uStatus: { value: 0 },
           uRisk: { value: 0 },
+          uHypo: { value: 0 },
         },
         transparent: true,
         blending: THREE.AdditiveBlending,
@@ -243,6 +262,16 @@ export class RoutesLayer {
     for (const [id, vis] of this.visuals) {
       vis.material.uniforms.uState.value = keepSelected?.has(id) ? 2 : 0;
     }
+  }
+
+  /** Hypothetical-frame role: 0 none, 1 perturbed, 2 spillover. */
+  setScenarioRole(routeId: EntityId, role: 0 | 1 | 2): void {
+    const vis = this.visuals.get(routeId);
+    if (vis) vis.material.uniforms.uHypo.value = role;
+  }
+
+  clearScenarioRoles(): void {
+    for (const vis of this.visuals.values()) vis.material.uniforms.uHypo.value = 0;
   }
 
   setTemporalState(routeId: EntityId, util: number, congestion: number, status: string): void {

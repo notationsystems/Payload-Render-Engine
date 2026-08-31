@@ -83,14 +83,17 @@ const VERT = /* glsl */ `
   attribute float aState;   // 0 normal, 1 hover, 2 selected
   attribute float aAlpha;   // 0 hidden .. 1 visible (LOD/layer)
   attribute float aHalo;    // economy emphasis pulse
+  attribute float aHypo;    // hypothetical frame: 0 none, 1 perturbed, 2 downstream
   uniform float uDpr;
   varying vec3 vColor;
   varying float vGlyph;
   varying float vState;
   varying float vAlpha;
   varying float vHalo;
+  varying float vHypo;
   void main() {
     vColor = aColor;
+    vHypo = aHypo;
     vGlyph = aGlyph;
     vState = aState;
     vAlpha = aAlpha;
@@ -110,6 +113,7 @@ const FRAG = /* glsl */ `
   varying float vState;
   varying float vAlpha;
   varying float vHalo;
+  varying float vHypo;
 
   float sdf(vec2 p, float g) {
     if (g < 0.5) return length(p) - 0.42;                                   // circle
@@ -148,6 +152,16 @@ const FRAG = /* glsl */ `
       k += exp(-length(p) * 1.4) * 0.8 * breathe;
     }
 
+    // hypothetical frame: dashed violet ring — never a real-state look
+    if (vHypo > 0.5) {
+      float a = atan(p.y, p.x);
+      float dash = step(0.5, fract(a * 1.909859 + uTime * 0.35)); // 12 dashes
+      float ring = smoothstep(0.10, 0.03, abs(length(p) - 0.86)) * dash;
+      vec3 hypo = vec3(0.85, 0.55, 1.0);
+      k += ring * (vHypo > 1.5 ? 0.9 : 1.6);
+      col = mix(col, hypo, vHypo > 1.5 ? 0.35 : 0.6);
+    }
+
     gl_FragColor = vec4(col * k * vAlpha, 1.0);
   }
 `;
@@ -167,6 +181,7 @@ export class NodesLayer {
   private stateAttr: THREE.BufferAttribute;
   private alphaAttr: THREE.BufferAttribute;
   private haloAttr: THREE.BufferAttribute;
+  private hypoAttr: THREE.BufferAttribute;
   private bucketVisible = new Map<string, boolean>();
   private emphasis = { production: false, demand: false, inventory: false };
   private altitude = 2;
@@ -181,6 +196,7 @@ export class NodesLayer {
     const states = new Float32Array(N);
     const alphas = new Float32Array(N);
     const halos = new Float32Array(N);
+    const hypos = new Float32Array(N);
 
     const col = new THREE.Color();
     nodes.forEach((node, i) => {
@@ -211,9 +227,11 @@ export class NodesLayer {
     this.stateAttr = new THREE.BufferAttribute(states, 1);
     this.alphaAttr = new THREE.BufferAttribute(alphas, 1);
     this.haloAttr = new THREE.BufferAttribute(halos, 1);
+    this.hypoAttr = new THREE.BufferAttribute(hypos, 1);
     geo.setAttribute('aState', this.stateAttr);
     geo.setAttribute('aAlpha', this.alphaAttr);
     geo.setAttribute('aHalo', this.haloAttr);
+    geo.setAttribute('aHypo', this.hypoAttr);
 
     const mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
@@ -282,6 +300,19 @@ export class NodesLayer {
       this.haloAttr.setX(e.index, halo);
     }
     this.haloAttr.needsUpdate = true;
+  }
+
+  /** Hypothetical-frame role for a node: 0 none, 1 perturbed, 2 downstream. */
+  setScenarioRole(id: EntityId, role: 0 | 1 | 2): void {
+    const e = this.byId.get(id);
+    if (!e) return;
+    this.hypoAttr.setX(e.index, role);
+    this.hypoAttr.needsUpdate = true;
+  }
+
+  clearScenarioRoles(): void {
+    for (const e of this.entries) this.hypoAttr.setX(e.index, 0);
+    this.hypoAttr.needsUpdate = true;
   }
 
   setState(id: EntityId, state: 0 | 1 | 2): void {

@@ -138,6 +138,31 @@ export function buildToolSurface(api: AppApi): TwinTool[] {
       }),
     },
     {
+      name: 'list_scenarios',
+      description: 'List the counterfactual frame catalog (chokepoint closures).',
+      category: 'query',
+      params: [],
+      safety: SAFE,
+      invoke: () => api.listScenarios(),
+    },
+    {
+      name: 'run_scenario',
+      description:
+        'Enter a HYPOTHETICAL frame: propagate a chokepoint closure through the network. A view-level projection — simulated outcome, not an outcome; nothing canonical changes.',
+      category: 'query',
+      params: [{ name: 'id', type: 'string', description: 'Scenario id from list_scenarios', required: true }],
+      safety: SAFE,
+      invoke: (a) => api.runScenario(String(a.id)),
+    },
+    {
+      name: 'clear_scenario',
+      description: 'Exit the hypothetical frame and return to observed state.',
+      category: 'query',
+      params: [],
+      safety: SAFE,
+      invoke: () => api.clearScenario(),
+    },
+    {
       name: 'follow_the_load',
       description: 'Run the cinematic multimodal demo scenario (Toronto → Chicago).',
       category: 'demo',

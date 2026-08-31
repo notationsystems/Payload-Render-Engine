@@ -6,6 +6,7 @@
  */
 
 import type { EntityId, Facility, Flow, LonLat, Route, TemporalState } from '../data/contracts';
+import type { ScenarioImpact, ScenarioSpec } from '../data/scenario';
 import type { SearchResult, WorldStore } from '../data/store';
 import type { EventBus } from '../core/events';
 import type { SimClock } from '../core/time';
@@ -80,6 +81,8 @@ export interface AppEvents extends Record<string, unknown> {
   preset: { preset: ViewPreset };
   flowMode: { enabled: boolean };
   demo: { active: boolean; step?: number; totalSteps?: number; caption?: string; title?: string };
+  /** A hypothetical frame was entered or exited. */
+  scenario: { active: boolean; impact?: ScenarioImpact };
   toast: { title: string; body?: string; tone?: 'info' | 'warn' | 'alert' };
   status: {
     fps: number;
@@ -149,4 +152,11 @@ export interface AppApi {
   startFollowTheLoad(): void;
   stopFollowTheLoad(): void;
   isDemoActive(): boolean;
+
+  // ---- counterfactual frames (hypothetical — never confused with state)
+  listScenarios(): ScenarioSpec[];
+  /** Enter a hypothetical frame; regime becomes 'scenario' until cleared. */
+  runScenario(id: EntityId): ScenarioImpact | null;
+  clearScenario(): void;
+  getActiveScenario(): ScenarioImpact | null;
 }

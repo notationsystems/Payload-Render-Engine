@@ -1,24 +1,32 @@
 /**
  * SCENARIOS view — temporal frames of the twin.
  *
- * Honest by construction: the frames that exist today are the ones the
- * clock can actually produce (historical reconstruction, current,
- * deterministic forecast). World events are listed as scenario seeds
- * you can jump to and watch propagate through the network state.
- * Hypothetical frames ('what if this load slips') belong to the
- * propagation engine and are explicitly marked as not yet wired —
- * a simulated outcome is not an outcome.
+ * Honest by construction: the frames listed are the ones the clock and
+ * the counterfactual engine can actually produce (historical
+ * reconstruction, current, deterministic forecast, and now computed
+ * HYPOTHETICAL frames). World events are listed as scenario seeds you
+ * can jump to and watch propagate through the network state.
+ * Counterfactual frames run through the propagation engine and are
+ * framed in the hypothetical violet — dashed, striped, labeled
+ * COMPUTED, NOT OBSERVED. A simulated outcome is not an outcome.
  */
 
 import type { AppApi } from '../app/api';
+import type { ScenarioImpact, ScenarioRole } from '../data/scenario';
+import type { EntityId } from '../data/contracts';
+import './scenario.css';
 
 /** Corpus strings are synthetic and trusted, but markup-escape anyway. */
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+const pct = (x: number): string => `${Math.round(x * 100)}%`;
+
+const ROLE_ORDER: Record<ScenarioRole, number> = { perturbed: 0, downstream: 1, spillover: 2 };
+
 export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');
-  el.className = 'os-panel';
+  el.className = 'os-panel sc-panel';
   el.hidden = true;
 
   const header = document.createElement('div');
@@ -41,7 +49,141 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
     <div class="os-frame"><span class="os-frame-dot" data-r="historical"></span>RECONSTRUCTION<span class="os-frame-note">what happened — scrub left of NOW</span></div>
     <div class="os-frame"><span class="os-frame-dot" data-r="current"></span>CURRENT<span class="os-frame-note">the mirror at the knowledge boundary</span></div>
     <div class="os-frame"><span class="os-frame-dot" data-r="forecast"></span>FORECAST<span class="os-frame-note">deterministic projection — scrub right of NOW</span></div>
-    <div class="os-frame off"><span class="os-frame-dot" data-r="scenario"></span>HYPOTHETICAL<span class="os-frame-note">propagation engine + re-optimization — not yet wired; reserved as regime 'scenario'</span></div>`;
+    <div class="os-frame"><span class="os-frame-dot" data-r="scenario"></span><span class="sc-frame-live">HYPOTHETICAL</span><span class="os-frame-note">enter a frame below — rendered as a violet dashed overlay, never as state</span></div>`;
+
+  // ---- counterfactual frames: catalog + impact readout --------------------
+
+  const cfTitle = document.createElement('div');
+  cfTitle.className = 'os-card-title sc-title';
+  cfTitle.textContent = 'COUNTERFACTUAL FRAMES — COMPUTED, NOT OBSERVED';
+
+  const catalog = document.createElement('div');
+  catalog.className = 'sc-catalog';
+
+  const impactBox = document.createElement('div');
+  impactBox.className = 'sc-impact sc-hidden-guard';
+  impactBox.hidden = true;
+
+  const renderCatalog = (activeId: EntityId | null): void => {
+    catalog.innerHTML = '';
+    for (const spec of api.listScenarios()) {
+      if (activeId !== null && spec.id !== activeId) continue;
+      const row = document.createElement('div');
+      row.className = 'sc-spec';
+      row.innerHTML = `
+        <div class="sc-spec-main">
+          <div class="sc-spec-name">${esc(spec.name)}</div>
+          <div class="sc-spec-desc">${esc(spec.description)}</div>
+        </div>`;
+      if (activeId === null) {
+        const run = document.createElement('button');
+        run.className = 'sc-run';
+        run.type = 'button';
+        run.textContent = 'RUN FRAME';
+        run.addEventListener('click', () => api.runScenario(spec.id));
+        row.appendChild(run);
+      } else {
+        const active = document.createElement('span');
+        active.className = 'sc-active-chip';
+        active.textContent = 'FRAME ACTIVE';
+        row.appendChild(active);
+      }
+      catalog.appendChild(row);
+    }
+  };
+
+  const renderImpact = (impact: ScenarioImpact | null): void => {
+    if (!impact) {
+      impactBox.hidden = true;
+      impactBox.innerHTML = '';
+      renderCatalog(null);
+      return;
+    }
+    renderCatalog(impact.spec.id);
+    impactBox.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'sc-impact-title';
+    title.textContent = 'IMPACT — HYPOTHETICAL FRAME';
+
+    const s = impact.summary;
+    const kpis = document.createElement('div');
+    kpis.className = 'sc-kpis';
+    const pairs: [string, string][] = [
+      ['BLOCKED LANES', String(s.perturbedRoutes)],
+      ['DOWNSTREAM FACILITIES', String(s.downstreamFacilities)],
+      ['SPILLOVER LANES', String(s.spilloverRoutes)],
+      ['FLOWS QUEUED', String(s.flowsDelayed)],
+      ['TOTAL DELAY', `+${s.totalDelayHours}h`],
+    ];
+    kpis.innerHTML = pairs
+      .map(
+        ([label, value]) => `
+        <div>
+          <div class="sc-kpi-label">${esc(label)}</div>
+          <div class="sc-kpi-value">${esc(value)}</div>
+        </div>`
+      )
+      .join('');
+
+    impactBox.append(title, kpis);
+
+    if (impact.delayedFlows.length) {
+      const sub = document.createElement('div');
+      sub.className = 'sc-sub';
+      sub.textContent = 'QUEUED FLOWS';
+      impactBox.appendChild(sub);
+      for (const df of impact.delayedFlows) {
+        const flow = api.store.flow(df.flowId);
+        const row = document.createElement('div');
+        row.className = 'sc-flow';
+        row.innerHTML = `
+          <span class="sc-flow-name">${esc(flow?.name ?? df.flowId)}</span>
+          <span class="sc-flow-note">${esc(df.note)}</span>
+          <span class="sc-flow-delay">+${df.delayHours} H</span>`;
+        row.addEventListener('click', () => api.focus(df.flowId));
+        impactBox.appendChild(row);
+      }
+    }
+
+    const deltas = [...impact.deltas].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role]);
+    if (deltas.length) {
+      const sub = document.createElement('div');
+      sub.className = 'sc-sub';
+      sub.textContent = `STATE DELTAS — ${Math.min(10, deltas.length)} OF ${deltas.length}`;
+      impactBox.appendChild(sub);
+      for (const d of deltas.slice(0, 10)) {
+        const entity = api.store.entity(d.entityId);
+        const row = document.createElement('div');
+        row.className = 'sc-delta';
+        row.title = d.note;
+        row.innerHTML = `
+          <span class="sc-role" data-role="${d.role}">${d.role.toUpperCase()}</span>
+          <span class="sc-delta-name">${esc(entity?.name ?? d.entityId)}</span>
+          <span class="sc-delta-note">${esc(d.note)}</span>
+          <span class="sc-delta-util">UTIL ${pct(d.baseline.utilization)} → ${pct(d.scenario.utilization)}</span>`;
+        row.addEventListener('click', () => api.focus(d.entityId));
+        impactBox.appendChild(row);
+      }
+    }
+
+    const foot = document.createElement('div');
+    foot.className = 'sc-impact-foot';
+    const standing = document.createElement('span');
+    standing.className = 'sc-impact-standing';
+    standing.textContent = 'simulated outcome — not an outcome';
+    const exit = document.createElement('button');
+    exit.className = 'sc-exit';
+    exit.type = 'button';
+    exit.textContent = 'EXIT FRAME';
+    exit.addEventListener('click', () => api.clearScenario());
+    foot.append(standing, exit);
+    impactBox.appendChild(foot);
+
+    impactBox.hidden = false;
+  };
+
+  // ---- event seeds --------------------------------------------------------
 
   const listTitle = document.createElement('div');
   listTitle.className = 'os-card-title';
@@ -90,11 +232,15 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
     list.appendChild(row);
   }
 
-  el.append(header, frames, listTitle, list);
+  el.append(header, frames, cfTitle, catalog, impactBox, listTitle, list);
 
   api.events.on('preset', ({ preset }) => {
     el.hidden = preset !== 'scenarios';
   });
+  api.events.on('scenario', ({ active, impact }) => {
+    renderImpact(active && impact ? impact : null);
+  });
+  renderImpact(api.getActiveScenario());
 
   return { el };
 }

@@ -52,7 +52,16 @@ export class SimClock {
     return this._speed;
   }
 
+  /** When set, the twin is projecting a hypothetical frame. */
+  private scenarioId: string | null = null;
+
+  setScenario(id: string | null): void {
+    this.scenarioId = id;
+    this.emitChange();
+  }
+
   get regime(): TemporalRegime {
+    if (this.scenarioId) return 'scenario';
     const d = this.simMs - this.nowMs;
     if (Math.abs(d) < 30 * 60 * 1000) return 'current';
     return d < 0 ? 'historical' : 'forecast';
@@ -63,6 +72,7 @@ export class SimClock {
       t: this.simTime,
       regime: this.regime,
       referenceNow: new Date(this.nowMs).toISOString(),
+      scenarioId: this.scenarioId ?? undefined,
     };
   }
 

@@ -237,7 +237,10 @@ snapshot's `timeRange { start, end, now }`.
 
 - **Regime**: `TemporalRegime` is derived from sim time vs the dataset's
   `now` — within ±30 minutes is `'current'`, before is `'historical'`, after
-  is `'forecast'` (`'scenario'` is reserved for future scenario branches).
+  is `'forecast'`. `'scenario'` overrides all three: while
+  `SimClock.setScenario(id)` holds a scenario id, the clock reports the
+  `'scenario'` regime and carries `scenarioId` in every `TemporalState`
+  event (see §13).
 - **Playback**: `tick(dtSeconds)` advances sim time at `speed` sim-seconds
   per wall-second (default 3600 = 1h/s; the `speed 6h` command sets 21600),
   clamping and pausing at the range end. `setFraction` scrubs; `jumpToNow`
@@ -283,8 +286,8 @@ vehicle-control (BADOSE) engines compute *what would happen* at the wrong
 grain; the twin renders *what is happening* as observed state. The one
 place simulation belongs is the counterfactual branch — propagation +
 re-optimization over twin state, rendered as an explicitly marked
-hypothetical frame (`TemporalRegime: 'scenario'` is reserved for exactly
-this). A simulated outcome is not an outcome.
+hypothetical frame (`TemporalRegime: 'scenario'` exists for exactly this,
+and is now wired — see §13). A simulated outcome is not an outcome.
 
 ## 10. Disciplines carried from the Terminal
 
@@ -362,3 +365,73 @@ an explicit allowlist of real waterways below the data's resolution
 "A lane over land is not where the ship goes" is a build gate, not a
 review comment: the reviewer sweep that first caught these defects has
 been turned into the check that prevents their return.
+
+## 13. The counterfactual layer (wired)
+
+`src/data/scenario.ts` is the one simulator the state mirror allows itself
+(§9), and it lives entirely inside the seam: pure, deterministic, no
+mutation, no persistence.
+
+**The engine.** `computeScenarioImpact(snapshot, stateAt, spec, t)` is a
+pure function from `(WorldSnapshot, resolver, ScenarioSpec, Timestamp)` to
+a `ScenarioImpact`. It never touches the snapshot and stores nothing back;
+running the same spec at the same sim time yields the same frame. A
+`ScenarioSpec` is a named set of `ScenarioPerturbation`s (a route or node
+id, `'closure' | 'congestion'`, magnitude 0..1) with a duration;
+`buildScenarioCatalog(snapshot)` derives one 72-hour closure spec per
+chokepoint / border crossing that any route actually passes.
+
+**Three named propagation mechanisms**, each attaching a human-readable
+`note` explaining why the entity changed — explainable over clever:
+
+1. **Closure** — the perturbed node and every lane through it: closure
+   drops route utilization to near zero (traffic stops; the queue builds
+   off-lane), pins congestion at 1, and sets status `'disrupted'`;
+   congestion-kind perturbations add pressure and degrade instead.
+2. **Starvation via flow chains** — every `Flow` whose segment chain
+   crosses a perturbed route queues (a `DelayedFlow` with `delayHours`
+   scaled by the closure window and magnitude), and every facility
+   downstream of the block on that chain starves: utilization down,
+   status degraded.
+3. **Corridor spillover** — unperturbed routes sharing a `corridorId`
+   with a blocked lane absorb diverted pressure: utilization and
+   congestion up, degrading when congestion crosses threshold.
+
+When one entity is reached by several mechanisms, the stronger role wins
+(`perturbed` > `downstream` > `spillover`).
+
+**Chokepoint resolution.** `routesThroughPoint(routes, point, radiusKm)`
+resolves a point perturbation to concrete lanes by great-circle proximity:
+any route whose polyline passes within the radius (default 150 km) of the
+node is a lane through it. This is how "close the Suez" becomes a set of
+specific `Route` records rather than a region annotation.
+
+**The frame contract.** A `ScenarioImpact` is the complete hypothetical
+frame: the `spec`, the sim time it was `computedAt`, per-entity
+`ScenarioEntityDelta`s (role + full `baseline` and `scenario` state — the
+observed values are carried alongside the perturbed ones, never replaced),
+the sorted `delayedFlows`, and a summary block (perturbed routes,
+downstream facilities, spillover routes, flows delayed, total delay
+hours).
+
+**Regime and provenance.** Entering a frame goes through
+`AppApi.runScenario(id)`; the clock is told via `SimClock.setScenario(id)`
+and reports `TemporalRegime: 'scenario'` until `clearScenario()` — the
+same regime channel the timeline and status bar already subscribe to, so
+the whole instrument knows it is projecting a hypothesis. Every scenario
+record carries `provenance.source: 'synthetic:scenario'`, so "is this
+real?" stays a query (§3): a scenario delta answers differently from an
+observed record by the same field on the same shape.
+
+**The standing render rule.** A hypothetical frame draws in a distinct
+violet dashed treatment — the `#d98cff`-family accent and dashed/striped
+edges are reserved for scenario framing and used nowhere else — under a
+persistent banner while the frame is active. Observed state never renders
+violet; scenario state never renders in the solid look of real state. A
+simulated outcome is not an outcome, and the pixels say so as loudly as
+the provenance field does.
+
+This deterministic engine is a stand-in with the seam already in place:
+Payload's real propagation engine + VROOM re-optimization will produce
+`ScenarioImpact` frames through the identical contract, and nothing above
+the data layer changes when they do.

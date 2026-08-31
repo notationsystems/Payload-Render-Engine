@@ -17,6 +17,14 @@ exposes every entity's promises, evidence, and deviations; and a single command
 bar drives the whole instrument. It is built as a strict projection of Payload
 state: the renderer draws the world, it never owns it.
 
+It can also ask "what if": a deterministic counterfactual engine closes a
+chokepoint and propagates the consequence — blocked lanes, starved downstream
+facilities, corridor spillover, delayed flows — as an explicitly hypothetical
+frame. Scenario frames carry `provenance.source: 'synthetic:scenario'`, render
+in a distinct violet dashed treatment under a persistent banner, and switch the
+clock to the `'scenario'` regime until cleared. They are never drawn in the
+solid look of observed state: a simulated outcome is not an outcome.
+
 ---
 
 > ## DATA DISCLAIMER
@@ -84,9 +92,16 @@ Main verbs:
 | `play` / `pause` / `now` | Simulation clock control; `now` jumps to the dataset's regime boundary. |
 | `speed 1h` / `speed 6h` / `speed 24h` | Sim-hours per wall-second. |
 | `compare <a> vs <b>` | Compare two routes: distance, promised duration, live utilization. |
-| `world` / `freight` / `trade` / `commodities` / `network` / `exceptions` | View presets. |
+| `world` / `freight` / `trade` / `commodities` / `network` / `intelligence` | View presets (`exceptions` remains a legacy alias for `intelligence`). |
+| `agents` / `scenarios` | Panel views: no layer change, they open an instrument panel (the AGENTS and SCENARIOS tabs). |
 | `follow the load` | Cinematic multimodal demo scenario; `stop` / `exit` ends it. |
 | `help` | Print the verb summary. |
+
+Counterfactuals run from the SCENARIOS panel (`scenarios`): pick a chokepoint
+closure from the catalog and RUN FRAME to enter the hypothetical frame — the
+regime becomes `'scenario'`, the impact renders in the violet dashed scenario
+treatment with a persistent banner, and clearing the frame returns to observed
+state.
 
 ## Architecture
 

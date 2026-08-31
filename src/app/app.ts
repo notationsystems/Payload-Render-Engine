@@ -16,6 +16,13 @@ import type {
 } from '../data/contracts';
 import { WorldStore, type SearchResult } from '../data/store';
 import { sourceRegistry } from '../data/sources';
+import {
+  buildScenarioCatalog,
+  computeScenarioImpact,
+  type ScenarioEntityDelta,
+  type ScenarioImpact,
+  type ScenarioSpec,
+} from '../data/scenario';
 import { EventBus } from '../core/events';
 import { SimClock } from '../core/time';
 import { Engine } from '../core/engine';
@@ -79,6 +86,9 @@ export class App implements AppApi {
   private countryOutline: THREE.Object3D | null = null;
   private activeEventIds = new Set<EntityId>();
   private anomaliesSig = '';
+  private scenarioCatalog: ScenarioSpec[] = [];
+  private activeScenario: ScenarioImpact | null = null;
+  private scenarioDeltaIx = new Map<EntityId, ScenarioEntityDelta>();
   private lastTemporalRefresh = 0;
   private lastSimMs = 0;
 
@@ -96,6 +106,7 @@ export class App implements AppApi {
     const source = sourceRegistry.get('synthetic-demo');
     if (!source?.makeProvider) throw new Error('no implemented data source registered');
     const snapshot = await this.store.init(source.makeProvider());
+    this.scenarioCatalog = buildScenarioCatalog(snapshot);
 
     progress(24, 'LOADING WORLD TOPOLOGY');
     const [countries, textures] = await Promise.all([
@@ -395,6 +406,18 @@ export class App implements AppApi {
   private refreshTemporalStates(initial: boolean): void {
     const t = this.clock.simTime;
     for (const route of this.store.snapshot.routes) {
+      // in a hypothetical frame, affected routes hold the frame's computed
+      // values (pinned at entry time) instead of live provider state
+      const delta = this.scenarioDeltaIx.get(route.id);
+      if (delta) {
+        this.routesLayer.setTemporalState(
+          route.id,
+          delta.scenario.utilization,
+          delta.scenario.congestion,
+          delta.scenario.status
+        );
+        continue;
+      }
       const s = this.store.stateAt(route.id, t);
       this.routesLayer.setTemporalState(route.id, s.utilization, s.congestion, s.status);
     }
@@ -740,6 +763,61 @@ export class App implements AppApi {
 
   startFollowTheLoad(): void {
     void this.demo.start();
+  }
+
+  // ------------------------------------------------- counterfactual frames
+
+  listScenarios(): ScenarioSpec[] {
+    return this.scenarioCatalog;
+  }
+
+  runScenario(id: EntityId): ScenarioImpact | null {
+    const spec = this.scenarioCatalog.find((sp) => sp.id === id);
+    if (!spec) return null;
+    if (this.activeScenario) this.clearScenario();
+
+    const impact = computeScenarioImpact(
+      this.store.snapshot,
+      (eid, t) => this.store.stateAt(eid, t),
+      spec,
+      this.clock.simTime
+    );
+    this.activeScenario = impact;
+    this.scenarioDeltaIx = new Map(impact.deltas.map((d) => [d.entityId, d]));
+
+    // renderer: violet dashed hypothetical treatment
+    for (const d of impact.deltas) {
+      if (this.store.route(d.entityId)) {
+        this.routesLayer.setScenarioRole(d.entityId, d.role === 'perturbed' ? 1 : 2);
+      } else if (this.store.node(d.entityId)) {
+        this.nodesLayer.setScenarioRole(d.entityId, d.role === 'perturbed' ? 1 : 2);
+      }
+    }
+    this.clock.setScenario(spec.id); // regime → 'scenario'; time event fans out
+    this.refreshTemporalStates(true);
+    this.events.emit('scenario', { active: true, impact });
+    this.events.emit('toast', {
+      title: 'HYPOTHETICAL FRAME ENTERED',
+      body: `${spec.name} — simulated outcome, not an outcome.`,
+      tone: 'warn',
+    });
+    return impact;
+  }
+
+  clearScenario(): void {
+    if (!this.activeScenario) return;
+    this.activeScenario = null;
+    this.scenarioDeltaIx = new Map();
+    this.routesLayer.clearScenarioRoles();
+    this.nodesLayer.clearScenarioRoles();
+    this.clock.setScenario(null);
+    this.refreshTemporalStates(true);
+    this.events.emit('scenario', { active: false });
+    this.events.emit('toast', { title: 'FRAME EXITED', body: 'Back to the mirror.', tone: 'info' });
+  }
+
+  getActiveScenario(): ScenarioImpact | null {
+    return this.activeScenario;
   }
 
   stopFollowTheLoad(): void {

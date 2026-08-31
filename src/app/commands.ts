@@ -135,6 +135,8 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'flows off', label: 'flows off', hint: 'FLOWS' },
   { text: 'follow the load', label: 'follow the load', hint: 'DEMO' },
   { text: 'stop demo', label: 'stop demo', hint: 'DEMO' },
+  { text: 'what if ', label: 'what if <chokepoint> closes', hint: 'FRAME' },
+  { text: 'exit frame', label: 'exit frame', hint: 'FRAME' },
   { text: 'compare ', label: 'compare <a> vs <b>', hint: 'ROUTES' },
   { text: 'play', label: 'play', hint: 'TIME' },
   { text: 'pause', label: 'pause', hint: 'TIME' },
@@ -308,6 +310,29 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'stop demo' || lower === 'exit' || lower === 'stop') {
     api.stopFollowTheLoad();
     return ok('DEMO STOPPED');
+  }
+
+  // -- 4b. counterfactual frames
+  if (
+    lower === 'exit frame' ||
+    lower === 'clear frame' ||
+    lower === 'clear scenario' ||
+    lower === 'exit scenario'
+  ) {
+    if (!api.getActiveScenario()) return ok('NO ACTIVE FRAME');
+    api.clearScenario();
+    return ok('FRAME EXITED — BACK TO THE MIRROR');
+  }
+  const frameMatch = /^(?:scenario|run frame|what if)\s+(.+)$/.exec(lower);
+  if (frameMatch) {
+    const q = frameMatch[1].replace(/\b(closes?|closure|closed|shuts?( down)?)\b/g, ' ').trim();
+    const spec = api
+      .listScenarios()
+      .find((sp) => sp.name.toLowerCase().includes(q) || sp.id.toLowerCase().includes(q));
+    if (!spec) return err(`NO FRAME MATCHES "${q.toUpperCase()}"`);
+    api.runScenario(spec.id);
+    api.setPreset('scenarios');
+    return ok(`HYPOTHETICAL FRAME · ${spec.name.toUpperCase()}`);
   }
 
   // -- 5. bare preset word ('exceptions' remains a legacy alias)

@@ -1,0 +1,344 @@
+/* ---------------------------------------------------------------------
+   HYPOTHETICAL-frame chrome — scenario banner + scenarios-panel
+   counterfactual additions.
+
+   The violet #d98cff family is the visual identity of hypothetical
+   framing and NOTHING else: dashed borders, diagonal-stripe fills —
+   never the solid look of observed/current state. The token lives on
+   the frame roots below; :root is untouched.
+   --------------------------------------------------------------------- */
+
+.sc-banner,
+.sc-panel,
+[data-regime='scenario'] {
+  --sc-hypo: #d98cff;
+  --sc-hypo-soft: rgba(217, 140, 255, 0.14);
+  --sc-hypo-stripe: rgba(217, 140, 255, 0.06);
+}
+
+/* hidden guard — author display values must never beat the hidden
+   attribute (mirrors the os.css guard for .os-* roots) */
+.sc-hidden-guard[hidden],
+.sc-banner[hidden],
+.sc-impact[hidden] {
+  display: none !important;
+}
+
+/* ------------------------------------------------ regime chips (timeline
+   + command-bar top clock) while a hypothetical frame is active */
+
+[data-regime='scenario'],
+.pe-cb-time-regime[data-regime='scenario'],
+.pi-tl-regime[data-regime='scenario'] {
+  color: var(--sc-hypo);
+  border-color: var(--sc-hypo);
+  border-style: dashed;
+}
+
+/* ---------------------------------------------------------- the banner */
+
+.sc-banner {
+  position: fixed;
+  top: 92px; /* directly under the command-bar tab strip */
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 460px));
+  z-index: 25;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      var(--sc-hypo-stripe) 0 6px,
+      transparent 6px 14px
+    ),
+    var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 2px dashed var(--sc-hypo);
+  border-radius: var(--radius);
+}
+
+.sc-chip {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sc-hypo);
+  border: 1px dashed var(--sc-hypo);
+  border-radius: var(--radius);
+  padding: 2px 7px;
+  white-space: nowrap;
+  background: var(--sc-hypo-soft);
+}
+
+.sc-banner-name {
+  flex: none;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.sc-banner-standing {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-banner-summary {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--sc-hypo);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sc-exit {
+  flex: none;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--sc-hypo);
+  border: 1px solid var(--sc-hypo);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.sc-exit:hover {
+  background: var(--sc-hypo-soft);
+}
+
+/* -------------------------------------- scenarios-panel: frames legend
+   (the HYPOTHETICAL row is live now — violet dashed, never solid) */
+
+.sc-panel .os-frame-dot[data-r='scenario'] {
+  background: transparent;
+  border: 1px dashed var(--sc-hypo);
+}
+.sc-panel .os-frame .sc-frame-live {
+  color: var(--sc-hypo);
+}
+
+/* ------------------------------- scenarios-panel: counterfactual frames */
+
+.sc-title {
+  color: var(--sc-hypo);
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.sc-catalog {
+  margin-bottom: 12px;
+}
+
+.sc-spec {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px dashed var(--line);
+}
+.sc-spec:first-child {
+  border-top: none;
+}
+.sc-spec-main {
+  flex: 1;
+  min-width: 0;
+}
+.sc-spec-name {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-hi);
+}
+.sc-spec-desc {
+  font-size: 11px;
+  color: var(--text-mid);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+.sc-run {
+  flex: none;
+  align-self: center;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--sc-hypo);
+  border: 1px solid var(--sc-hypo);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.sc-run:hover {
+  background: var(--sc-hypo-soft);
+}
+.sc-active-chip {
+  flex: none;
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--sc-hypo);
+  border: 1px dashed var(--sc-hypo);
+  border-radius: var(--radius);
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+/* -------------------------------------- scenarios-panel: impact readout */
+
+.sc-impact {
+  border: 2px dashed var(--sc-hypo);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--sc-hypo-stripe) 0 6px,
+    transparent 6px 14px
+  );
+}
+.sc-impact-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  color: var(--sc-hypo);
+  margin-bottom: 8px;
+}
+
+.sc-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px 14px;
+  margin-bottom: 6px;
+}
+.sc-kpi-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+.sc-kpi-value {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--sc-hypo);
+  font-variant-numeric: tabular-nums;
+}
+
+.sc-sub {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  color: var(--text-dim);
+  margin: 10px 0 4px;
+}
+
+.sc-flow,
+.sc-delta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-top: 1px dashed var(--line);
+  cursor: pointer;
+}
+.sc-flow:hover .sc-flow-name,
+.sc-delta:hover .sc-delta-name {
+  color: var(--sc-hypo);
+}
+.sc-flow-name,
+.sc-delta-name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--text-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-flow-note,
+.sc-delta-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-flow-delay {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--sc-hypo);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sc-delta-util {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sc-role {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  padding: 1px 5px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.sc-role[data-role='perturbed'] {
+  color: var(--sc-hypo);
+  border-color: var(--sc-hypo);
+}
+.sc-role[data-role='downstream'] {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.sc-role[data-role='spillover'] {
+  color: var(--text-mid);
+}
+
+.sc-impact-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--line);
+}
+.sc-impact-standing {
+  font-size: 10px;
+  color: var(--text-dim);
+}
