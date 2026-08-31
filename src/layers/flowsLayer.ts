@@ -32,6 +32,8 @@ const VERT = /* glsl */ `
   uniform float uDpr;
   out vec3 vColor;
   out float vBoost;
+  out float vAngle;  // screen-space heading (radians, +y up)
+  out float vShape;  // 0 = round dot, 1 = heading dart
 
   void main() {
     float t = fract(aPhase + uTime * aSpeed);
@@ -44,6 +46,13 @@ const VERT = /* glsl */ `
     vec3 p1 = texelFetch(uPos, ivec2(x1, row), 0).xyz;
     vec3 p = mix(p0, p1, f);
 
+    // world-stable heading: central-difference direction along the route,
+    // flipped for reverse traversal
+    int xa = max(x0 - 2, 0);
+    int xb = min(x0 + 2, ${SAMPLES - 1});
+    vec3 dirW = (texelFetch(uPos, ivec2(xb, row), 0).xyz -
+                 texelFetch(uPos, ivec2(xa, row), 0).xyz) * sign(aSpeed);
+
     float boost = 1.0;
     if (uSelectedFlow >= 0.0) {
       boost = abs(aFlow - uSelectedFlow) < 0.5 ? 2.4 : 0.25;
@@ -52,8 +61,22 @@ const VERT = /* glsl */ `
     vColor = aColor;
 
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
-    gl_PointSize = clamp(aSize * 9.0 / -mv.z, 1.5, 10.0) * uDpr * (boost > 1.5 ? 1.5 : 1.0);
-    gl_Position = projectionMatrix * mv;
+    vec4 clip0 = projectionMatrix * mv;
+    // project the heading into screen space each frame: a second point a
+    // hair down-route, through the same transform
+    vec4 clip1 = projectionMatrix * modelViewMatrix * vec4(p + normalize(dirW) * 0.01, 1.0);
+    vec2 sd = clip1.xy / clip1.w - clip0.xy / clip0.w;
+    float aspect = projectionMatrix[1][1] / projectionMatrix[0][0];
+    vec2 dirPx = vec2(sd.x * aspect, sd.y);
+
+    float px = clamp(aSize * 11.0 / -mv.z, 2.0, 13.0) * (boost > 1.5 ? 1.5 : 1.0);
+    gl_PointSize = px * uDpr;
+    // hold the dot when direction degenerates (limb-parallel motion) or
+    // the sprite is too small for a dart to read
+    float dirOk = step(1e-7, length(dirPx));
+    vAngle = atan(dirPx.y, dirPx.x + (1.0 - dirOk));
+    vShape = dirOk * smoothstep(4.5, 7.0, px);
+    gl_Position = clip0;
   }
 `;
 
@@ -61,12 +84,28 @@ const FRAG = /* glsl */ `
   precision highp float;
   in vec3 vColor;
   in float vBoost;
+  in float vAngle;
+  in float vShape;
   out vec4 fragColor;
   void main() {
     vec2 p = gl_PointCoord * 2.0 - 1.0;
     float r = length(p);
     if (r > 1.0) discard;
-    float k = exp(-r * 3.0) * 1.6 * vBoost;
+
+    // round dot (fallback + small sizes)
+    float dot_ = exp(-r * 3.0) * 1.6;
+
+    // heading dart: rotate into route frame (+x = direction of travel;
+    // gl_PointCoord has +y down, screen angle has +y up)
+    float c = cos(vAngle), s = sin(vAngle);
+    vec2 q = mat2(c, -s, s, c) * vec2(p.x, -p.y);
+    float hw = (0.72 - q.x) * 0.34;                     // taper to the tip
+    float inX = step(-0.92, q.x) * step(q.x, 0.72);
+    float body = smoothstep(0.10, -0.08, abs(q.y) - hw) * inX;
+    float notch = smoothstep(-0.10, 0.14, q.x + 0.92 - abs(q.y) * 0.9); // swallow tail
+    float dart = body * notch * 1.5 + exp(-length(q - vec2(0.35, 0.0)) * 2.6) * 0.6;
+
+    float k = mix(dot_, dart, vShape) * vBoost;
     fragColor = vec4(vColor * k, 1.0);
   }
 `;

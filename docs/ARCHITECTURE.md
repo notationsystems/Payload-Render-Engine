@@ -314,3 +314,39 @@ renderer from the first record:
 - **Cluster placement** (future, at corpus scale): centroids on the sphere
   via vector mean at minimum (correct across the antimeridian, unlike
   lon/lat averaging), geodesic median where outlier robustness matters.
+
+## 11. Ingestion disciplines (adapted from gods-eye-view, MIT)
+
+Patterns lifted from `notationsystems/gods-eye-view` — a live public-feed
+globe whose disciplines map cleanly onto the twin's seam:
+
+- **Source registry** (`src/data/sources.ts`): every data source is a
+  self-describing entry — what it feeds, the `provenance.source` class its
+  records carry, keyless-or-not, metered-or-not, freshness, licensing
+  caveats. The synthetic corpus is the one implemented entry; the free-feed
+  recon (AISStream, NASA FIRMS, OpenSky/adsb.lol, USGS, CelesTrak, GBFS)
+  is captured as queryable data, caveats included (OpenSky is
+  non-commercial; AISStream is free-beta with no formal ToS).
+- **Budget-governed proxies**: a metered source (Google tiles, TomTom,
+  commercial AIS, LLM calls) is never called from the client. It sits
+  behind a server proxy with allowlisted destinations, per-IP throttles,
+  disk-cached responses with short TTLs, response-size caps, sanitized
+  errors, and a per-provider daily credit governor (their TomTom proxy —
+  120 s cache + a configurable daily tile budget — is the reference
+  implementation). The `metered` flag in the registry marks which sources
+  must take this path.
+- **Interpolation-behind-realtime**: when live telemetry lands, the twin
+  renders one polling interval behind real time and interpolates between
+  known fixes, dead-reckoning the gaps — markers glide instead of jumping
+  each poll. This is the production form of the last-known + ghost
+  discipline in §10: the interpolated position is presentation, the fixes
+  are evidence, and the gap between them stays visible.
+- **World-stable heading projection**: direction-carrying markers rotate
+  by their bearing projected into screen space each frame, with a safe
+  fallback when the projected direction degenerates. In this renderer the
+  whole pass runs in the flow layer's vertex shader (two route-texture
+  samples → clip-space projection → screen bearing → rotated dart SDF;
+  round-dot fallback below legibility size or at degenerate angles).
+- **SGP4 + GMST orbit propagation** (deferred): only relevant if the
+  maritime layer ever tracks vessels via satellite AIS; CelesTrak TLEs +
+  SGP4 with GMST-locked rings is the correct implementation to adapt.

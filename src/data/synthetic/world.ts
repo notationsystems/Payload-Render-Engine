@@ -2159,6 +2159,28 @@ export function buildWorldSnapshot(): WorldSnapshot {
   }
 
   const flows = buildFlows(routesById);
+
+  // Wire supply dependencies from the flow chains: a flow's destination
+  // depends on its origin (supplier), the origin serves the destination
+  // (customer), and intermediate chain nodes join both directions. This
+  // is what the DEPENDENCIES intel layer and the NETWORK preset render.
+  const link = (arr: string[] | undefined, id: string): string[] => {
+    if (!arr) return [id];
+    if (!arr.includes(id)) arr.push(id);
+    return arr;
+  };
+  for (const f of flows) {
+    const chain: string[] = [f.segments[0]?.fromNodeId, ...f.segments.map((s) => s.toNodeId)].filter(
+      Boolean
+    );
+    for (let i = 0; i < chain.length; i++) {
+      const n = nodesById.get(chain[i]);
+      if (!n) continue;
+      if (i > 0) n.connectedSupplierIds = link(n.connectedSupplierIds, chain[i - 1]);
+      if (i < chain.length - 1) n.connectedCustomerIds = link(n.connectedCustomerIds, chain[i + 1]);
+    }
+  }
+
   const constraints = buildConstraints();
   const { assertions, observations } = buildAssertionsAndObservations(routesById);
   const cityLights = buildCityLights();

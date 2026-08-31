@@ -119,7 +119,7 @@ const STARTERS: Suggestion[] = [
   { text: 'Show bottlenecks', label: 'Show bottlenecks', hint: 'INTEL' },
   { text: 'Follow the load', label: 'Follow the load', hint: 'DEMO' },
   { text: 'Show copper flows', label: 'Show copper flows', hint: 'FLOWS' },
-  { text: 'Compare routes', label: 'Compare <a> vs <b>', hint: 'ROUTES' },
+  { text: 'compare ', label: 'Compare <a> vs <b>', hint: 'ROUTES' },
   { text: 'Exceptions', label: 'Exceptions preset', hint: 'PRESET' },
 ];
 

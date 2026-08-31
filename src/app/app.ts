@@ -15,7 +15,7 @@ import type {
   TemporalState,
 } from '../data/contracts';
 import { WorldStore, type SearchResult } from '../data/store';
-import { SyntheticProvider } from '../data/synthetic/provider';
+import { sourceRegistry } from '../data/sources';
 import { EventBus } from '../core/events';
 import { SimClock } from '../core/time';
 import { Engine } from '../core/engine';
@@ -92,7 +92,9 @@ export class App implements AppApi {
     };
 
     progress(8, 'LOADING SYNTHETIC CORPUS');
-    const snapshot = await this.store.init(new SyntheticProvider());
+    const source = sourceRegistry.get('synthetic-demo');
+    if (!source?.makeProvider) throw new Error('no implemented data source registered');
+    const snapshot = await this.store.init(source.makeProvider());
 
     progress(24, 'LOADING WORLD TOPOLOGY');
     const [countries, textures] = await Promise.all([
@@ -577,6 +579,10 @@ export class App implements AppApi {
   }
 
   focus(id: EntityId): void {
+    if (id.startsWith('country:')) {
+      this.selectCountry(id.slice('country:'.length));
+      return;
+    }
     const node = this.store.node(id);
     if (node) {
       this.select(id, 'search');
@@ -643,7 +649,29 @@ export class App implements AppApi {
   }
 
   search(q: string): SearchResult[] {
-    return this.store.search(q);
+    // countries are first-class selectable objects, so they are
+    // first-class findable objects too — merged with corpus results
+    const results = this.store.search(q);
+    const ql = q.trim().toLowerCase();
+    if (ql.length >= 2) {
+      for (const c of this.countries.countries) {
+        const name = c.name.toLowerCase();
+        let score = 0;
+        if (name === ql) score = 95;
+        else if (name.startsWith(ql)) score = 70;
+        else if (name.includes(ql)) score = 45;
+        if (score) {
+          results.push({
+            id: `country:${this.countryCode(c)}`,
+            name: c.name,
+            kind: 'country',
+            score,
+            detail: c.iso2 ?? '',
+          });
+        }
+      }
+    }
+    return results.sort((a, b) => b.score - a.score).slice(0, 8);
   }
 
   startFollowTheLoad(): void {

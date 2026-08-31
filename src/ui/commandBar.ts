@@ -127,6 +127,16 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
 
   const chooseSuggestion = (s: Suggestion): void => {
     input.value = s.text;
+    // template suggestions ('find <name>', trailing-space verbs) complete
+    // the input and re-suggest instead of executing an incomplete command
+    const isTemplate = s.text.endsWith(' ') || s.label.includes('<');
+    if (isTemplate) {
+      input.focus();
+      suggestions = api.suggest(s.text);
+      activeIx = -1;
+      renderDropdown();
+      return;
+    }
     closeDropdown();
     runCommand(s.text);
   };
