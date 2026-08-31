@@ -254,16 +254,34 @@ export function computeScenarioImpact(
     }
   }
 
-  // ---- 3. spillover: corridor siblings absorb diverted pressure -----------
+  // ---- 3. spillover: diverted traffic loads the alternatives --------------
+  // Two explainable mechanisms: (a) corridor siblings that are not
+  // themselves blocked; (b) same-mode lanes sharing an endpoint with a
+  // blocked lane — when a whole corridor closes (Suez), the diversion
+  // shows up on the other lanes serving the same ports.
   const perturbedCorridors = new Set<string>();
+  const perturbedEndpoints = new Set<EntityId>();
+  const perturbedModes = new Set<string>();
   for (const id of perturbedRoutes.keys()) {
-    const c = routesById.get(id)?.corridorId;
-    if (c) perturbedCorridors.add(c);
+    const r = routesById.get(id);
+    if (!r) continue;
+    if (r.corridorId) perturbedCorridors.add(r.corridorId);
+    perturbedEndpoints.add(r.originId);
+    perturbedEndpoints.add(r.destinationId);
+    perturbedModes.add(r.mode);
   }
   for (const route of snapshot.routes) {
     if (perturbedRoutes.has(route.id)) continue;
-    if (!route.corridorId || !perturbedCorridors.has(route.corridorId)) continue;
-    put(route.id, 'spillover', `absorbing traffic diverted by ${spec.name}`, (b) => ({
+    const corridorSibling =
+      !!route.corridorId && perturbedCorridors.has(route.corridorId);
+    const endpointAlternative =
+      perturbedModes.has(route.mode) &&
+      (perturbedEndpoints.has(route.originId) || perturbedEndpoints.has(route.destinationId));
+    if (!corridorSibling && !endpointAlternative) continue;
+    const note = corridorSibling
+      ? `corridor sibling absorbing traffic diverted by ${spec.name}`
+      : `alternative lane at a blocked port absorbing diversion from ${spec.name}`;
+    put(route.id, 'spillover', note, (b) => ({
       utilization: clamp01(b.utilization + 0.2),
       congestion: clamp01(b.congestion + 0.3),
       status: b.congestion + 0.3 > 0.8 ? 'degraded' : b.status,

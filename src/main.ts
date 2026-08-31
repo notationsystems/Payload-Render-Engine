@@ -18,6 +18,7 @@ import { createAnalyticsDock } from './ui/analyticsDock';
 import { createAgentsPanel } from './ui/agentsPanel';
 import { createScenariosPanel } from './ui/scenariosPanel';
 import { createArchOverlay } from './ui/archOverlay';
+import { createScenarioBanner } from './ui/scenarioBanner';
 
 async function start(): Promise<void> {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -46,6 +47,7 @@ async function start(): Promise<void> {
   hud.appendChild(createAgentsPanel(app, tools).el);
   hud.appendChild(createScenariosPanel(app).el);
   hud.appendChild(createArchOverlay(app).el);
+  hud.appendChild(createScenarioBanner(app).el);
 
   // escape: exit demo, else clear selection — but never while typing
   // (the search box owns Escape for its own dropdown/blur)

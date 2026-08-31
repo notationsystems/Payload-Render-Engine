@@ -94,14 +94,15 @@ Main verbs:
 | `compare <a> vs <b>` | Compare two routes: distance, promised duration, live utilization. |
 | `world` / `freight` / `trade` / `commodities` / `network` / `intelligence` | View presets (`exceptions` remains a legacy alias for `intelligence`). |
 | `agents` / `scenarios` | Panel views: no layer change, they open an instrument panel (the AGENTS and SCENARIOS tabs). |
+| `what if <chokepoint> closes` / `scenario <name>` | Enter a hypothetical frame (e.g. `what if suez closes`); `exit frame` returns to observed state. |
 | `follow the load` | Cinematic multimodal demo scenario; `stop` / `exit` ends it. |
 | `help` | Print the verb summary. |
 
-Counterfactuals run from the SCENARIOS panel (`scenarios`): pick a chokepoint
-closure from the catalog and RUN FRAME to enter the hypothetical frame — the
-regime becomes `'scenario'`, the impact renders in the violet dashed scenario
-treatment with a persistent banner, and clearing the frame returns to observed
-state.
+Counterfactuals run from the SCENARIOS panel (`scenarios`) or straight from the
+command bar (`what if suez closes`): pick a chokepoint closure and enter the
+hypothetical frame — the regime becomes `'scenario'`, the impact renders in the
+violet dashed scenario treatment with a persistent banner, and `exit frame`
+returns to observed state.
 
 ## Architecture
 
