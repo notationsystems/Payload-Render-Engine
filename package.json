@@ -1,0 +1,24 @@
+{
+  "name": "payload-earth",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Payload Earth — interactive digital twin of the physical economy",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run check && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "check": "node scripts/check-seam.mjs && node scripts/validate-provenance.mjs && tsc --noEmit"
+  },
+  "dependencies": {
+    "three": "^0.180.0",
+    "topojson-client": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "@types/topojson-client": "^3.1.5",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
