@@ -35,9 +35,12 @@ async function start(): Promise<void> {
   hud.appendChild(createInfoPanel(app).el);
   hud.appendChild(createTimeline(app).el);
 
-  // escape: exit demo, else clear selection
+  // escape: exit demo, else clear selection — but never while typing
+  // (the search box owns Escape for its own dropdown/blur)
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     if (app.isDemoActive()) app.stopFollowTheLoad();
     else {
       app.select(null);

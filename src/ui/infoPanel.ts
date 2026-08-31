@@ -194,6 +194,11 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     return div('pi-empty', text);
   }
 
+  function rangeDays(): number {
+    const r = api.clock.range;
+    return Math.max(1, Math.round((r.endMs - r.startMs) / 86400000));
+  }
+
   function sparkSection(title: string, entityId: EntityId, color?: string): HTMLElement | null {
     const { startMs, endMs, nowMs } = api.clock.range;
     if (!(endMs > startMs)) return null;
@@ -328,7 +333,7 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
       .filter((e): e is WorldEvent => !!e);
     if (evts.length) content.append(section('ACTIVE EVENTS', ...evts.map(eventRow)));
 
-    content.append(sparkSection('UTILIZATION 14D', f.id) ?? empty(''));
+    content.append(sparkSection(`UTILIZATION ${rangeDays()}D`, f.id) ?? empty(''));
     content.append(evidence(f.provenance));
   }
 
@@ -670,12 +675,23 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     render();
   });
 
-  // re-render dynamic values while time moves, throttled to ~2 Hz
+  // re-render dynamic values while time moves, throttled to ~2 Hz with a
+  // trailing render so the final state after a scrub burst always lands
   let lastTimeRender = 0;
+  let trailing: number | undefined;
   api.events.on('time', () => {
     if (!selectedId && !country) return;
     const now = performance.now();
-    if (now - lastTimeRender < 500) return;
+    if (now - lastTimeRender < 500) {
+      if (trailing === undefined) {
+        trailing = window.setTimeout(() => {
+          trailing = undefined;
+          lastTimeRender = performance.now();
+          render();
+        }, 520);
+      }
+      return;
+    }
     lastTimeRender = now;
     render();
   });

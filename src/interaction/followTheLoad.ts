@@ -74,8 +74,13 @@ export class FollowTheLoad {
     const totalSteps = segments.length;
 
     try {
-      // -- 1 · setup ----------------------------------------------------
-      this.emitDemo(0, totalSteps, SUBTITLE);
+      // -- 1 · setup (no step number during the establishing shot) ------
+      this.api.events.emit('demo', {
+        active: true,
+        totalSteps,
+        title: TITLE,
+        caption: SUBTITLE,
+      });
       for (const layer of DEMO_LAYERS) this.api.setLayerVisible(layer, true);
       this.api.setFlowMode(true);
       this.api.camera.setAutoRotate(false);
@@ -192,7 +197,14 @@ export class FollowTheLoad {
       const node = this.api.store.node(id);
       if (node?.kind === 'border_crossing') return node;
     }
-    return undefined;
+    // the crossing usually sits ON a leg rather than at its endpoints —
+    // find a border node attached to either leg's route (or demo-tagged)
+    const routeIds = new Set([a.routeId, b.routeId]);
+    return this.api.store.snapshot.nodes.find(
+      (n) =>
+        n.kind === 'border_crossing' &&
+        (n.connectedRouteIds?.some((r) => routeIds.has(r)) || n.tags?.includes(DEMO_TAG))
+    );
   }
 
   private longestRoute(segments: TransportSegment[]): Route | undefined {

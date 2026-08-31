@@ -72,6 +72,8 @@ export class App implements AppApi {
 
   private preset: ViewPreset = 'world';
   private selection: EntityId | null = null;
+  /** Routes highlighted by the current selection (a route, or a flow's legs). */
+  private selectedRouteIds = new Set<EntityId>();
   private hoverId: EntityId | null = null;
   private selectedCountry: Country | null = null;
   private countryOutline: THREE.Object3D | null = null;
@@ -130,6 +132,18 @@ export class App implements AppApi {
     this.registerLayers();
     this.wireSelection(canvas);
     this.demo = new FollowTheLoad(this);
+    // a drag or wheel during the demo hands control back to the user
+    // instead of letting the script fight them for the camera
+    this.cameraCtl.onInteract = () => {
+      if (this.demo.active) {
+        this.demo.stop();
+        this.events.emit('toast', {
+          title: 'DEMO EXITED',
+          body: 'Camera control returned.',
+          tone: 'info',
+        });
+      }
+    };
 
     // temporal spine
     this.clock.configure(
@@ -434,13 +448,15 @@ export class App implements AppApi {
   private applyHover(pick: Pick): void {
     const id = pick && pick.type !== 'country' ? pick.id : null;
     if (id === this.hoverId) return;
-    // clear old hover
+    // restore old hover to its selection-aware baseline, never to bare 0
     if (this.hoverId && this.hoverId !== this.selection) {
       if (this.store.node(this.hoverId)) this.nodesLayer.setState(this.hoverId, 0);
-      if (this.store.route(this.hoverId)) this.routesLayer.setState(this.hoverId, 0);
+      if (this.store.route(this.hoverId)) {
+        this.routesLayer.setState(this.hoverId, this.selectedRouteIds.has(this.hoverId) ? 2 : 0);
+      }
     }
     this.hoverId = id;
-    if (id && id !== this.selection) {
+    if (id && id !== this.selection && !this.selectedRouteIds.has(id)) {
       if (this.store.node(id)) this.nodesLayer.setState(id, 1);
       if (this.store.route(id)) this.routesLayer.setState(id, 1);
     }
@@ -496,6 +512,7 @@ export class App implements AppApi {
       if (this.store.route(id)) selectedRoutes.add(id);
       if (this.store.node(id)) selectedNode = id;
     }
+    this.selectedRouteIds = selectedRoutes;
     this.routesLayer.clearStates(selectedRoutes);
     this.nodesLayer.clearStates(selectedNode);
     this.flowsLayer.setSelectedFlow(selectedFlow);
@@ -508,9 +525,26 @@ export class App implements AppApi {
     return this.selection;
   }
 
+  /**
+   * Countries outside the ISO alpha-2 table still get a stable code of
+   * the form '#<numeric-id>' so selection, the inspector, and lookups
+   * work for every polygon on the globe, not just corpus countries.
+   */
+  private countryCode(c: Country): string {
+    return c.iso2 ?? `#${c.id}`;
+  }
+
+  private resolveCountry(code: string): Country | undefined {
+    if (code.startsWith('#')) {
+      const id = Number(code.slice(1));
+      return this.countries.countries.find((c) => c.id === id);
+    }
+    return this.countries.byIso2(code);
+  }
+
   getSelectedCountry(): { code: string; name: string } | null {
     if (!this.selectedCountry) return null;
-    return { code: this.selectedCountry.iso2 ?? '', name: this.selectedCountry.name };
+    return { code: this.countryCode(this.selectedCountry), name: this.selectedCountry.name };
   }
 
   selectCountry(code: string | null): void {
@@ -518,7 +552,7 @@ export class App implements AppApi {
       this.selectCountryObj(null);
       return;
     }
-    const c = this.countries.byIso2(code);
+    const c = this.resolveCountry(code);
     if (c) this.selectCountryObj(c, true);
   }
 
@@ -537,7 +571,7 @@ export class App implements AppApi {
       }
     }
     this.events.emit('countrySelect', {
-      code: country?.iso2 ?? null,
+      code: country ? this.countryCode(country) : null,
       name: country?.name ?? null,
     });
   }
@@ -584,10 +618,13 @@ export class App implements AppApi {
   }
 
   countryInfo(code: string): CountryInfo | null {
-    const country = this.countries.byIso2(code);
+    const country = this.resolveCountry(code);
     if (!country) return null;
-    const nodes = this.store.nodesInCountry(code);
-    const routes = this.store.routesTouchingCountry(code);
+    // corpus aggregates key off ISO-2; unmapped countries report empty
+    // inventories rather than failing to open at all
+    const iso2 = country.iso2 ?? '~none';
+    const nodes = this.store.nodesInCountry(iso2);
+    const routes = this.store.routesTouchingCountry(iso2);
     const nodeIds = new Set(nodes.map((n) => n.id));
     const flows = this.store.snapshot.flows.filter(
       (f) => nodeIds.has(f.originId) || nodeIds.has(f.destinationId)

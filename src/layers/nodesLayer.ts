@@ -320,7 +320,9 @@ export class NodesLayer {
     radiusPx = 16
   ): NodeEntry | null {
     const camDist = camera.position.length();
-    const horizon = 1 / camDist;
+    // nodes sit slightly above the surface, so give the horizon test a
+    // little slack — no unpickable dead zone just inside the limb
+    const horizon = 1 / camDist - 0.015;
     const px = ((ndcX + 1) / 2) * widthPx;
     const py = ((1 - ndcY) / 2) * heightPx;
     let best: NodeEntry | null = null;

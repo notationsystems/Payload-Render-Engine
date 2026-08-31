@@ -179,7 +179,7 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
       highlight((activeIx + 1) % suggestions.length);
     } else if (e.key === 'ArrowUp' && suggestions.length) {
       e.preventDefault();
-      highlight((activeIx - 1 + suggestions.length) % suggestions.length);
+      highlight(activeIx < 0 ? suggestions.length - 1 : (activeIx - 1 + suggestions.length) % suggestions.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (activeIx >= 0 && activeIx < suggestions.length) {

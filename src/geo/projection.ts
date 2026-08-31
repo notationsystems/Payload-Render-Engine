@@ -99,8 +99,10 @@ export function samplePath(
   const baseRadius = opts.baseRadius ?? EARTH_RADIUS;
   const altitude = opts.altitude ?? (() => 0);
 
-  // 1. waypoints on unit sphere
+  // 1. waypoints on unit sphere (degenerate single-point paths are padded
+  // so the arc-length machinery below always has a segment to walk)
   let unit = coords.map((c) => latLonToVec3(c[1], c[0], 1));
+  if (unit.length === 1) unit = [unit[0], unit[0].clone()];
 
   // 2. optional Catmull-Rom smoothing through waypoints (re-normalized)
   if (opts.smooth && unit.length > 2) {

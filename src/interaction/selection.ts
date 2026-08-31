@@ -45,11 +45,15 @@ export class SelectionInput {
     canvas.addEventListener('pointerdown', (e) => {
       if (e.button === 0) this.downAt = { x: e.clientX, y: e.clientY };
     });
-    canvas.addEventListener('pointerup', (e) => {
+    // window, not canvas: a drag released outside the viewport must still
+    // clear downAt or hover picking locks out until the next click
+    window.addEventListener('pointerup', (e) => {
       if (!this.downAt || e.button !== 0) return;
       const moved = Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y);
       this.downAt = null;
-      if (moved < 5) this.onClick?.(this.pick(e.clientX, e.clientY, true));
+      if (moved < 5 && e.target === canvas) {
+        this.onClick?.(this.pick(e.clientX, e.clientY, true));
+      }
     });
     canvas.addEventListener('dblclick', (e) => {
       this.onDoubleClick?.(this.pick(e.clientX, e.clientY, true));
