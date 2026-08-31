@@ -53,7 +53,10 @@ export class LabelsLayer {
   update(camera: THREE.PerspectiveCamera, nodesLayer: NodesLayer, altitude: number): void {
     if (!this.enabled) return;
     const camUnit = _cu.copy(camera.position).normalize();
-    const horizon = 1 / camera.position.length();
+    // same above-surface horizon extension as node picking (r = 1.006)
+    const horizon = Math.cos(
+      Math.acos(Math.min(1, 1 / camera.position.length())) + Math.acos(1 / 1.006)
+    );
     const maxLabels = altitude < 0.4 ? 28 : altitude < 1.1 ? 18 : altitude < 2.2 ? 12 : 8;
 
     const candidates: { e: NodeEntry; score: number; facing: number }[] = [];

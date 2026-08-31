@@ -75,18 +75,32 @@ export class CameraController {
 
   // ------------------------------------------------------------ input
 
+  /** True once the current press has moved far enough to count as a drag. */
+  private dragCommitted = false;
+  private downX = 0;
+  private downY = 0;
+
   private onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
     this.dragging = true;
+    this.dragCommitted = false;
+    this.downX = e.clientX;
+    this.downY = e.clientY;
     this.lastX = e.clientX;
     this.lastY = e.clientY;
     this.velTheta = 0;
     this.velPhi = 0;
-    this.interrupt();
+    // interrupt() is deferred to the first real movement: a stationary
+    // click must not cancel a flight or exit the demo
   };
 
   private onMove = (e: PointerEvent) => {
     if (!this.dragging) return;
+    if (!this.dragCommitted) {
+      if (Math.hypot(e.clientX - this.downX, e.clientY - this.downY) < 4) return;
+      this.dragCommitted = true;
+      this.interrupt();
+    }
     const dx = e.clientX - this.lastX;
     const dy = e.clientY - this.lastY;
     this.lastX = e.clientX;

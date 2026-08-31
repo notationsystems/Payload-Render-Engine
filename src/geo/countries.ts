@@ -50,8 +50,12 @@ export class Countries {
     const c = new Countries();
     c.topology = topo;
     const fc = feature(topo, topo.objects.countries) as any;
-    for (const f of fc.features) {
-      const id = parseInt(String(f.id), 10);
+    for (let fi = 0; fi < fc.features.length; fi++) {
+      const f = fc.features[fi];
+      // a few features (Kosovo, Somaliland, N. Cyprus) carry no ISO numeric
+      // id — give them stable negative ids so codes stay unique
+      const parsed = parseInt(String(f.id), 10);
+      const id = Number.isFinite(parsed) ? parsed : -(fi + 1);
       const polygons: CountryPolygon[] = [];
       const polys =
         f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;

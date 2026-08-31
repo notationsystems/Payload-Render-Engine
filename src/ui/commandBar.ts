@@ -227,6 +227,9 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
         runCommand(input.value);
       }
     } else if (e.key === 'Escape') {
+      // consume it: the synchronous blur would defeat main.ts's
+      // activeElement guard and the same keypress would clear selection
+      e.stopPropagation();
       if (!dropdown.hidden) closeDropdown();
       else input.blur();
     }

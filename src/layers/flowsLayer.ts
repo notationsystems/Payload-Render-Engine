@@ -47,11 +47,15 @@ const VERT = /* glsl */ `
     vec3 p = mix(p0, p1, f);
 
     // world-stable heading: central-difference direction along the route,
-    // flipped for reverse traversal
+    // flipped for reverse traversal. Guard the degenerate (single-point)
+    // route BEFORE normalize — normalize(vec3(0)) is NaN and step() fails
+    // open on NaN, which would poison the projection and bloom.
     int xa = max(x0 - 2, 0);
     int xb = min(x0 + 2, ${SAMPLES - 1});
     vec3 dirW = (texelFetch(uPos, ivec2(xb, row), 0).xyz -
                  texelFetch(uPos, ivec2(xa, row), 0).xyz) * sign(aSpeed);
+    float dirLen = length(dirW);
+    vec3 dirN = dirLen > 1e-9 ? dirW / dirLen : vec3(1.0, 0.0, 0.0);
 
     float boost = 1.0;
     if (uSelectedFlow >= 0.0) {
@@ -64,16 +68,16 @@ const VERT = /* glsl */ `
     vec4 clip0 = projectionMatrix * mv;
     // project the heading into screen space each frame: a second point a
     // hair down-route, through the same transform
-    vec4 clip1 = projectionMatrix * modelViewMatrix * vec4(p + normalize(dirW) * 0.01, 1.0);
+    vec4 clip1 = projectionMatrix * modelViewMatrix * vec4(p + dirN * 0.01, 1.0);
     vec2 sd = clip1.xy / clip1.w - clip0.xy / clip0.w;
     float aspect = projectionMatrix[1][1] / projectionMatrix[0][0];
     vec2 dirPx = vec2(sd.x * aspect, sd.y);
 
     float px = clamp(aSize * 11.0 / -mv.z, 2.0, 13.0) * (boost > 1.5 ? 1.5 : 1.0);
     gl_PointSize = px * uDpr;
-    // hold the dot when direction degenerates (limb-parallel motion) or
-    // the sprite is too small for a dart to read
-    float dirOk = step(1e-7, length(dirPx));
+    // hold the dot when direction degenerates (single-point route,
+    // limb-parallel motion) or the sprite is too small for a dart to read
+    float dirOk = step(1e-9, dirLen) * step(1e-7, length(dirPx));
     vAngle = atan(dirPx.y, dirPx.x + (1.0 - dirOk));
     vShape = dirOk * smoothstep(4.5, 7.0, px);
     gl_Position = clip0;
@@ -96,9 +100,10 @@ const FRAG = /* glsl */ `
     float dot_ = exp(-r * 3.0) * 1.6;
 
     // heading dart: rotate into route frame (+x = direction of travel;
-    // gl_PointCoord has +y down, screen angle has +y up)
+    // gl_PointCoord has +y down, screen angle has +y up). The 1.16 scale
+    // shrinks the glyph so its tail corners stay inside the r=1 discard.
     float c = cos(vAngle), s = sin(vAngle);
-    vec2 q = mat2(c, -s, s, c) * vec2(p.x, -p.y);
+    vec2 q = mat2(c, -s, s, c) * vec2(p.x, -p.y) * 1.16;
     float hw = (0.72 - q.x) * 0.34;                     // taper to the tip
     float inX = step(-0.92, q.x) * step(q.x, 0.72);
     float body = smoothstep(0.10, -0.08, abs(q.y) - hw) * inX;
@@ -230,6 +235,10 @@ export class FlowsLayer {
     const points = new THREE.Points(geo, this.material);
     points.renderOrder = 7;
     points.frustumCulled = false;
+    const mat = this.material;
+    window.addEventListener('resize', () => {
+      mat.uniforms.uDpr.value = Math.min(window.devicePixelRatio || 1, 2);
+    });
     (this as { points: THREE.Points | null }).points = points;
     this.group.add(points);
     this.group.visible = false;
@@ -250,7 +259,11 @@ export class FlowsLayer {
 
   update(dt: number): void {
     if (!this.material || !this.group.visible) return;
-    this.time += dt;
+    // wrap to keep uTime*aSpeed inside float32 precision on long sessions
+    // (unbounded time makes fract() quantize and motion turn steppy).
+    // The wrap causes one particle reshuffle per ~18h — invisible noise
+    // for representational particles, unlike growing stutter.
+    this.time = (this.time + dt) % 65536;
     this.material.uniforms.uTime.value = this.time;
   }
 }

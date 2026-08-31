@@ -366,6 +366,8 @@ export class App implements AppApi {
 
   // ------------------------------------------------------------------ time
 
+  private trailingRefresh: number | undefined;
+
   private onTimeChange(t: TemporalState): void {
     this.events.emit('time', t);
     this.updateSun(this.clock.simMillis);
@@ -373,8 +375,15 @@ export class App implements AppApi {
     if (now - this.lastTemporalRefresh > 150) {
       this.lastTemporalRefresh = now;
       this.refreshTemporalStates(false);
+    } else if (this.trailingRefresh === undefined) {
+      // a drag's final event usually lands inside the throttle window —
+      // schedule a trailing refresh so the globe never stays stale
+      this.trailingRefresh = window.setTimeout(() => {
+        this.trailingRefresh = undefined;
+        this.lastTemporalRefresh = performance.now();
+        this.refreshTemporalStates(false);
+      }, 170);
     }
-    this.lastSimMs = this.clock.simMillis;
   }
 
   private updateSun(simMillis: number): void {
@@ -391,9 +400,13 @@ export class App implements AppApi {
     }
     if (this.anomalies.visible) this.refreshAnomaliesIfChanged();
 
-    // event toasts: only on smooth advance (playback), not on scrub jumps
+    // event toasts: only on smooth advance (playback), not on scrub jumps.
+    // Measured refresh-to-refresh (lastSimMs updates HERE, not per clock
+    // event) — otherwise a drag reads as many small per-pointermove steps
+    // and toasts fire for every event the playhead sweeps across.
     const jump = Math.abs(this.clock.simMillis - this.lastSimMs);
     const smooth = jump < this.clock.speed * 3000;
+    this.lastSimMs = this.clock.simMillis;
     const current = new Set(this.store.activeEvents(t).map((e) => e.id));
     if (!initial && smooth) {
       for (const ev of this.store.activeEvents(t)) {
@@ -554,6 +567,12 @@ export class App implements AppApi {
     this.nodesLayer.clearStates(selectedNode);
     this.flowsLayer.setSelectedFlow(selectedFlow);
     this.labelsLayer.setSelected(selectedNode ?? null);
+    // clearStates wiped the hover glow; re-apply it (applyHover would
+    // early-return because hoverId is unchanged)
+    if (this.hoverId && this.hoverId !== id && !this.selectedRouteIds.has(this.hoverId)) {
+      if (this.store.node(this.hoverId)) this.nodesLayer.setState(this.hoverId, 1);
+      if (this.store.route(this.hoverId)) this.routesLayer.setState(this.hoverId, 1);
+    }
     this.rebuildDependencyOverlay();
     this.events.emit('select', { id, source });
   }

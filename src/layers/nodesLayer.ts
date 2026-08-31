@@ -228,6 +228,10 @@ export class NodesLayer {
     });
     this.points = new THREE.Points(geo, mat);
     this.points.renderOrder = 6;
+    // browser zoom / monitor moves change devicePixelRatio at runtime
+    window.addEventListener('resize', () => {
+      mat.uniforms.uDpr.value = Math.min(window.devicePixelRatio || 1, 2);
+    });
   }
 
   setBucketVisible(bucket: string, visible: boolean): void {
@@ -320,9 +324,11 @@ export class NodesLayer {
     radiusPx = 16
   ): NodeEntry | null {
     const camDist = camera.position.length();
-    // nodes sit slightly above the surface, so give the horizon test a
-    // little slack — no unpickable dead zone just inside the limb
-    const horizon = 1 / camDist - 0.015;
+    // nodes at radius 1.006 stay visible past the unit-sphere horizon by
+    // acos(1/1.006) ≈ 6.3° — the exact gate is cos(θ_horizon + θ_node)
+    const horizon = Math.cos(
+      Math.acos(Math.min(1, 1 / camDist)) + Math.acos(1 / 1.006)
+    );
     const px = ((ndcX + 1) / 2) * widthPx;
     const py = ((1 - ndcY) / 2) * heightPx;
     let best: NodeEntry | null = null;
