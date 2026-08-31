@@ -350,3 +350,15 @@ globe whose disciplines map cleanly onto the twin's seam:
 - **SGP4 + GMST orbit propagation** (deferred): only relevant if the
   maritime layer ever tracks vessels via satellite AIS; CelesTrak TLEs +
   SGP4 with GMST-locked rings is the correct implementation to adapt.
+
+## 12. Sea-lane integrity is mechanical
+
+`scripts/check-sea-lanes.mjs` (part of `npm run check`) samples every
+maritime route's great-circle chords at 10 km steps against Natural
+Earth 50m land polygons and fails the build on any on-land run of
+≥ 20 km — outside a 60 km harbor-approach grace at route endpoints and
+an explicit allowlist of real waterways below the data's resolution
+(Panama and Suez canal transits, the Elbe and Westerschelde estuaries).
+"A lane over land is not where the ship goes" is a build gate, not a
+review comment: the reviewer sweep that first caught these defects has
+been turned into the check that prevents their return.

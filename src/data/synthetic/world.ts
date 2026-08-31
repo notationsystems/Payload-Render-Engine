@@ -968,6 +968,9 @@ function buildRoutes(): Route[] {
         ll(42.0, -138.0),
         ll(38.0, -128.0),
         ll(34.5, -121.0),
+        ll(34.28, -120.4), // Santa Barbara Channel
+        ll(34.15, -119.7),
+        ll(33.85, -119.15),
         ll(33.6, -118.9), // San Pedro approach
         ll(33.73, -118.26),
       ],
@@ -1008,7 +1011,9 @@ function buildRoutes(): Route[] {
         ll(1.26, 103.83),
         ll(1.5, 103.0),
         ll(2.6, 101.0), // Strait of Malacca
-        ll(4.5, 99.5),
+        ll(4.7, 99.0),
+        ll(5.4, 97.8), // Malacca channel, off NE Sumatra
+        ll(5.85, 96.3),
         ll(6.0, 95.0), // off Banda Aceh
         ll(5.5, 80.5), // south of Dondra Head (Sri Lanka's tip is 5.92 N)
         ll(10.0, 63.0), // Arabian Sea
@@ -1018,7 +1023,11 @@ function buildRoutes(): Route[] {
         ll(21.0, 38.5),
         ll(24.0, 36.5),
         ll(27.6, 34.0),
-        ll(29.9, 32.55), // Gulf of Suez
+        ll(27.9, 33.7), // Gulf of Suez entrance
+        ll(28.5, 33.05),
+        ll(29.2, 32.7),
+        ll(29.5, 32.65),
+        ll(29.9, 32.55),
         ll(30.45, 32.35),
       ],
       cons: [
@@ -1043,8 +1052,10 @@ function buildRoutes(): Route[] {
         ll(33.0, 28.0), // Eastern Med
         ll(34.5, 20.0),
         ll(37.2, 11.2), // Strait of Sicily
+        ll(37.6, 9.9), // clear of Bizerte
         ll(36.9, 3.0),
         ll(35.95, -5.6), // Gibraltar
+        ll(36.7, -8.9), // Gulf of Cadiz, south of the Algarve
         ll(38.0, -10.5),
         ll(43.5, -9.5), // off Finisterre
         ll(48.6, -5.5), // Ushant
@@ -1071,8 +1082,11 @@ function buildRoutes(): Route[] {
       corridorId: 'corridor:asia-europe-sea',
       pts: [
         ll(25.01, 55.06),
-        ll(25.8, 56.0),
+        ll(25.4, 54.85), // out into the Gulf, not across the UAE
+        ll(26.0, 55.5),
+        ll(26.35, 56.2),
         ll(26.4, 56.6), // Hormuz
+        ll(25.6, 57.0), // Gulf of Oman, clear of the Makran coast
         ll(25.0, 58.5),
         ll(22.0, 60.5),
         ll(15.0, 58.0), // Arabian Sea
@@ -1082,6 +1096,11 @@ function buildRoutes(): Route[] {
         ll(17.0, 40.5),
         ll(21.5, 38.0),
         ll(24.0, 36.5),
+        ll(26.7, 35.2), // northern Red Sea
+        ll(27.7, 33.9), // Gulf of Suez entrance
+        ll(28.5, 33.05),
+        ll(29.2, 32.7),
+        ll(29.5, 32.65),
         ll(29.9, 32.55),
         ll(30.45, 32.35),
       ],
@@ -1125,6 +1144,7 @@ function buildRoutes(): Route[] {
       pts: [
         ll(-23.98, -46.3),
         ll(-25.0, -44.0),
+        ll(-22.3, -40.7), // clear of Cabo de Sao Tome
         ll(-19.0, -38.5),
         ll(-8.0, -34.0), // off Recife
         ll(2.0, -30.0),
@@ -1162,6 +1182,7 @@ function buildRoutes(): Route[] {
         ll(10.0, 127.5), // east of Mindanao
         ll(15.0, 128.0),
         ll(20.0, 126.0),
+        ll(24.6, 124.4), // clear of the Yaeyama Islands
         ll(25.0, 123.5),
         ll(29.0, 122.5),
         ll(31.34, 121.65),
@@ -1180,7 +1201,12 @@ function buildRoutes(): Route[] {
         ll(-30.0, -72.5),
         ll(-25.0, -73.0),
         ll(-18.0, -72.0),
-        ll(-8.0, -79.6), // off Trujillo, Peru (coast at 8 S runs ~79.1 W)
+        ll(-16.8, -74.2), // hugging the Peruvian coast offshore
+        ll(-14.0, -76.9),
+        ll(-12.2, -77.9), // off Lima
+        ll(-8.0, -79.6), // off Trujillo
+        ll(-6.5, -81.2), // Sechura Bay offing
+        ll(-4.8, -81.8), // rounding Punta Parinas
         ll(-3.0, -81.5),
         ll(3.0, -80.5),
         ll(7.0, -79.3), // Gulf of Panama
@@ -1188,6 +1214,8 @@ function buildRoutes(): Route[] {
         ll(9.35, -79.92), // Gatún reach
         ll(10.5, -79.5), // Caribbean
         ll(14.0, -75.0),
+        ll(18.1, -68.0), // Mona Passage approach
+        ll(18.55, -67.35),
         ll(19.5, -65.0),
         ll(30.0, -50.0),
         ll(38.0, -35.0),
@@ -1215,6 +1243,8 @@ function buildRoutes(): Route[] {
         ll(31.34, 121.65),
         ll(30.6, 123.8),
         ll(31.5, 130.0),
+        ll(30.92, 130.5), // Osumi Strait
+        ll(30.92, 131.05),
         ll(34.2, 140.5),
         ll(40.0, 155.0),
         ll(44.0, 170.0),
@@ -1224,12 +1254,15 @@ function buildRoutes(): Route[] {
         ll(20.0, -120.0),
         ll(12.0, -100.0),
         ll(7.5, -85.0),
+        ll(6.9, -82.5), // south of the Azuero bulge
+        ll(6.8, -80.2),
         ll(8.9, -79.55),
         ll(9.35, -79.92), // Panama Canal
         ll(10.0, -79.0),
         ll(15.0, -74.5),
         ll(18.4, -74.9), // clear of Haiti's Tiburon Peninsula (west tip ~74.45 W)
         ll(20.0, -73.8), // Windward Passage
+        ll(21.3, -72.4), // clear of Great Inagua
         ll(25.0, -73.0),
         ll(32.0, -74.5),
         ll(40.4, -73.6),
@@ -1259,9 +1292,12 @@ function buildRoutes(): Route[] {
         ll(20.0, 63.0),
         ll(12.0, 70.0),
         ll(6.5, 78.0), // south of India
+        ll(5.5, 80.5), // south of Dondra Head
         ll(5.8, 82.0),
         ll(6.2, 90.0),
         ll(6.0, 95.0),
+        ll(5.7, 96.6), // Malacca channel, off Aceh
+        ll(5.2, 97.9),
         ll(4.5, 98.5),
         ll(2.6, 101.0), // Malacca
         ll(1.4, 103.0),
@@ -1337,10 +1373,12 @@ function buildRoutes(): Route[] {
       pts: [
         ll(35.08, 129.06),
         ll(34.3, 130.5), // Korea Strait
-        ll(35.5, 133.5), // Sea of Japan
+        ll(36.2, 132.5), // Sea of Japan, clear of Shimane
         ll(37.5, 135.0),
         ll(40.0, 138.5),
-        ll(41.45, 140.9), // Tsugaru Strait
+        ll(41.62, 140.9), // Tsugaru Strait
+        ll(41.6, 142.0),
+        ll(41.75, 143.3), // clear of Cape Erimo
         ll(42.5, 145.0),
         ll(46.0, 160.0),
         ll(50.0, 178.0),
@@ -1350,6 +1388,10 @@ function buildRoutes(): Route[] {
         ll(49.0, -133.0),
         ll(48.4, -125.5),
         ll(48.2, -123.0), // Juan de Fuca
+        ll(48.17, -122.77), // Admiralty Inlet
+        ll(48.02, -122.64),
+        ll(47.9, -122.44), // Puget Sound
+        ll(47.55, -122.44),
         ll(47.27, -122.41),
       ],
     },
@@ -1407,7 +1449,7 @@ function buildRoutes(): Route[] {
       utilization: 0.64,
       importance: 0.64,
       corridorId: 'corridor:asia-europe-sea',
-      pts: [ll(37.94, 23.62), ll(36.5, 24.5), ll(33.5, 28.0), ll(31.4, 32.3), ll(30.45, 32.35)],
+      pts: [ll(37.94, 23.62), ll(36.6, 24.75), ll(35.3, 26.6), ll(33.5, 28.0), ll(31.4, 32.3), ll(30.45, 32.35)],
       cons: [{ type: 'chokepoint', description: 'Suez Canal convoy scheduling', severity: 0.65, at: AT_SUEZ }],
     },
 
