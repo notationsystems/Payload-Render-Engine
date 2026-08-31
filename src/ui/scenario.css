@@ -138,6 +138,84 @@
   color: var(--sc-hypo);
 }
 
+/* -------------------------- scenarios-panel: chokepoint criticality
+   (ranking table — computed intelligence, same violet-dashed language) */
+
+.sc-crit {
+  margin-bottom: 12px;
+}
+.sc-crit-scroll {
+  overflow-x: auto;
+}
+.sc-crit-table {
+  min-width: 100%;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.sc-crit-head,
+.sc-crit-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0 4px 6px;
+  border-left: 2px solid transparent;
+}
+.sc-crit-head {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sc-crit-row {
+  font-size: 11px;
+  border-top: 1px dashed var(--line);
+  cursor: pointer;
+}
+/* the most critical chokepoint — subtle violet left edge */
+.sc-crit-row-top {
+  border-left-color: rgba(217, 140, 255, 0.55);
+}
+.sc-crit-rank {
+  flex: none;
+  width: 16px;
+  color: var(--text-dim);
+}
+.sc-crit-name {
+  flex: 1;
+  min-width: 120px;
+  color: var(--text-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s ease;
+}
+.sc-crit-row:hover .sc-crit-name {
+  color: var(--sc-hypo);
+}
+.sc-crit-num {
+  flex: none;
+  width: 56px;
+  text-align: right;
+  color: var(--text-mid);
+  white-space: nowrap;
+}
+.sc-crit-delay {
+  color: var(--sc-hypo);
+}
+/* while a frame is ACTIVE: other rows visible but non-interactive */
+.sc-crit-row-inert {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.sc-crit-row-active {
+  cursor: default;
+}
+.sc-crit-note {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
 /* ------------------------------- scenarios-panel: counterfactual frames */
 
 .sc-title {

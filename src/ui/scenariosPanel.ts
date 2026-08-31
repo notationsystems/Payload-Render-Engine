@@ -51,6 +51,81 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
     <div class="os-frame"><span class="os-frame-dot" data-r="forecast"></span>FORECAST<span class="os-frame-note">deterministic projection — scrub right of NOW</span></div>
     <div class="os-frame"><span class="os-frame-dot" data-r="scenario"></span><span class="sc-frame-live">HYPOTHETICAL</span><span class="os-frame-note">enter a frame below — rendered as a violet dashed overlay, never as state</span></div>`;
 
+  // ---- chokepoint criticality: every frame computed (not entered) and
+  //      ranked — standing intelligence, refreshed when the panel opens ------
+
+  const critTitle = document.createElement('div');
+  critTitle.className = 'os-card-title sc-title';
+  critTitle.textContent = 'CHOKEPOINT CRITICALITY — COMPUTED, NOT OBSERVED';
+
+  const crit = document.createElement('div');
+  crit.className = 'sc-crit';
+
+  /** Rows cached from the last recompute; re-styled (not recomputed) on
+   *  scenario enter/exit so the active frame stays visually pinned. */
+  let critRows: ScenarioRankingRow[] = [];
+
+  const renderCriticality = (activeId: EntityId | null): void => {
+    crit.innerHTML = '';
+
+    const scroll = document.createElement('div');
+    scroll.className = 'sc-crit-scroll';
+    const table = document.createElement('div');
+    table.className = 'sc-crit-table';
+
+    const head = document.createElement('div');
+    head.className = 'sc-crit-head';
+    head.innerHTML = `
+      <span class="sc-crit-rank">#</span>
+      <span class="sc-crit-name">FRAME</span>
+      <span class="sc-crit-num">BLOCKED</span>
+      <span class="sc-crit-num">QUEUED</span>
+      <span class="sc-crit-num">SPILL</span>
+      <span class="sc-crit-num">+DELAY</span>`;
+    table.appendChild(head);
+
+    critRows.forEach((row, i) => {
+      const r = document.createElement('div');
+      r.className = 'sc-crit-row';
+      if (i === 0) r.classList.add('sc-crit-row-top');
+      r.innerHTML = `
+        <span class="sc-crit-rank">${i + 1}</span>
+        <span class="sc-crit-name">${esc(row.name)}</span>
+        <span class="sc-crit-num">${row.summary.perturbedRoutes}</span>
+        <span class="sc-crit-num">${row.summary.flowsDelayed}</span>
+        <span class="sc-crit-num">${row.summary.spilloverRoutes}</span>
+        <span class="sc-crit-num sc-crit-delay">+${row.summary.totalDelayHours} H</span>`;
+      if (activeId !== null && row.specId === activeId) {
+        r.classList.add('sc-crit-row-active');
+        const chip = document.createElement('span');
+        chip.className = 'sc-active-chip';
+        chip.textContent = 'FRAME ACTIVE';
+        r.appendChild(chip);
+      } else if (activeId !== null) {
+        r.classList.add('sc-crit-row-inert');
+      } else {
+        r.addEventListener('click', () => api.runScenario(row.specId));
+      }
+      table.appendChild(r);
+    });
+
+    scroll.appendChild(table);
+    crit.appendChild(scroll);
+
+    const note = document.createElement('div');
+    note.className = 'sc-crit-note';
+    note.textContent =
+      'every frame computed at current sim time — ranked by simulated queued delay';
+    crit.appendChild(note);
+  };
+
+  /** Recompute the ranking at the current sim time. Called when the panel
+   *  becomes visible — never on time ticks. */
+  const recomputeCriticality = (): void => {
+    critRows = api.rankScenarios();
+    renderCriticality(api.getActiveScenario()?.spec.id ?? null);
+  };
+
   // ---- counterfactual frames: catalog + impact readout --------------------
 
   const cfTitle = document.createElement('div');
@@ -232,14 +307,20 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
     list.appendChild(row);
   }
 
-  el.append(header, frames, cfTitle, catalog, impactBox, listTitle, list);
+  el.append(header, frames, critTitle, crit, cfTitle, catalog, impactBox, listTitle, list);
 
   api.events.on('preset', ({ preset }) => {
     el.hidden = preset !== 'scenarios';
+    // refresh the ranking when the panel opens so it tracks sim time —
+    // deliberately NOT on every time tick
+    if (preset === 'scenarios') recomputeCriticality();
   });
   api.events.on('scenario', ({ active, impact }) => {
     renderImpact(active && impact ? impact : null);
+    // re-style the cached rows around the active frame; no recompute
+    renderCriticality(active && impact ? impact.spec.id : null);
   });
+  recomputeCriticality();
   renderImpact(api.getActiveScenario());
 
   return { el };
