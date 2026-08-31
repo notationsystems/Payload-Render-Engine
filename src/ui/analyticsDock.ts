@@ -11,6 +11,10 @@ import { drawSparkline } from './sparkline';
 const REFRESH_MS = 1000;
 const SPARK_SAMPLES = 40;
 
+/** Corpus strings are synthetic and trusted, but markup-escape anyway. */
+const esc = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');
   el.className = 'os-dock';
@@ -43,6 +47,7 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
     kpiCard.hidden = collapsed;
     bnCard.hidden = collapsed;
     toggle.classList.toggle('collapsed', collapsed);
+    if (!collapsed) render(); // never show pre-collapse data
   });
 
   el.append(toggle, kpiCard, bnCard);
@@ -130,7 +135,7 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
         const sev = row.congestion > 0.66 ? 'HIGH' : row.congestion > 0.45 ? 'MED' : 'LOW';
         div.innerHTML = `
           <span class="os-bn-rank">${i + 1}</span>
-          <span class="os-bn-name">${row.name}</span>
+          <span class="os-bn-name">${esc(row.name)}</span>
           <span class="os-bn-chip ${sev.toLowerCase()}">${sev}</span>
           <span class="os-bn-val">${Math.round(row.congestion * 100)}%</span>`;
         div.title = row.kind;
@@ -140,10 +145,22 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
     );
   };
 
+  // throttled with a trailing render so the state after a scrub burst
+  // always lands (leading-only throttles leave stale KPIs on screen)
   let last = 0;
+  let trailing: number | undefined;
   api.events.on('time', () => {
     const now = performance.now();
-    if (now - last < REFRESH_MS) return;
+    if (now - last < REFRESH_MS) {
+      if (trailing === undefined) {
+        trailing = window.setTimeout(() => {
+          trailing = undefined;
+          last = performance.now();
+          render();
+        }, REFRESH_MS + 50);
+      }
+      return;
+    }
     last = now;
     render();
   });

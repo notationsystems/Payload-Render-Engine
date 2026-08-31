@@ -12,6 +12,10 @@
 
 import type { AppApi } from '../app/api';
 
+/** Corpus strings are synthetic and trusted, but markup-escape anyway. */
+const esc = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');
   el.className = 'os-panel';
@@ -55,7 +59,7 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
     const window_ = `${ev.start.slice(5, 10)} → ${ev.end ? ev.end.slice(5, 10) : 'OPEN'}`;
     row.innerHTML = `
       <div class="os-seed-head">
-        <span class="os-seed-name">${ev.name}</span>
+        <span class="os-seed-name">${esc(ev.name)}</span>
         <span class="os-seed-cat">${ev.category.toUpperCase()}</span>
       </div>
       <div class="os-seed-meta">
@@ -63,7 +67,7 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
         <span>AFFECTS ${ev.affects.length}</span>
         <span class="os-seed-sev"><i style="width:${Math.round(ev.severity * 100)}%"></i></span>
       </div>
-      <div class="os-seed-desc">${ev.description}</div>`;
+      <div class="os-seed-desc">${esc(ev.description)}</div>`;
     const actions = document.createElement('div');
     actions.className = 'os-seed-actions';
     const jump = document.createElement('button');

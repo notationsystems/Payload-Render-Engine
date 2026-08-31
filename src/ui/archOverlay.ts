@@ -72,7 +72,11 @@ export function createArchOverlay(api: AppApi): { el: HTMLElement } {
   });
   window.addEventListener('pe:arch-toggle' as keyof WindowEventMap, () => setOpen(el.hidden));
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !el.hidden) setOpen(false);
+    if (e.key !== 'Escape' || el.hidden) return;
+    setOpen(false);
+    // the overlay consumes this Escape — later window listeners (selection
+    // clearing in main.ts) must not also act on it
+    e.stopImmediatePropagation();
   });
 
   return { el };

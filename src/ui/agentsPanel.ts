@@ -8,6 +8,9 @@
 import type { AppApi } from '../app/api';
 import type { TwinTool } from '../app/toolSurface';
 
+const esc = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
 export function createAgentsPanel(api: AppApi, tools: TwinTool[]): { el: HTMLElement } {
   const el = document.createElement('div');
   el.className = 'os-panel';
@@ -51,7 +54,7 @@ export function createAgentsPanel(api: AppApi, tools: TwinTool[]): { el: HTMLEle
         <span class="os-tool-cat">${tool.category.toUpperCase()}</span>
         ${tool.safety.longRunning ? '<span class="os-tool-flag">LONG-RUNNING</span>' : ''}
       </div>
-      <div class="os-tool-desc">${tool.description}</div>
+      <div class="os-tool-desc">${esc(tool.description)}</div>
       <div class="os-tool-params">${params}</div>`;
     list.appendChild(row);
   }

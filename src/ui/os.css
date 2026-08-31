@@ -161,9 +161,11 @@
 .os-panel {
   position: fixed;
   top: 96px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(660px, calc(100vw - 420px));
+  /* centered in the clear space between the layer rail and the inspector */
+  left: 240px;
+  right: 368px;
+  margin: 0 auto;
+  width: min(660px, calc(100vw - 640px));
   max-height: calc(100vh - 230px);
   overflow-y: auto;
   background: var(--glass);
@@ -417,6 +419,8 @@
   overflow-y: auto;
 }
 .os-preset-chips { flex: 0 0 auto; }
+/* the collapsed rail is just the slim LAYERS tab — chips hide with it */
+.pe-layerpanel.collapsed .os-preset-chips { display: none; }
 
 .os-preset-chips {
   display: flex;
