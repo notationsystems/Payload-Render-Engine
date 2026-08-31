@@ -12,7 +12,7 @@
  */
 
 import type { AppApi } from '../app/api';
-import type { ScenarioImpact, ScenarioRole } from '../data/scenario';
+import type { ScenarioImpact, ScenarioRankingRow, ScenarioRole } from '../data/scenario';
 import type { EntityId } from '../data/contracts';
 import './scenario.css';
 

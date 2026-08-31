@@ -19,8 +19,10 @@ import { sourceRegistry } from '../data/sources';
 import {
   buildScenarioCatalog,
   computeScenarioImpact,
+  rankScenarioImpacts,
   type ScenarioEntityDelta,
   type ScenarioImpact,
+  type ScenarioRankingRow,
   type ScenarioSpec,
 } from '../data/scenario';
 import { EventBus } from '../core/events';
@@ -769,6 +771,22 @@ export class App implements AppApi {
 
   listScenarios(): ScenarioSpec[] {
     return this.scenarioCatalog;
+  }
+
+  private rankingCache: { hourKey: number; rows: ScenarioRankingRow[] } | null = null;
+
+  rankScenarios(): ScenarioRankingRow[] {
+    // deterministic per sim-hour — cache on the hour bucket
+    const hourKey = Math.floor(this.clock.simMillis / 3_600_000);
+    if (this.rankingCache?.hourKey === hourKey) return this.rankingCache.rows;
+    const rows = rankScenarioImpacts(
+      this.store.snapshot,
+      (eid, t) => this.store.stateAt(eid, t),
+      this.scenarioCatalog,
+      this.clock.simTime
+    );
+    this.rankingCache = { hourKey, rows };
+    return rows;
   }
 
   runScenario(id: EntityId): ScenarioImpact | null {

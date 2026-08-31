@@ -146,6 +146,15 @@ export function buildToolSurface(api: AppApi): TwinTool[] {
       invoke: () => api.listScenarios(),
     },
     {
+      name: 'rank_scenarios',
+      description:
+        'Chokepoint criticality: compute every catalog frame at current sim time (without entering any) and rank by simulated queued delay. COMPUTED intelligence, not observation.',
+      category: 'query',
+      params: [],
+      safety: SAFE,
+      invoke: () => api.rankScenarios(),
+    },
+    {
       name: 'run_scenario',
       description:
         'Enter a HYPOTHETICAL frame: propagate a chokepoint closure through the network. A view-level projection — simulated outcome, not an outcome; nothing canonical changes.',

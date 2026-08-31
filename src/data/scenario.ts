@@ -133,16 +133,75 @@ export function buildScenarioCatalog(snapshot: WorldSnapshot): ScenarioSpec[] {
     if (node.kind !== 'chokepoint' && node.kind !== 'border_crossing') continue;
     const touched = routesThroughPoint(snapshot.routes, node.geometry.coordinates);
     if (!touched.length) continue;
+    const slug = node.id.replace(/^node:/, '');
     specs.push({
-      id: `scenario:close:${node.id.replace(/^node:/, '')}`,
+      id: `scenario:close:${slug}`,
       name: `${node.name} closure — 72 h`,
       description: `Full transit stop at ${node.name} for 72 hours. ${touched.length} lane(s) blocked; dependent flows queue, corridor siblings absorb diverted pressure.`,
       durationHours: 72,
       perturbations: [{ entityId: node.id, kind: 'closure', magnitude: 1 }],
       provenance: SCENARIO_PROV,
     });
+    // partial-capacity frames for the two canals and the land border —
+    // the common real-world case is constraint, not closure
+    const constrained =
+      node.id.includes('panama') || node.id.includes('suez')
+        ? 'draft/slot restriction — 50% capacity, 1 week'
+        : node.kind === 'border_crossing'
+          ? 'enhanced inspections — 1 week'
+          : null;
+    if (constrained) {
+      specs.push({
+        id: `scenario:constrain:${slug}`,
+        name: `${node.name} ${constrained.split(' — ')[0]}`,
+        description: `${node.name}: ${constrained}. Transit continues under pressure; queues build without a full stop.`,
+        durationHours: 168,
+        perturbations: [{ entityId: node.id, kind: 'congestion', magnitude: 0.5 }],
+        provenance: SCENARIO_PROV,
+      });
+    }
   }
   return specs.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ------------------------------------------------------------------
+// Criticality ranking — the engine as standing intelligence
+// ------------------------------------------------------------------
+
+export interface ScenarioRankingRow {
+  specId: EntityId;
+  name: string;
+  summary: ScenarioImpact['summary'];
+  /** Rank key, explainable: total queued delay across flows (hours). */
+  score: number;
+}
+
+/**
+ * Compute every frame's impact WITHOUT entering any of them (the engine
+ * is pure) and rank by simulated network damage. This is computed
+ * intelligence, never observation — label it as such wherever shown.
+ */
+export function rankScenarioImpacts(
+  snapshot: WorldSnapshot,
+  stateAt: (id: EntityId, t: Timestamp) => EntityState,
+  specs: ScenarioSpec[],
+  t: Timestamp
+): ScenarioRankingRow[] {
+  const rows = specs.map((spec) => {
+    const impact = computeScenarioImpact(snapshot, stateAt, spec, t);
+    return {
+      specId: spec.id,
+      name: spec.name,
+      summary: impact.summary,
+      score: impact.summary.totalDelayHours,
+    };
+  });
+  return rows.sort(
+    (a, b) =>
+      b.score - a.score ||
+      b.summary.flowsDelayed - a.summary.flowsDelayed ||
+      b.summary.perturbedRoutes - a.summary.perturbedRoutes
+  );
 }
 
 // ------------------------------------------------------------------

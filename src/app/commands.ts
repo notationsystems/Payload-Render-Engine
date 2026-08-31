@@ -137,6 +137,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'stop demo', label: 'stop demo', hint: 'DEMO' },
   { text: 'what if ', label: 'what if <chokepoint> closes', hint: 'FRAME' },
   { text: 'exit frame', label: 'exit frame', hint: 'FRAME' },
+  { text: 'rank chokepoints', label: 'rank chokepoints', hint: 'FRAME' },
   { text: 'compare ', label: 'compare <a> vs <b>', hint: 'ROUTES' },
   { text: 'play', label: 'play', hint: 'TIME' },
   { text: 'pause', label: 'pause', hint: 'TIME' },
@@ -313,6 +314,21 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   }
 
   // -- 4b. counterfactual frames
+  if (
+    lower === 'rank chokepoints' ||
+    lower === 'criticality' ||
+    lower === 'rank frames' ||
+    lower === 'rank scenarios'
+  ) {
+    const rows = api.rankScenarios();
+    if (!rows.length) return err('NO FRAMES TO RANK');
+    api.setPreset('scenarios');
+    const top = rows
+      .slice(0, 3)
+      .map((r, i) => `${i + 1}. ${r.name.toUpperCase()} +${r.summary.totalDelayHours}H`)
+      .join(' · ');
+    return ok(`CRITICALITY (COMPUTED) · ${top}`);
+  }
   if (
     lower === 'exit frame' ||
     lower === 'clear frame' ||

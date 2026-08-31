@@ -378,8 +378,9 @@ a `ScenarioImpact`. It never touches the snapshot and stores nothing back;
 running the same spec at the same sim time yields the same frame. A
 `ScenarioSpec` is a named set of `ScenarioPerturbation`s (a route or node
 id, `'closure' | 'congestion'`, magnitude 0..1) with a duration;
-`buildScenarioCatalog(snapshot)` derives one 72-hour closure spec per
-chokepoint / border crossing that any route actually passes.
+`buildScenarioCatalog(snapshot)` derives a 72-hour closure spec per
+chokepoint / border crossing that any route actually passes, plus the
+constraint frames described under **Criticality ranking** below.
 
 **Three named propagation mechanisms**, each attaching a human-readable
 `note` explaining why the entity changed — explainable over clever:
@@ -413,6 +414,24 @@ observed values are carried alongside the perturbed ones, never replaced),
 the sorted `delayedFlows`, and a summary block (perturbed routes,
 downstream facilities, spillover routes, flows delayed, total delay
 hours).
+
+**Criticality ranking.** Because `computeScenarioImpact` is pure, every
+frame in the catalog can be computed *without being entered*.
+`rankScenarioImpacts(snapshot, stateAt, specs, t)` does exactly that: it
+runs the whole catalog at the current sim time and orders chokepoints by
+simulated queued delay — the rank key is `totalDelayHours`, explainable
+like everything else in this module, with `flowsDelayed` then
+`perturbedRoutes` as secondary keys. To feed it, the catalog now carries
+two frame shapes per chokepoint where they make sense: the 72-hour full
+closure, and a **constraint frame** for the common real-world case that
+is pressure rather than stoppage — 50% canal capacity (Panama, Suez
+draft/slot restriction) or enhanced border inspections, each running
+168 hours as a congestion-kind perturbation. The App caches the ranking
+per sim-hour bucket (`rankScenarios()` in `src/app/app.ts`): the engine
+is deterministic, so one computation per hour is the whole cost. The
+standing rule applies with full force: a criticality rank is **computed
+intelligence, never observation** — the same rule as every hypothetical
+product, and every surface that shows it says so.
 
 **Regime and provenance.** Entering a frame goes through
 `AppApi.runScenario(id)`; the clock is told via `SimClock.setScenario(id)`

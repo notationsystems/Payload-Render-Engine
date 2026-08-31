@@ -6,7 +6,7 @@
  */
 
 import type { EntityId, Facility, Flow, LonLat, Route, TemporalState } from '../data/contracts';
-import type { ScenarioImpact, ScenarioSpec } from '../data/scenario';
+import type { ScenarioImpact, ScenarioRankingRow, ScenarioSpec } from '../data/scenario';
 import type { SearchResult, WorldStore } from '../data/store';
 import type { EventBus } from '../core/events';
 import type { SimClock } from '../core/time';
@@ -155,6 +155,12 @@ export interface AppApi {
 
   // ---- counterfactual frames (hypothetical — never confused with state)
   listScenarios(): ScenarioSpec[];
+  /**
+   * Chokepoint criticality: every catalog frame computed (not entered)
+   * at the current sim time, ranked by simulated network damage.
+   * COMPUTED intelligence, never observation.
+   */
+  rankScenarios(): ScenarioRankingRow[];
   /** Enter a hypothetical frame; regime becomes 'scenario' until cleared. */
   runScenario(id: EntityId): ScenarioImpact | null;
   clearScenario(): void;

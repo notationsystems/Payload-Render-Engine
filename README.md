@@ -23,7 +23,10 @@ facilities, corridor spillover, delayed flows — as an explicitly hypothetical
 frame. Scenario frames carry `provenance.source: 'synthetic:scenario'`, render
 in a distinct violet dashed treatment under a persistent banner, and switch the
 clock to the `'scenario'` regime until cleared. They are never drawn in the
-solid look of observed state: a simulated outcome is not an outcome.
+solid look of observed state: a simulated outcome is not an outcome. Because the
+engine is pure, the SCENARIOS panel also ranks every chokepoint by simulated
+queued delay without entering any frame — a criticality ranking that is computed
+intelligence, never observation.
 
 ---
 
@@ -95,6 +98,7 @@ Main verbs:
 | `world` / `freight` / `trade` / `commodities` / `network` / `intelligence` | View presets (`exceptions` remains a legacy alias for `intelligence`). |
 | `agents` / `scenarios` | Panel views: no layer change, they open an instrument panel (the AGENTS and SCENARIOS tabs). |
 | `what if <chokepoint> closes` / `scenario <name>` | Enter a hypothetical frame (e.g. `what if suez closes`); `exit frame` returns to observed state. |
+| `rank chokepoints` / `criticality` | Rank every catalog frame by simulated queued delay without entering any — computed intelligence, never observation. Opens the SCENARIOS panel. |
 | `follow the load` | Cinematic multimodal demo scenario; `stop` / `exit` ends it. |
 | `help` | Print the verb summary. |
 
