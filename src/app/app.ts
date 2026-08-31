@@ -78,6 +78,7 @@ export class App implements AppApi {
   private selectedCountry: Country | null = null;
   private countryOutline: THREE.Object3D | null = null;
   private activeEventIds = new Set<EntityId>();
+  private anomaliesSig = '';
   private lastTemporalRefresh = 0;
   private lastSimMs = 0;
 
@@ -224,6 +225,19 @@ export class App implements AppApi {
     this.anomalies.visible = false;
   }
 
+  /** Rebuild anomaly markers only when the active event set changed —
+   *  not on every 150 ms temporal refresh during playback. */
+  private refreshAnomaliesIfChanged(): void {
+    const sig = this.store
+      .activeEvents(this.clock.simTime)
+      .map((e) => e.id)
+      .sort()
+      .join('|');
+    if (sig === this.anomaliesSig) return;
+    this.anomaliesSig = sig;
+    this.rebuildAnomalies();
+  }
+
   private rebuildAnomalies(): void {
     const positions: number[] = [];
     for (const ev of this.store.activeEvents(this.clock.simTime)) {
@@ -256,6 +270,11 @@ export class App implements AppApi {
   }
 
   private rebuildDependencyOverlay(): void {
+    for (const child of this.depOverlay.children) {
+      const line = child as THREE.LineSegments;
+      line.geometry.dispose();
+      (line.material as THREE.Material).dispose();
+    }
     this.depOverlay.clear();
     if (!this.layerMgr.isVisible('intel.dependencies') || !this.selection) return;
     const node = this.store.node(this.selection);
@@ -336,7 +355,10 @@ export class App implements AppApi {
     m.register('intel.constraints', (v) => this.routesLayer.setConstraintsVisible(v));
     m.register('intel.anomalies', (v) => {
       this.anomalies.visible = v;
-      if (v) this.rebuildAnomalies();
+      if (v) {
+        this.anomaliesSig = '';
+        this.refreshAnomaliesIfChanged();
+      }
     });
     m.register('intel.dependencies', () => this.rebuildDependencyOverlay());
     m.register('intel.risk', (v) => this.routesLayer.setRiskMode(v));
@@ -367,7 +389,7 @@ export class App implements AppApi {
       const s = this.store.stateAt(route.id, t);
       this.routesLayer.setTemporalState(route.id, s.utilization, s.congestion, s.status);
     }
-    if (this.anomalies.visible) this.rebuildAnomalies();
+    if (this.anomalies.visible) this.refreshAnomaliesIfChanged();
 
     // event toasts: only on smooth advance (playback), not on scrub jumps
     const jump = Math.abs(this.clock.simMillis - this.lastSimMs);
@@ -473,16 +495,29 @@ export class App implements AppApi {
   }
 
   setLayerVisible(id: LayerId, visible: boolean): void {
+    // the registered applier handles intel.dependencies — no double rebuild
     this.layerMgr.setVisible(id, visible);
-    if (id === 'intel.dependencies') this.rebuildDependencyOverlay();
   }
 
+  /** Last preset that actually changed layers — panel views return here. */
+  private lastLayerPreset: ViewPreset = 'world';
+
   setPreset(preset: ViewPreset): void {
+    // legacy alias from the original brief
+    if ((preset as string) === 'exceptions') preset = 'intelligence';
     this.preset = preset;
-    this.layerMgr.applyPreset(preset);
-    this.routesLayer.setDimUndisturbed(this.layerMgr.presetDimsHealthy(preset));
+    if (preset !== 'agents' && preset !== 'scenarios') {
+      this.lastLayerPreset = preset;
+      this.layerMgr.applyPreset(preset);
+      this.routesLayer.setDimUndisturbed(this.layerMgr.presetDimsHealthy(preset));
+    }
     this.events.emit('preset', { preset });
     this.events.emit('flowMode', { enabled: this.getFlowMode() });
+  }
+
+  /** Where a closing panel view should land. */
+  getLastLayerPreset(): ViewPreset {
+    return this.lastLayerPreset;
   }
 
   getPreset(): ViewPreset {
@@ -561,6 +596,16 @@ export class App implements AppApi {
   private selectCountryObj(country: Country | null, fly = false): void {
     if (this.countryOutline) {
       this.engine.scene.remove(this.countryOutline);
+      // outline group shares one material across its ring geometries
+      let materialDisposed = false;
+      this.countryOutline.traverse((obj) => {
+        const line = obj as THREE.Line;
+        if (line.geometry) line.geometry.dispose();
+        if (!materialDisposed && line.material) {
+          (line.material as THREE.Material).dispose();
+          materialDisposed = true;
+        }
+      });
       this.countryOutline = null;
     }
     this.selectedCountry = country;

@@ -285,8 +285,50 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     if (f.operator) capRows.push(kv('OPERATOR', f.operator.toUpperCase()));
     if (capRows.length) content.append(section('CAPACITY', ...capRows));
 
-    // CONNECTED TRANSPORT — grouped by mode
+    // CONNECTED NETWORKS — one chip per mode touching this facility
     const routes = api.store.routesOfNode(f.id);
+    if (routes.length) {
+      const chips = div('os-net-chips');
+      for (const mode of MODE_ORDER) {
+        if (!routes.some((r) => r.mode === mode)) continue;
+        const chip = document.createElement('span');
+        chip.className = 'os-net-chip';
+        const i = document.createElement('i');
+        i.style.background = MODE_COLOR[mode];
+        chip.append(i, document.createTextNode(mode.toUpperCase()));
+        chips.appendChild(chip);
+      }
+      content.append(section('CONNECTED NETWORKS', chips));
+    }
+
+    // FLOW BALANCE + TOP COMMODITIES — derived from flow chains
+    {
+      const touching = api.store.flowsTouchingNode(f.id);
+      const inbound = touching.filter((fl) => fl.destinationId === f.id).length;
+      const outbound = touching.filter((fl) => fl.originId === f.id).length;
+      const through = touching.length - inbound - outbound;
+      if (touching.length) {
+        const rows = [
+          kv('INBOUND', String(inbound)),
+          kv('OUTBOUND', String(outbound)),
+        ];
+        if (through > 0) rows.push(kv('TRANSITING', String(through)));
+        // commodity shares by relative flow intensity (synthetic — not tonnage)
+        const byCommodity = new Map<string, number>();
+        for (const fl of touching) {
+          const name = api.store.commodity(fl.commodityId)?.name ?? fl.commodityId;
+          byCommodity.set(name, (byCommodity.get(name) ?? 0) + fl.intensity);
+        }
+        const total = [...byCommodity.values()].reduce((a, b) => a + b, 0) || 1;
+        const top = [...byCommodity.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
+        for (const [name, w] of top) {
+          rows.push(kv(name.toUpperCase(), `${Math.round((w / total) * 100)}% OF FLOW`));
+        }
+        content.append(section('FLOW PROFILE', ...rows));
+      }
+    }
+
+    // CONNECTED TRANSPORT — grouped by mode
     if (routes.length) {
       const holder = document.createElement('div');
       for (const mode of MODE_ORDER) {

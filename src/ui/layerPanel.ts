@@ -48,7 +48,29 @@ export function createLayerPanel(api: AppApi): { el: HTMLElement } {
   tab.className = 'pe-lp-tab';
   tab.textContent = 'LAYERS';
 
-  el.append(head, body, tab);
+  // layer presets — one-click OS focus modes
+  const chips = document.createElement('div');
+  chips.className = 'os-preset-chips';
+  const chipTitle = document.createElement('div');
+  chipTitle.className = 'chip-title';
+  chipTitle.textContent = 'LAYER PRESETS';
+  chips.appendChild(chipTitle);
+  const presetChips: [string, string][] = [
+    ['Global Overview', 'world'],
+    ['Freight Focus', 'freight'],
+    ['Industrial Focus', 'commodities'],
+    ['Risk Focus', 'intelligence'],
+  ];
+  for (const [label, preset] of presetChips) {
+    const b = document.createElement('button');
+    b.className = 'os-preset-chip';
+    b.type = 'button';
+    b.textContent = label;
+    b.addEventListener('click', () => api.setPreset(preset as never));
+    chips.appendChild(b);
+  }
+  // outside `body`: render() calls body.replaceChildren(), chips persist
+  el.append(head, body, chips, tab);
 
   const setCollapsed = (collapsed: boolean): void => {
     panelCollapsed = collapsed;

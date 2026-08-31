@@ -5,6 +5,7 @@
 
 import './ui/theme.css';
 import './ui/inspect.css';
+import './ui/os.css';
 import { App } from './app/app';
 import { buildToolSurface } from './app/toolSurface';
 import { createCommandBar } from './ui/commandBar';
@@ -13,6 +14,10 @@ import { createStatusBar } from './ui/statusBar';
 import { createToasts } from './ui/toasts';
 import { createInfoPanel } from './ui/infoPanel';
 import { createTimeline } from './ui/timeline';
+import { createAnalyticsDock } from './ui/analyticsDock';
+import { createAgentsPanel } from './ui/agentsPanel';
+import { createScenariosPanel } from './ui/scenariosPanel';
+import { createArchOverlay } from './ui/archOverlay';
 
 async function start(): Promise<void> {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -27,6 +32,9 @@ async function start(): Promise<void> {
     throw err;
   }
 
+  // structured tool surface first — the agents panel renders it
+  const tools = buildToolSurface(app);
+
   // instrument layer
   hud.appendChild(createCommandBar(app).el);
   hud.appendChild(createLayerPanel(app).el);
@@ -34,6 +42,10 @@ async function start(): Promise<void> {
   hud.appendChild(createToasts(app).el);
   hud.appendChild(createInfoPanel(app).el);
   hud.appendChild(createTimeline(app).el);
+  hud.appendChild(createAnalyticsDock(app).el);
+  hud.appendChild(createAgentsPanel(app, tools).el);
+  hud.appendChild(createScenariosPanel(app).el);
+  hud.appendChild(createArchOverlay(app).el);
 
   // escape: exit demo, else clear selection — but never while typing
   // (the search box owns Escape for its own dropdown/blur)
@@ -41,8 +53,12 @@ async function start(): Promise<void> {
     if (e.key !== 'Escape') return;
     const ae = document.activeElement as HTMLElement | null;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    // the architecture overlay owns Escape while it is open
+    if (document.querySelector('.os-arch:not([hidden])')) return;
     if (app.isDemoActive()) app.stopFollowTheLoad();
-    else {
+    else if (app.getPreset() === 'agents' || app.getPreset() === 'scenarios') {
+      app.setPreset(app.getLastLayerPreset());
+    } else {
       app.select(null);
       app.selectCountry(null);
     }
@@ -50,7 +66,6 @@ async function start(): Promise<void> {
 
   // structured tool surface (GeoAgent pattern): the same operations the
   // command bar uses, exposed for a future agent/MCP binding.
-  const tools = buildToolSurface(app);
   (window as unknown as Record<string, unknown>).payloadEarth = {
     api: app,
     tools,

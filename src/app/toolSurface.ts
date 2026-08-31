@@ -81,7 +81,8 @@ export function buildToolSurface(api: AppApi): TwinTool[] {
     },
     {
       name: 'set_preset',
-      description: 'Apply a view preset: world, freight, trade, commodities, network, exceptions.',
+      description:
+        'Apply a view preset: world, freight, trade, commodities, network, intelligence — or open the agents / scenarios panel views.',
       category: 'layers',
       params: [{ name: 'preset', type: 'string', description: 'Preset name', required: true }],
       safety: SAFE,

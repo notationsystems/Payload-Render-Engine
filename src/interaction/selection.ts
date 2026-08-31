@@ -70,29 +70,40 @@ export class SelectionInput {
     const node = this.nodesLayer.pick(ndcX, ndcY, this.camera, w, h, 14);
     if (node) return { type: 'node', id: node.node.id };
 
-    // 2. routes (raycast against visible tubes)
+    // 2. routes (raycast against visible tubes; globe occlusion is an
+    // analytic ray–sphere test — never a 49k-triangle mesh raycast)
     this.pointer.set(ndcX, ndcY);
     this.raycaster.setFromCamera(this.pointer, this.camera);
+    const globeDist = raySphereDistance(this.raycaster.ray);
     const hits = this.raycaster.intersectObjects(this.routesLayer.pickables(), false);
     if (hits.length) {
-      // ignore route hits hidden behind the globe
-      const globeHit = this.raycaster.intersectObject(this.globeMesh, false)[0];
       const first = hits[0];
-      if (!globeHit || first.distance < globeHit.distance + 0.004) {
+      if (globeDist === null || first.distance < globeDist + 0.004) {
         const id = first.object.userData.routeId as EntityId;
         if (id) return { type: 'route', id };
       }
     }
 
-    // 3. country (sphere intersection → point-in-polygon)
-    if (includeCountry) {
-      const globeHit = this.raycaster.intersectObject(this.globeMesh, false)[0];
-      if (globeHit) {
-        const ll = vec3ToLatLon(globeHit.point);
-        const country = this.countries.pickAt(ll.lat, ll.lon);
-        if (country) return { type: 'country', country };
-      }
+    // 3. country (analytic sphere intersection → point-in-polygon)
+    if (includeCountry && globeDist !== null) {
+      const point = this.raycaster.ray.at(globeDist, _hit);
+      const ll = vec3ToLatLon(point);
+      const country = this.countries.pickAt(ll.lat, ll.lon);
+      if (country) return { type: 'country', country };
     }
     return null;
   }
+}
+
+const _hit = new THREE.Vector3();
+
+/** Nearest intersection distance of a ray with the unit sphere at origin. */
+function raySphereDistance(ray: THREE.Ray, radius = 1): number | null {
+  // |o + t·d|² = r²  with |d| = 1
+  const b = ray.origin.dot(ray.direction);
+  const c = ray.origin.lengthSq() - radius * radius;
+  const disc = b * b - c;
+  if (disc < 0) return null;
+  const t = -b - Math.sqrt(disc);
+  return t >= 0 ? t : null;
 }

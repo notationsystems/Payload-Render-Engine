@@ -47,6 +47,7 @@ export const DATASET_END = '2026-09-14T00:00:00Z';
 
 const START_MS = Date.parse(DATASET_START);
 const END_MS = Date.parse(DATASET_END);
+const NOW_MS = Date.parse(DATASET_NOW);
 
 function prov(overrides?: Partial<Provenance>): Provenance {
   return { source: 'synthetic:demo', knownAt: DATASET_NOW, confidence: 0.92, ...overrides };
@@ -816,6 +817,8 @@ function buildRoutes(): Route[] {
         ll(52.13, -106.67), // Saskatoon
         ll(49.9, -97.2), // Winnipeg
         ll(50.1, -91.92), // Sioux Lookout
+        ll(50.29, -89.03), // Armstrong (north of Lake Nipigon)
+        ll(50.18, -86.7), // Nakina
         ll(49.21, -84.78), // Hornepayne
         ll(46.71, -80.92), // Capreol
         ll(43.83, -79.53),
@@ -1007,7 +1010,7 @@ function buildRoutes(): Route[] {
         ll(2.6, 101.0), // Strait of Malacca
         ll(4.5, 99.5),
         ll(6.0, 95.0), // off Banda Aceh
-        ll(6.0, 80.0), // south of Sri Lanka
+        ll(5.5, 80.5), // south of Dondra Head (Sri Lanka's tip is 5.92 N)
         ll(10.0, 63.0), // Arabian Sea
         ll(12.5, 48.0), // Gulf of Aden
         ll(12.6, 43.4), // Bab el-Mandeb
@@ -1154,6 +1157,8 @@ function buildRoutes(): Route[] {
         ll(-4.0, 117.4), // Makassar Strait
         ll(-1.0, 118.8),
         ll(3.5, 122.0), // Celebes Sea
+        ll(5.2, 125.6), // south of Sarangani
+        ll(5.9, 127.4), // rounding Cape San Agustin
         ll(10.0, 127.5), // east of Mindanao
         ll(15.0, 128.0),
         ll(20.0, 126.0),
@@ -1175,7 +1180,7 @@ function buildRoutes(): Route[] {
         ll(-30.0, -72.5),
         ll(-25.0, -73.0),
         ll(-18.0, -72.0),
-        ll(-8.0, -78.5), // off Peru
+        ll(-8.0, -79.6), // off Trujillo, Peru (coast at 8 S runs ~79.1 W)
         ll(-3.0, -81.5),
         ll(3.0, -80.5),
         ll(7.0, -79.3), // Gulf of Panama
@@ -1223,6 +1228,7 @@ function buildRoutes(): Route[] {
         ll(9.35, -79.92), // Panama Canal
         ll(10.0, -79.0),
         ll(15.0, -74.5),
+        ll(18.4, -74.9), // clear of Haiti's Tiburon Peninsula (west tip ~74.45 W)
         ll(20.0, -73.8), // Windward Passage
         ll(25.0, -73.0),
         ll(32.0, -74.5),
@@ -1787,10 +1793,15 @@ function buildAssertionsAndObservations(
   const ASSERTED_AT = '2026-08-01T00:00:00Z';
   const rangeMs = END_MS - START_MS;
 
+  // Evidence can only exist for the past: observations spread across
+  // START..NOW, never after the dataset's knowledge boundary.
+  const obsRangeMs = NOW_MS - START_MS;
   const addObs = (entityId: string, metric: string, base: number, devMin: number, devMax: number, count: number, unit: string) => {
     for (let i = 0; i < count; i++) {
-      const t = new Date(START_MS + Math.round(((i + 1) / (count + 1)) * rangeMs)).toISOString();
-      const u = hashUnit(fnv1a(`${entityId}:${metric}:obs:${i}`));
+      const t = new Date(START_MS + Math.round(((i + 1) / (count + 1)) * obsRangeMs)).toISOString();
+      // index leads the key so it diffuses through the whole FNV chain —
+      // trailing-index keys barely perturb the kept high bits
+      const u = hashUnit(fnv1a(`obs${i}:${entityId}:${metric}`));
       const value = round1(base * (1 + devMin + (devMax - devMin) * u));
       observations.push({
         id: `obs:${entityId}:${metric}:${i}`,

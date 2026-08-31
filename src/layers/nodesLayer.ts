@@ -327,11 +327,11 @@ export class NodesLayer {
     const py = ((1 - ndcY) / 2) * heightPx;
     let best: NodeEntry | null = null;
     let bestD = radiusPx;
-    const proj = new THREE.Vector3();
-    const camUnit = camera.position.clone().normalize();
+    const proj = _pickProj;
+    const camUnit = _pickCam.copy(camera.position).normalize();
     for (const e of this.entries) {
       if (this.alphaAttr.getX(e.index) < 0.5) continue;
-      const facing = e.pos.clone().normalize().dot(camUnit);
+      const facing = _pickNode.copy(e.pos).normalize().dot(camUnit);
       if (facing < horizon) continue; // behind the limb
       proj.copy(e.pos).project(camera);
       const sx = ((proj.x + 1) / 2) * widthPx;
@@ -345,3 +345,7 @@ export class NodesLayer {
     return best;
   }
 }
+
+const _pickProj = new THREE.Vector3();
+const _pickCam = new THREE.Vector3();
+const _pickNode = new THREE.Vector3();

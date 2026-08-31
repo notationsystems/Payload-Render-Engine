@@ -104,14 +104,16 @@ const PRESETS: ViewPreset[] = [
   'trade',
   'commodities',
   'network',
-  'exceptions',
+  'intelligence',
+  'agents',
+  'scenarios',
 ];
 
 const HINT = 'TRY: find <place> · show <layer> · follow the load';
 
 const HELP_MESSAGE =
   'FIND <NAME> · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
-  'COMPARE <A> VS <B> · WORLD/FREIGHT/TRADE/COMMODITIES/NETWORK/EXCEPTIONS · FOLLOW THE LOAD · EXIT';
+  'COMPARE <A> VS <B> · WORLD/FREIGHT/TRADE/COMMODITIES/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · FOLLOW THE LOAD · EXIT';
 
 const STARTERS: Suggestion[] = [
   { text: 'Find Toronto', label: 'Find Toronto', hint: 'SEARCH' },
@@ -120,7 +122,7 @@ const STARTERS: Suggestion[] = [
   { text: 'Follow the load', label: 'Follow the load', hint: 'DEMO' },
   { text: 'Show copper flows', label: 'Show copper flows', hint: 'FLOWS' },
   { text: 'compare ', label: 'Compare <a> vs <b>', hint: 'ROUTES' },
-  { text: 'Exceptions', label: 'Exceptions preset', hint: 'PRESET' },
+  { text: 'Intelligence', label: 'Intelligence preset', hint: 'PRESET' },
 ];
 
 /** Verb templates offered as prefix completions in suggestCommands. */
@@ -145,7 +147,9 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'trade', label: 'trade', hint: 'PRESET' },
   { text: 'commodities', label: 'commodities', hint: 'PRESET' },
   { text: 'network', label: 'network', hint: 'PRESET' },
-  { text: 'exceptions', label: 'exceptions', hint: 'PRESET' },
+  { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
+  { text: 'agents', label: 'agents', hint: 'VIEW' },
+  { text: 'scenarios', label: 'scenarios', hint: 'VIEW' },
   { text: 'help', label: 'help', hint: 'HELP' },
 ];
 
@@ -306,7 +310,11 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
     return ok('DEMO STOPPED');
   }
 
-  // -- 5. bare preset word
+  // -- 5. bare preset word ('exceptions' remains a legacy alias)
+  if (lower === 'exceptions') {
+    api.setPreset('intelligence');
+    return { ok: true, message: 'PRESET INTELLIGENCE' };
+  }
   if ((PRESETS as string[]).includes(lower)) {
     api.setPreset(lower as ViewPreset);
     return ok(`PRESET ${lower.toUpperCase()}`);

@@ -11,7 +11,9 @@ const PRESETS: { id: ViewPreset; label: string }[] = [
   { id: 'trade', label: 'TRADE' },
   { id: 'commodities', label: 'COMMODITIES' },
   { id: 'network', label: 'NETWORK' },
-  { id: 'exceptions', label: 'EXCEPTIONS' },
+  { id: 'intelligence', label: 'INTELLIGENCE' },
+  { id: 'agents', label: 'AGENTS' },
+  { id: 'scenarios', label: 'SCENARIOS' },
 ];
 
 export function createCommandBar(api: AppApi): { el: HTMLElement } {
@@ -51,7 +53,33 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
   followBtn.type = 'button';
   followBtn.textContent = 'FOLLOW THE LOAD';
 
-  row.append(mark, searchWrap, flowChip, followBtn);
+  // sim-time readout + regime chip (OS top-bar clock)
+  const timeChip = document.createElement('div');
+  timeChip.className = 'pe-cb-time';
+  const timeText = document.createElement('span');
+  timeText.className = 'pe-cb-time-text';
+  const regimeDot = document.createElement('span');
+  regimeDot.className = 'pe-cb-time-regime';
+  timeChip.append(timeText, regimeDot);
+  const renderClock = (t: string, regime: string): void => {
+    timeText.textContent = `UTC ${t.slice(0, 16).replace('T', ' ')}`;
+    regimeDot.textContent = regime.toUpperCase();
+    regimeDot.dataset.regime = regime;
+  };
+  api.events.on('time', (ts) => renderClock(ts.t, ts.regime));
+  renderClock(api.clock.state().t, api.clock.state().regime);
+
+  // OS architecture overlay toggle
+  const osBtn = document.createElement('button');
+  osBtn.className = 'pe-chip pe-cb-os';
+  osBtn.type = 'button';
+  osBtn.textContent = 'OS';
+  osBtn.title = 'Payload OS architecture';
+  osBtn.addEventListener('click', () =>
+    window.dispatchEvent(new CustomEvent('pe:arch-toggle'))
+  );
+
+  row.append(mark, searchWrap, flowChip, followBtn, timeChip, osBtn);
 
   // ---------------------------------------------------------------- tabs
   const tabs = document.createElement('div');

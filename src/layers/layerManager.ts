@@ -30,7 +30,7 @@ const DEFS: [LayerId, string, LayerDef['group'], boolean][] = [
   ['intel.risk', 'Risk', 'INTELLIGENCE', false],
 ];
 
-const PRESETS: Record<ViewPreset, Partial<Record<LayerId, boolean>>> = {
+const PRESETS: Partial<Record<ViewPreset, Partial<Record<LayerId, boolean>>>> = {
   world: Object.fromEntries(DEFS.map(([id, , , v]) => [id, v])),
   freight: {
     'world.nightlights': true,
@@ -99,7 +99,7 @@ const PRESETS: Record<ViewPreset, Partial<Record<LayerId, boolean>>> = {
     'intel.anomalies': false,
     'intel.risk': false,
   },
-  exceptions: {
+  intelligence: {
     'transport.road': true,
     'transport.rail': true,
     'transport.maritime': true,
@@ -116,6 +116,9 @@ const PRESETS: Record<ViewPreset, Partial<Record<LayerId, boolean>>> = {
     'intel.risk': true,
   },
 };
+
+// panel presets change no layers
+const PANEL_PRESETS = new Set(['agents', 'scenarios']);
 
 export class LayerManager {
   private defs: LayerDef[];
@@ -154,7 +157,9 @@ export class LayerManager {
   }
 
   applyPreset(preset: ViewPreset): void {
+    if (PANEL_PRESETS.has(preset)) return;
     const map = PRESETS[preset];
+    if (!map) return;
     for (const [id, v] of Object.entries(map)) {
       this.setVisible(id as LayerId, v as boolean, true);
     }
@@ -163,6 +168,6 @@ export class LayerManager {
 
   /** Exceptions preset dims healthy routes; expose the flag per preset. */
   presetDimsHealthy(preset: ViewPreset): boolean {
-    return preset === 'exceptions';
+    return preset === 'intelligence';
   }
 }

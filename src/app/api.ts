@@ -16,7 +16,9 @@ export type ViewPreset =
   | 'trade'
   | 'commodities'
   | 'network'
-  | 'exceptions';
+  | 'intelligence' // formerly 'exceptions' — setPreset still accepts the old word
+  | 'agents' // panel views: no layer change, they open an instrument panel
+  | 'scenarios';
 
 export interface LayerDef {
   id: LayerId;
@@ -124,6 +126,8 @@ export interface AppApi {
   setLayerVisible(id: LayerId, visible: boolean): void;
   setPreset(preset: ViewPreset): void;
   getPreset(): ViewPreset;
+  /** Last layer-changing preset — where a closing panel view returns. */
+  getLastLayerPreset(): ViewPreset;
   setFlowMode(enabled: boolean): void;
   getFlowMode(): boolean;
 
