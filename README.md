@@ -104,7 +104,7 @@ Main verbs:
 | `speed 1h` / `speed 6h` / `speed 24h` | Sim-hours per wall-second. |
 | `compare <a> vs <b>` | Compare two routes: distance, promised duration, live utilization. |
 | `world` / `freight` / `trade` / `commodities` / `network` / `intelligence` | View presets (`exceptions` remains a legacy alias for `intelligence`). |
-| `agents` / `scenarios` | Panel views: no layer change, they open an instrument panel (the AGENTS and SCENARIOS tabs). |
+| `agents` / `scenarios` / `markets` | Panel views: no layer change, they open an instrument panel (the AGENTS, SCENARIOS and MARKETS tabs). |
 | `what if <chokepoint> closes` / `scenario <name>` | Enter a hypothetical frame (e.g. `what if suez closes`); `exit frame` returns to observed state. |
 | `rank chokepoints` / `criticality` | Rank every catalog frame by simulated queued delay without entering any — computed intelligence, never observation. Opens the SCENARIOS panel. |
 | `follow the load` | Cinematic multimodal demo scenario; `stop` / `exit` ends it. |
@@ -115,6 +115,31 @@ command bar (`what if suez closes`): pick a chokepoint closure and enter the
 hypothetical frame — the regime becomes `'scenario'`, the impact renders in the
 violet dashed scenario treatment with a persistent banner, and `exit frame`
 returns to observed state.
+
+## Markets (trading desk)
+
+The MARKETS tab opens the trading-desk workspace: FX, crypto, crypto
+derivatives, and the broker seam, served through the spatial API's markets
+proxy (`server/markets.mjs` — hosts fixed in code, cached with stated TTLs
+and ages, typed refusals with remedies). Every desk leads with its basis,
+and every figure the panel derives (a % change, an annualized basis, a
+funding APR, a put/call ratio) is labeled COMPUTED in text:
+
+| Desk | Upstream (keyless) | Basis shown in the UI |
+|---|---|---|
+| FX | ECB daily reference rates via api.frankfurter.dev | REPORTED · daily fix with its date — informational, **not a tradeable quote** |
+| CRYPTO | Coinbase Exchange public market data | OBSERVED · single-venue prints (last trade, 24h stats, daily closes) — venue truth, not an index |
+| DERIVATIVES | Deribit public book summaries (BTC, ETH) | REPORTED · venue marks — futures term structure with COMPUTED annualized basis, perpetual funding (+ COMPUTED APR), top-OI options with the venue's mark IV |
+| BROKER | Interactive Brokers Client Portal Gateway | fail-closed adapter seam — see below |
+
+**Broker posture.** The BROKER desk is a read-only adapter seam for
+Interactive Brokers' Client Portal API: it renders `BROKER_NOT_CONFIGURED`
+with a remedy until `IBKR_GATEWAY_URL` points at a running, authenticated
+gateway. Credentials live in the gateway, never in this service and never
+in a browser. **No order capability exists on this surface by design** —
+order execution belongs to the Terminal backend under its own authority
+model; this desk mirrors session state the way the operations desk mirrors
+the control tower.
 
 ## Live substrate (gods-eye-view, under PayLoad OS chrome)
 
@@ -139,6 +164,7 @@ with a remedy, never a faked surface:
 
 | Power-up | Needs | Status |
 |---|---|---|
+| Interactive Brokers desk | IB Client Portal Gateway running + `IBKR_GATEWAY_URL` | Adapter seam implemented (`/api/markets/broker`); refuses with the remedy until configured; read-only by design |
 | Active fires overlay | `FIRMS_MAP_KEY` (free: https://firms.modaps.eosdis.nasa.gov/api/map_key/) | Proxy route implemented (`/api/live/fires`); refuses with the remedy until keyed |
 | Live vessels (AIS) | AISStream account/key | Documented design; not implemented until a key path exists |
 | Voice control | OpenAI realtime key | Not implemented; the command bar is the hands-on equivalent |

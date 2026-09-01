@@ -20,7 +20,8 @@ export type ViewPreset =
   | 'intelligence' // formerly 'exceptions' — setPreset still accepts the old word
   | 'agents' // panel views: no layer change, they open an instrument panel
   | 'scenarios'
-  | 'operations';
+  | 'operations'
+  | 'markets';
 
 export interface LayerDef {
   id: LayerId;

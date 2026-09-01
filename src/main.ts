@@ -24,6 +24,7 @@ import { createCommoditiesPanel } from './ui/commoditiesPanel';
 import { createArchOverlay } from './ui/archOverlay';
 import { createScenarioBanner } from './ui/scenarioBanner';
 import { createTrackCard } from './ui/trackCard';
+import { createMarketsPanel } from './ui/marketsPanel';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -60,6 +61,7 @@ async function start(): Promise<void> {
   hud.appendChild(createArchOverlay(app).el);
   hud.appendChild(createScenarioBanner(app).el);
   hud.appendChild(createTrackCard(app).el);
+  hud.appendChild(createMarketsPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 
@@ -73,7 +75,11 @@ async function start(): Promise<void> {
     if (document.querySelector('.os-arch:not([hidden])')) return;
     if (app.isDemoActive()) app.stopFollowTheLoad();
     else if (app.isLiveTracking()) app.releaseLiveTrack();
-    else if (app.getPreset() === 'agents' || app.getPreset() === 'scenarios') {
+    else if (
+      app.getPreset() === 'agents' ||
+      app.getPreset() === 'scenarios' ||
+      app.getPreset() === 'markets'
+    ) {
       app.setPreset(app.getLastLayerPreset());
     } else {
       app.select(null);

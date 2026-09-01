@@ -715,7 +715,7 @@ export class App implements AppApi {
     // legacy alias from the original brief
     if ((preset as string) === 'exceptions') preset = 'intelligence';
     this.preset = preset;
-    if (preset !== 'agents' && preset !== 'scenarios' && preset !== 'operations') {
+    if (preset !== 'agents' && preset !== 'scenarios' && preset !== 'operations' && preset !== 'markets') {
       this.lastLayerPreset = preset;
       this.layerMgr.applyPreset(preset);
       this.routesLayer.setDimUndisturbed(this.layerMgr.presetDimsHealthy(preset));

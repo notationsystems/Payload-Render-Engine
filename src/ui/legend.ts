@@ -91,7 +91,8 @@ export function createLegend(api: AppApi): { el: HTMLElement } {
       preset === 'operations' ||
       preset === 'agents' ||
       preset === 'scenarios' ||
-      preset === 'commodities';
+      preset === 'commodities' ||
+      preset === 'markets';
     sync2();
   });
   api.events.on('select', ({ id }) => {

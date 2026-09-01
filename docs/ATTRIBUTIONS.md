@@ -26,3 +26,21 @@ patterns only, no code vendored.
 
 Country and land geometry via world-atlas (Natural Earth data, public
 domain).
+
+## Market data upstreams (keyless public endpoints)
+
+The markets proxy (`server/markets.mjs`) consumes, with hosts fixed in
+code and no keys:
+
+- **ECB reference rates via Frankfurter** (https://frankfurter.dev) —
+  European Central Bank daily reference rates; an informational fix,
+  never presented as a tradeable quote.
+- **Coinbase Exchange public market data** — single-venue spot prints
+  (24h stats, daily candles), labeled venue truth, not an index.
+- **Deribit public API** — futures/perpetual book summaries and option
+  marks/IV/open interest; mark values are the venue's model and are
+  labeled as such.
+
+The Interactive Brokers desk is an adapter seam only: it talks to a
+locally run IB Client Portal Gateway when one is configured and holds
+no credentials itself.

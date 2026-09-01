@@ -209,6 +209,28 @@ else process.env.PAYLOAD_OPERATIONS_TOKEN = savedToken;
 if (savedUrl === undefined) delete process.env.TERMINAL_URL;
 else process.env.TERMINAL_URL = savedUrl;
 
+// broker seam: fail-closed without a gateway, credential posture stated
+console.log('\n— markets broker seam —');
+const savedGw = process.env.IBKR_GATEWAY_URL;
+delete process.env.IBKR_GATEWAY_URL;
+const brokerNoGw = await call('GET', '/api/markets/broker');
+check(
+  brokerNoGw?.status === 'refused' && brokerNoGw.refusal.kind === 'BROKER_NOT_CONFIGURED',
+  'no IB gateway configured → fail-closed typed refusal'
+);
+check(
+  /never in this service or the browser/.test(brokerNoGw?.refusal?.remedy ?? ''),
+  'remedy states the credential posture'
+);
+process.env.IBKR_GATEWAY_URL = 'http://127.0.0.1:1'; // nothing listens here
+const brokerDown = await call('GET', '/api/markets/broker');
+check(
+  brokerDown?.status === 'refused' && brokerDown.refusal.kind === 'BROKER_UNREACHABLE',
+  'unreachable gateway → typed refusal, never a fabricated session'
+);
+if (savedGw === undefined) delete process.env.IBKR_GATEWAY_URL;
+else process.env.IBKR_GATEWAY_URL = savedGw;
+
 // malformed inputs are refused, never 500s or silent zeros
 const badId = tcall('GET', '/api/state/%ZZ');
 check(badId?.status === 'refused' && badId.refusal.kind === 'UNPARSEABLE_ID', 'invalid percent-encoding → typed refusal, not a crash');

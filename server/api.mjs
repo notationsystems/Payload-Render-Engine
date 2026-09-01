@@ -15,6 +15,7 @@
 
 import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
+import { registerMarketRoutes } from './markets.mjs';
 
 export async function registerRoutes(corpus) {
   corpus = corpus ?? (await selectCorpus(process.env));
@@ -433,6 +434,9 @@ export async function registerRoutes(corpus) {
 
   // live-feed proxy (gods-eye-view substrate) — corpus-independent
   registerLiveRoutes(get, { ok, refuse, meta });
+
+  // markets proxy (trading-desk substrate) — corpus-independent
+  registerMarketRoutes(get, { ok, refuse, meta });
 
   get('/api/scenarios', () => scenarioGuard() ?? ok(scenarios));
 

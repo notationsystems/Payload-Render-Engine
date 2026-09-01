@@ -11,6 +11,7 @@ const PRESETS: { id: ViewPreset; label: string }[] = [
   { id: 'operations', label: 'OPERATIONS' },
   { id: 'trade', label: 'TRADE' },
   { id: 'commodities', label: 'COMMODITIES' },
+  { id: 'markets', label: 'MARKETS' },
   { id: 'network', label: 'NETWORK' },
   { id: 'intelligence', label: 'INTELLIGENCE' },
   { id: 'agents', label: 'AGENTS' },

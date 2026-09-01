@@ -1,0 +1,259 @@
+/* MARKETS workspace — trading-desk tiles in the instrument idiom.
+   Numbers are tabular, deltas are colored by direction (ok/alert),
+   and every derived figure carries its COMPUTED label in text, not
+   just style. Desk accents: FX blue, crypto amber, derivatives
+   violet, broker teal — the same family the rest of the OS speaks. */
+
+.mk-panel {
+  width: min(880px, calc(100vw - 640px));
+}
+
+.mk-chips {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.mk-chip {
+  padding: 4px 12px;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.mk-chip:hover { color: var(--text-mid); border-color: var(--line-strong); }
+.mk-chip.active {
+  color: var(--text-hi);
+  border-color: var(--line-strong);
+  background: rgba(210, 226, 240, 0.06);
+}
+
+.mk-status {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+  margin-bottom: 8px;
+}
+.mk-status b { color: var(--text-hi); font-weight: 500; }
+
+.mk-basis {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  border-left: 2px solid var(--line-strong);
+  padding: 4px 8px;
+  margin-bottom: 10px;
+}
+
+/* ---------------------------------------------------------- tile grid */
+
+.mk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mk-tile {
+  background: var(--glass-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.mk-tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.mk-pair {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--text-mid);
+}
+.mk-kind {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+
+.mk-tile-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-hi);
+  margin: 2px 0 1px;
+}
+
+.mk-delta {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.mk-delta.up, .up { color: var(--ok); }
+.mk-delta.down, .down { color: var(--alert); }
+
+.mk-spark {
+  width: 100%;
+  height: 34px;
+  margin-top: 5px;
+  display: block;
+}
+
+.mk-tile-foot {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -------------------------------------------------------- derivatives */
+
+.mk-deriv {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--glass-soft);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.mk-deriv-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.mk-deriv-ccy {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--text-hi);
+}
+.mk-deriv-index {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+.mk-perp {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.mk-perp b { color: var(--text-hi); font-weight: 500; }
+.mk-perp-name { color: #b48cff; letter-spacing: 0.14em; }
+.mk-computed {
+  font-style: normal;
+  color: var(--text-dim);
+  font-size: 8.5px;
+}
+
+.mk-sect {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin: 8px 0 5px;
+}
+
+.mk-term-row, .mk-opt-row {
+  display: grid;
+  grid-template-columns: 92px 76px 64px 1fr 84px;
+  gap: 10px;
+  align-items: center;
+  padding: 2.5px 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mid);
+}
+.mk-term-exp { color: var(--text-dim); letter-spacing: 0.04em; }
+.mk-term-mark { text-align: right; color: var(--text-hi); }
+.mk-term-basis { text-align: right; }
+.mk-term-oi { text-align: right; color: var(--text-dim); }
+
+.mk-opt-strike { text-align: right; color: var(--text-hi); }
+.mk-opt-strike i { font-style: normal; font-size: 8.5px; padding-left: 2px; }
+.mk-call { color: var(--ok); }
+.mk-put { color: var(--alert); }
+.mk-opt-iv { text-align: right; color: #b48cff; }
+
+.mk-oi-bar {
+  height: 4px;
+  background: rgba(120, 160, 200, 0.12);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mk-oi-bar i {
+  display: block;
+  height: 100%;
+  background: #b48cff;
+  opacity: 0.65;
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------------------- broker */
+
+.mk-posture {
+  border: 1px solid rgba(255, 180, 84, 0.4);
+  border-left-width: 2px;
+  border-radius: var(--radius);
+  background: rgba(255, 180, 84, 0.05);
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.mk-posture-title {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--warn);
+  margin-bottom: 4px;
+}
+.mk-posture-body {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-mid);
+}
+
+.mk-broker {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--glass-soft);
+  padding: 8px 10px;
+}
+.mk-broker-row {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+  padding: 2px 0;
+}
+.mk-broker-row b { color: var(--text-hi); font-weight: 500; }
