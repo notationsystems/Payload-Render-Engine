@@ -110,11 +110,11 @@ export async function generateEarthTextures(
   l.save();
   l.globalCompositeOperation = 'source-atop';
   const lg = l.createLinearGradient(0, 0, 0, H);
-  lg.addColorStop(0, '#141c28');
-  lg.addColorStop(0.32, '#151e29');
-  lg.addColorStop(0.5, '#18212c');
-  lg.addColorStop(0.68, '#151e29');
-  lg.addColorStop(1, '#141c28');
+  lg.addColorStop(0, '#1a2433');
+  lg.addColorStop(0.32, '#1d2836');
+  lg.addColorStop(0.5, '#212e3f');
+  lg.addColorStop(0.68, '#1d2836');
+  lg.addColorStop(1, '#1a2433');
   l.fillStyle = lg;
   l.fillRect(0, 0, W, H);
 
@@ -156,7 +156,7 @@ export async function generateEarthTextures(
   m.fill('evenodd');
 
   // ------------------------------------------------------------ NIGHT 2048×1024
-  const NW = 2048, NH = 1024;
+  const NW = 4096, NH = 2048;
   const nightC = document.createElement('canvas');
   nightC.width = NW;
   nightC.height = NH;
@@ -170,10 +170,12 @@ export async function generateEarthTextures(
     const x = px(lon, NW);
     const y = py(lat, NH);
     const I = Math.max(0.05, Math.min(1, intensity));
-    const r = 1.4 + I * 5;
+    // 4096-wide canvas: tight cores with a short falloff — metros read
+    // as points of light, not cotton balls
+    const r = 1.6 + I * 4.2;
     const g = n.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(255, 224, 178, ${0.32 + I * 0.34})`);
-    g.addColorStop(0.4, `rgba(255, 196, 120, ${0.1 + I * 0.14})`);
+    g.addColorStop(0, `rgba(255, 228, 186, ${0.38 + I * 0.36})`);
+    g.addColorStop(0.25, `rgba(255, 196, 120, ${0.1 + I * 0.14})`);
     g.addColorStop(1, 'rgba(255, 170, 80, 0)');
     n.fillStyle = g;
     n.fillRect(x - r, y - r, r * 2, r * 2);
@@ -200,7 +202,7 @@ export async function generateEarthTextures(
   const mk = (c: HTMLCanvasElement, srgb = true) => {
     const t = new THREE.CanvasTexture(c);
     if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
+    t.anisotropy = 8;
     t.wrapS = THREE.RepeatWrapping; // longitudinal wrap at the antimeridian seam
     t.needsUpdate = true;
     return t;

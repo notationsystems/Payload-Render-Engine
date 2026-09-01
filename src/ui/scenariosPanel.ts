@@ -97,10 +97,11 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
         <span class="sc-crit-num sc-crit-delay">+${row.summary.totalDelayHours} H</span>`;
       if (activeId !== null && row.specId === activeId) {
         r.classList.add('sc-crit-row-active');
+        // chip rides INSIDE the name cell — numeric columns keep their grid
         const chip = document.createElement('span');
         chip.className = 'sc-active-chip';
-        chip.textContent = 'FRAME ACTIVE';
-        r.appendChild(chip);
+        chip.textContent = 'ACTIVE';
+        r.querySelector('.sc-crit-name')?.appendChild(chip);
       } else if (activeId !== null) {
         r.classList.add('sc-crit-row-inert');
       } else {

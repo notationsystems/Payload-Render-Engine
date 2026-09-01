@@ -151,7 +151,11 @@ export class CameraController {
   // ------------------------------------------------------------ programmatic
 
   setAutoRotate(enabled: boolean): void {
-    this.autoRotate = enabled;
+    // a vestibular preference is a hard constraint, not a suggestion
+    const reduce =
+      typeof matchMedia !== 'undefined' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.autoRotate = enabled && !reduce;
   }
 
   altitudeRadii(): number {

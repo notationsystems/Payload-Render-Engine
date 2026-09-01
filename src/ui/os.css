@@ -331,17 +331,18 @@
 .os-arch {
   position: fixed;
   inset: 0;
-  background: rgba(2, 4, 9, 0.72);
-  backdrop-filter: blur(4px);
+  /* heavy blur + desaturation abstracts the scene into ambient depth
+     instead of legible smears behind the sheet */
+  background: rgba(2, 4, 9, 0.86);
+  backdrop-filter: blur(24px) saturate(0.55);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   pointer-events: auto;
   z-index: 40;
 }
 .os-arch-sheet {
   width: min(1240px, calc(100vw - 40px));
-  margin-bottom: 20px;
   background: var(--glass);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -467,3 +468,12 @@
   padding: 2px 7px;
 }
 .os-net-chip i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+
+/* the dock yields to center panels instead of being sliced by them */
+.os-dock-eclipsed {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-10px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}

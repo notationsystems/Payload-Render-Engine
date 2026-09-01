@@ -65,8 +65,14 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
   const meanUtilAt = (t: string): number => {
     const routes = api.store.snapshot.routes;
     let sum = 0;
-    for (const r of routes) sum += api.store.stateAt(r.id, t).utilization;
-    return routes.length ? sum / routes.length : 0;
+    let n = 0;
+    for (const r of routes) {
+      const s = api.store.stateAt(r.id, t);
+      if (s.observed === false) continue; // placeholders never enter a mean
+      sum += s.utilization;
+      n++;
+    }
+    return n ? sum / n : 0;
   };
 
   const render = (): void => {
@@ -108,7 +114,7 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
             deltaPct > 1.5 ? 'warn' : deltaPct < -1.5 ? 'ok' : ''
           )
         : kpi('NETWORK UTIL', '—', 'UNOBSERVED')) +
-      kpi('DISRUPTED', String(disrupted), degraded ? `+${degraded} DEGRADED` : undefined, disrupted ? 'alert' : '') +
+      kpi('DISRUPTED', String(disrupted), degraded ? `+${degraded} DEGRADED` : undefined, disrupted ? 'alert' : degraded ? 'warn' : '') +
       kpi('ACTIVE EVENTS', String(activeEvents), undefined, activeEvents > 2 ? 'warn' : '');
 
     // sparkline across the whole range (cached — deterministic data).
@@ -168,6 +174,13 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
       })
     );
   };
+
+  // the dock yields while a center panel is open — an eclipsed KPI
+  // sliced mid-word is worse than an absent one
+  api.events.on('preset', ({ preset }) => {
+    const eclipsed = preset === 'agents' || preset === 'scenarios' || preset === 'operations';
+    el.classList.toggle('os-dock-eclipsed', eclipsed);
+  });
 
   // throttled with a trailing render so the state after a scrub burst
   // always lands (leading-only throttles leave stale KPIs on screen)

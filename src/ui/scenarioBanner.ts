@@ -37,7 +37,10 @@ export function createScenarioBanner(api: AppApi): { el: HTMLElement } {
   exit.textContent = 'EXIT FRAME';
   exit.addEventListener('click', () => api.clearScenario());
 
-  el.append(chip, name, standing, summary, exit);
+  const row1 = document.createElement('div');
+  row1.className = 'sc-banner-row';
+  row1.append(chip, name, summary, exit);
+  el.append(row1, standing);
 
   const render = (impact: ScenarioImpact | null): void => {
     if (!impact) {
@@ -52,10 +55,22 @@ export function createScenarioBanner(api: AppApi): { el: HTMLElement } {
     el.hidden = false;
   };
 
+  // the scenarios panel carries its own frame header — never show both
+  let panelOpen = false;
+  let current: ScenarioImpact | null = null;
+  const sync = (): void => {
+    render(panelOpen ? null : current);
+  };
   api.events.on('scenario', ({ active, impact }) => {
-    render(active && impact ? impact : null);
+    current = active && impact ? impact : null;
+    sync();
   });
-  render(api.getActiveScenario());
+  api.events.on('preset', ({ preset }) => {
+    panelOpen = preset === 'scenarios';
+    sync();
+  });
+  current = api.getActiveScenario();
+  sync();
 
   return { el };
 }

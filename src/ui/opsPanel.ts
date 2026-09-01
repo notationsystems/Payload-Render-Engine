@@ -120,7 +120,7 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
         ? 'ok'
         : v === 'refused' || v === 'failed' || v === 'rejected'
           ? 'alert'
-          : v === 'pending' || v === 'undetermined' || v === 'not_created'
+          : v === 'pending' || v === 'undetermined' || v === 'not_created' || v === 'not_selected'
             ? 'warn'
             : '';
     return `<span class="ops-state ${tone}" title="${esc(label)}">${esc(label)} ${esc(v.replace(/_/g, ' ').toUpperCase())}</span>`;

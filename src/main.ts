@@ -18,6 +18,8 @@ import { createAnalyticsDock } from './ui/analyticsDock';
 import { createAgentsPanel } from './ui/agentsPanel';
 import { createScenariosPanel } from './ui/scenariosPanel';
 import { createOpsPanel } from './ui/opsPanel';
+import { createTooltip } from './ui/tooltip';
+import { createLegend } from './ui/legend';
 import { createArchOverlay } from './ui/archOverlay';
 import { createScenarioBanner } from './ui/scenarioBanner';
 
@@ -48,6 +50,8 @@ async function start(): Promise<void> {
   hud.appendChild(createAgentsPanel(app, tools).el);
   hud.appendChild(createScenariosPanel(app).el);
   hud.appendChild(createOpsPanel(app).el);
+  hud.appendChild(createTooltip(app).el);
+  hud.appendChild(createLegend(app).el);
   hud.appendChild(createArchOverlay(app).el);
   hud.appendChild(createScenarioBanner(app).el);
 
@@ -85,7 +89,7 @@ async function start(): Promise<void> {
       ? 'SOURCE · PAYLOAD SPATIAL API'
       : 'SOURCE · IN-BROWSER CORPUS';
   app.events.emit('toast', {
-    title: 'PAYLOAD EARTH ONLINE',
+    title: 'PAYLOAD OS ONLINE',
     body: `${sourceLabel} · ${app.store.snapshot.meta.label} · ${app.store.snapshot.meta.disclaimer}`,
     tone: 'info',
   });

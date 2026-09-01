@@ -2,7 +2,7 @@
   "name": "payload-earth",
   "private": true,
   "version": "0.1.0",
-  "description": "Payload Earth — interactive digital twin of the physical economy",
+  "description": "PayLoad OS — interactive digital twin of the physical economy",
   "type": "module",
   "scripts": {
     "dev": "vite",

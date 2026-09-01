@@ -12,9 +12,14 @@ import { MODE_COLORS } from '../app/palette';
 
 const VERT = /* glsl */ `
   varying vec2 vUv;
+  varying vec3 vN;
+  varying vec3 vV;
   void main() {
     vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vN = normalize(normalMatrix * normal);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    vV = normalize(-mv.xyz);
+    gl_Position = projectionMatrix * mv;
   }
 `;
 
@@ -31,10 +36,21 @@ const FRAG = /* glsl */ `
   uniform float uRisk;       // risk layer on/off
   uniform float uHypo;       // hypothetical frame: 0 none, 1 perturbed, 2 spillover
   uniform float uHasLoad;    // 1 = utilization asserted/observed; 0 = absent → no pulse
+  uniform float uAltFade;    // 1 far → glow full; approaches 0.35 up close
   varying vec2 vUv;
+  varying vec3 vN;
+  varying vec3 vV;
 
   void main() {
     float u = vUv.x;
+
+    // core+halo cross-section: bright along the tube's view-facing spine,
+    // falling off toward the silhouette — reads as a slim luminous line
+    // with a soft halo instead of a solid ribbon, at every zoom
+    float face = max(dot(normalize(vN), normalize(vV)), 0.0);
+    // sharper spine as the camera descends (uAltFade falls): the tube
+    // reads as a line up close, a soft band from orbit
+    float profile = pow(face, mix(4.5, 2.2, uAltFade));
 
     // traveling pulse: bright head, decaying tail, moving origin→destination
     float speed = uMode == 3.0 ? 0.55 : (uMode == 2.0 ? 0.10 : 0.22);
@@ -57,7 +73,7 @@ const FRAG = /* glsl */ `
     // risk layer: congestion bleeds red into the line
     if (uRisk > 0.5) col = mix(col, vec3(1.0, 0.30, 0.38), clamp(uCong, 0.0, 1.0) * 0.8);
 
-    float glow = base * pattern * (0.55 + 1.6 * pulse);
+    float glow = base * pattern * (0.55 + 1.15 * pulse);
 
     if (uState > 1.5) {
       col = mix(col, vec3(1.0), 0.20);
@@ -67,6 +83,7 @@ const FRAG = /* glsl */ `
     }
 
     glow *= (1.0 - uDim * 0.88);
+    glow *= profile * uAltFade;
 
     // hypothetical frame: violet DASHED treatment — deliberately unlike
     // any real-state look, so a simulated outcome cannot read as one
@@ -84,7 +101,12 @@ const FRAG = /* glsl */ `
       }
     }
 
-    gl_FragColor = vec4(col * glow, 1.0);
+    // hue-preserving soft clip: additive stacking must saturate toward
+    // the mode color, never wash to white
+    vec3 c = col * glow;
+    float peak = max(c.r, max(c.g, c.b));
+    c /= (1.0 + peak * 0.45);
+    gl_FragColor = vec4(c, 1.0);
   }
 `;
 
@@ -137,8 +159,10 @@ export class RoutesLayer {
         altitude: isAir ? airAltitudeProfile(pathAngle(coords)) : undefined,
       });
       const curve = new THREE.CatmullRomCurve3(path.points, false, 'catmullrom', 0.0);
-      const radius =
-        (isAir ? 0.0011 : 0.0015) + route.importance * (isAir ? 0.0009 : 0.0016);
+      const radius = Math.min(
+        0.0022,
+        (isAir ? 0.0011 : 0.0015) + route.importance * (isAir ? 0.0009 : 0.0016)
+      );
       const geo = new THREE.TubeGeometry(
         curve,
         Math.min(220, path.points.length),
@@ -156,6 +180,7 @@ export class RoutesLayer {
           // absent utilization = no claimed load → no pulse, not a fake one
           uUtil: { value: route.utilization ?? 0 },
           uHasLoad: { value: route.utilization !== undefined ? 1 : 0 },
+          uAltFade: { value: 1 },
           uCong: { value: 0 },
           uDim: { value: 0 },
           uMode: { value: MODE_INDEX[route.mode] },
@@ -245,8 +270,26 @@ export class RoutesLayer {
     this.applyDim();
   }
 
+  /**
+   * Brush focus (kepler-style): routes in the lit set stay bright,
+   * everything else dims. null restores the preset's own dim baseline.
+   */
+  applyBrush(lit: Set<EntityId> | null): void {
+    if (lit === null) {
+      this.applyDim();
+      return;
+    }
+    for (const [id, vis] of this.visuals) {
+      vis.material.uniforms.uDim.value = lit.has(id) ? 0 : 1;
+    }
+  }
+
   setAltitude(alt: number): void {
     this.altitude = alt;
+    // close-range regime: attenuate glow so tubes read as lines, not
+    // screen-flooding ribbons, as the camera descends
+    const fade = Math.min(1, Math.max(0.22, alt / 0.9));
+    for (const vis of this.visuals.values()) vis.material.uniforms.uAltFade.value = fade;
     this.applyVisibility();
   }
 

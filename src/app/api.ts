@@ -87,6 +87,8 @@ export interface AppEvents extends Record<string, unknown> {
   demo: { active: boolean; step?: number; totalSteps?: number; caption?: string; title?: string };
   /** A hypothetical frame was entered or exited. */
   scenario: { active: boolean; impact?: ScenarioImpact };
+  /** Route brush focus (hold B) engaged or released. */
+  brush: { active: boolean };
   toast: { title: string; body?: string; tone?: 'info' | 'warn' | 'alert' };
   status: {
     fps: number;

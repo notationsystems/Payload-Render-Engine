@@ -27,6 +27,18 @@ export function createStatusBar(api: AppApi): { el: HTMLElement } {
   const nodesSeg = seg();
   const routesSeg = seg();
   const particlesSeg = seg();
+  // detail segments yield on narrow viewports before colliding with the timeline
+  altSeg.classList.add('pe-sb-opt');
+  particlesSeg.classList.add('pe-sb-opt');
+
+  const brushChip = document.createElement('span');
+  brushChip.className = 'pe-sb-chip pe-sb-brush';
+  brushChip.textContent = 'BRUSH · ROUTES WITHIN 900 KM OF CURSOR';
+  brushChip.hidden = true;
+  el.appendChild(brushChip);
+  api.events.on('brush', ({ active }) => {
+    brushChip.hidden = !active;
+  });
 
   const chip = document.createElement('span');
   chip.className = 'pe-sb-chip';

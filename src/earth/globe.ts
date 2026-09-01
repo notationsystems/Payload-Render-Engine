@@ -44,13 +44,13 @@ const FRAG = /* glsl */ `
     float land = texture2D(uMask, vUv).r;
 
     // day side: painted world lit by sun angle
-    vec3 lit = dayCol * (0.45 + 0.85 * clamp(d, 0.0, 1.0));
+    vec3 lit = dayCol * (0.55 + 1.15 * clamp(d, 0.0, 1.0));
 
     // night side: faint moonlit earth + warm city lights (soft-capped so
     // dense corridors stay legible instead of blooming into fog)
     vec3 lights = nightGlow * uNightIntensity * 1.25;
     lights = lights / (1.0 + lights * 0.9);
-    vec3 nightSide = dayCol * 0.14 + lights;
+    vec3 nightSide = dayCol * 0.30 + vec3(0.010, 0.016, 0.028) * land + lights;
 
     vec3 col = mix(nightSide, lit, dayFactor);
 
@@ -60,8 +60,8 @@ const FRAG = /* glsl */ `
 
     // ocean specular glint — tight highlight, not a searchlight
     vec3 R = reflect(-sun, n);
-    float spec = pow(max(dot(R, V), 0.0), 220.0) * (1.0 - land) * dayFactor;
-    col += spec * vec3(0.45, 0.65, 0.9) * 0.30;
+    float spec = pow(max(dot(R, V), 0.0), 380.0) * (1.0 - land) * dayFactor;
+    col += spec * vec3(0.55, 0.70, 0.9) * 0.10;
 
     // atmospheric rim (inner fresnel)
     float fres = pow(1.0 - max(dot(n, V), 0.0), 3.0);

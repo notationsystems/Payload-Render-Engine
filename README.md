@@ -1,4 +1,4 @@
-# PAYLOAD EARTH
+# PayLoad OS
 
 **An interactive digital twin of the physical economy.**
 

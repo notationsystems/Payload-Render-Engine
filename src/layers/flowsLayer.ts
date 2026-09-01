@@ -111,7 +111,11 @@ const FRAG = /* glsl */ `
     float dart = body * notch * 1.5 + exp(-length(q - vec2(0.35, 0.0)) * 2.6) * 0.6;
 
     float k = mix(dot_, dart, vShape) * vBoost;
-    fragColor = vec4(vColor * k, 1.0);
+    // hue-preserving soft clip — particle pileups saturate toward the
+    // mode color instead of washing white
+    vec3 c = vColor * k;
+    float peak = max(c.r, max(c.g, c.b));
+    fragColor = vec4(c / (1.0 + peak * 0.35), 1.0);
   }
 `;
 

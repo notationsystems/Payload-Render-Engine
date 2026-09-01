@@ -442,7 +442,7 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
       .deviationsFor(r.id)
       .find((d) => d.assertion.metric === 'transit_hours');
     if (dev) {
-      transitRows.push(kv('OBSERVED μ', `${fmt(dev.meanObserved, 1)} H`));
+      transitRows.push(kv('MEAN OBSERVED', `${fmt(dev.meanObserved, 1)} H`));
       const pct = (dev.deviation.ratio - 1) * 100;
       const over = pct > 5;
       transitRows.push(

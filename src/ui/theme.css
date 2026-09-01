@@ -1,5 +1,5 @@
 /* ================================================================
-   PAYLOAD EARTH — UI THEME
+   PAYLOAD OS — UI THEME
    Dark instrument chrome: void ground, glass panels, 1px lines,
    mono data values, uppercase micro-labels.
    ================================================================ */
@@ -137,20 +137,19 @@ input {
   pointer-events: none;
 }
 
+/* plain-jane nameplate: a wordmark, nothing else */
 #boot .boot-mark {
   font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 22px;
-  letter-spacing: 0.55em;
-  padding-left: 0.55em; /* optical centering vs tracking */
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: 0.04em;
   color: var(--text-hi);
 }
 
 #boot .boot-sub {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
+  letter-spacing: 0.14em;
   color: var(--text-dim);
 }
 
@@ -205,7 +204,7 @@ input {
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(860px, calc(100vw - 32px));
+  width: min(1000px, calc(100vw - 32px));
   pointer-events: auto;
   z-index: 30;
 }
@@ -226,21 +225,13 @@ input {
 .pe-cb-mark {
   display: flex;
   align-items: center;
-  gap: 8px;
   font-family: var(--font-ui);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.3em;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
   color: var(--text-hi);
   user-select: none;
   white-space: nowrap;
-}
-
-.pe-cb-glyph {
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
-  flex: none;
 }
 
 .pe-cb-searchwrap {
@@ -264,6 +255,7 @@ input {
   font-size: 12px;
   color: var(--text-hi);
   letter-spacing: 0.02em;
+  text-overflow: ellipsis;
 }
 
 .pe-cb-search::placeholder {
@@ -273,8 +265,11 @@ input {
 .pe-cb-suggest {
   position: absolute;
   top: calc(100% + 7px);
-  left: 0;
-  right: 0;
+  left: -13px;
+  right: auto;
+  width: max-content;
+  min-width: calc(100% + 26px);
+  max-width: 440px;
   background: var(--glass);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
@@ -380,7 +375,14 @@ input {
   display: flex;
   justify-content: center;
   gap: 4px;
-  margin-top: 6px;
+  margin: 6px auto 0;
+  width: fit-content;
+  /* quiet glass ribbon so inactive tabs stay legible over bright arcs */
+  background: var(--glass-soft);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 8px;
 }
 
 .pe-commandbar.demo .pe-cb-tabs {
@@ -393,7 +395,7 @@ input {
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-dim);
+  color: var(--text-mid);
   padding: 6px 10px 5px;
   border-bottom: 1px solid transparent;
   transition: color 0.15s ease;
@@ -742,5 +744,119 @@ input {
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+/* Z-BANDS (one system, every fixed surface declares its band):
+   3D labels 5 · docks/legend 12-15 · inspector 20 · timeline 21 ·
+   scenario banner 25 · command bar 30 · suggest/toasts/arch 40 ·
+   tooltip 60 */
+
+/* ------------------------------------------------------------------ */
+/* hover tooltip — identifies before the click                         */
+/* ------------------------------------------------------------------ */
+.pe-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 9px;
+  background: var(--glass);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.pe-tt-kind {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  border: 1px solid;
+  border-radius: 2px;
+  padding: 1px 5px;
+}
+.pe-tt-name { color: var(--text-hi); font-weight: 600; }
+.pe-tt-state {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-mid);
+}
+.pe-tt-state b { color: var(--text-hi); font-weight: 500; }
+.pe-tt-dim { color: var(--text-dim); letter-spacing: 0.06em; }
+
+/* ------------------------------------------------------------------ */
+/* legend — every color on the globe, decoded                          */
+/* ------------------------------------------------------------------ */
+.pe-legend {
+  position: fixed;
+  right: 16px;
+  bottom: 96px;
+  z-index: 15;
+  width: 208px;
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: opacity 0.2s ease;
+}
+.pe-legend.pe-legend-tucked { opacity: 0; pointer-events: none; }
+.pe-legend-head {
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.pe-legend-head:hover { color: var(--text-mid); }
+.pe-legend-body { padding: 2px 10px 9px; }
+.pe-lg-group {
+  margin: 7px 0 3px;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+}
+.pe-lg-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 1.5px 0;
+  font-size: 10px;
+  color: var(--text-mid);
+}
+.pe-lg-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.pe-lg-line {
+  width: 16px;
+  height: 2px;
+  background: var(--lg);
+  flex: none;
+}
+.pe-lg-line.dashed {
+  background: repeating-linear-gradient(90deg, var(--lg) 0 3px, transparent 3px 6px);
+}
+
+
+/* responsive shed: the status bar yields detail before it collides */
+@media (max-width: 1780px) {
+  .pe-sb-opt { display: none; }
+}
+
+/* motion discipline: the instrument respects reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  #hud *, #boot, .pe-tooltip, .pe-legend {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
 }

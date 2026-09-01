@@ -64,8 +64,11 @@ export function createTimeline(api: AppApi): { el: HTMLElement } {
   regimeChip.textContent = 'CURRENT';
 
   const setRegime = (regime: TemporalRegime): void => {
-    regimeChip.classList.remove('regime-historical', 'regime-current', 'regime-forecast');
-    regimeChip.classList.add(`regime-${regime === 'scenario' ? 'forecast' : regime}`);
+    // every regime keeps its own identity — scenario is violet-dashed
+    // here too, or the solid/dashed semantic collapses
+    regimeChip.dataset.regime = regime;
+    regimeChip.classList.remove('regime-historical', 'regime-current', 'regime-forecast', 'regime-scenario');
+    regimeChip.classList.add(`regime-${regime === 'scenario' ? 'scenario' : regime}`);
     regimeChip.textContent = regime.toUpperCase();
   };
 
@@ -92,12 +95,22 @@ export function createTimeline(api: AppApi): { el: HTMLElement } {
   const nowTick = document.createElement('div');
   nowTick.className = 'pi-tl-nowtick';
 
+  // forecast zone reads as provisional: striped from NOW to range end
+  const future = document.createElement('div');
+  future.className = 'pi-tl-future';
+
   const markers = document.createElement('div');
+
+  // kepler-style density strip: how much EVIDENCE the corpus holds per
+  // time bucket (observation knownAt + event starts) — faint bars behind
+  // the track, so the scrubber shows where knowledge actually lives
+  const density = document.createElement('canvas');
+  density.className = 'pi-tl-density';
 
   const playhead = document.createElement('div');
   playhead.className = 'pi-tl-playhead';
 
-  track.append(played, nowTick, markers, playhead);
+  track.append(density, future, played, nowTick, markers, playhead);
   scrub.append(track);
 
   el.append(row1, scrub);
@@ -116,7 +129,46 @@ export function createTimeline(api: AppApi): { el: HTMLElement } {
     if (key === markersRangeKey) return;
     markersRangeKey = key;
 
-    nowTick.style.left = `${frac(nowMs, startMs, endMs) * 100}%`;
+    const nowFrac = frac(nowMs, startMs, endMs);
+    nowTick.style.left = `${nowFrac * 100}%`;
+    future.style.left = `${nowFrac * 100}%`;
+
+    // density strip
+    try {
+      const snap = api.store.snapshot;
+      const BUCKETS = 72;
+      const counts = new Array(BUCKETS).fill(0);
+      for (const o of snap.observations) {
+        const ms = Date.parse(o.provenance.knownAt);
+        if (Number.isFinite(ms) && ms >= startMs && ms <= endMs)
+          counts[Math.min(BUCKETS - 1, Math.floor(frac(ms, startMs, endMs) * BUCKETS))]++;
+      }
+      for (const e of snap.events) {
+        const ms = Date.parse(e.start);
+        if (Number.isFinite(ms) && ms >= startMs && ms <= endMs)
+          counts[Math.min(BUCKETS - 1, Math.floor(frac(ms, startMs, endMs) * BUCKETS))]++;
+      }
+      const peak = Math.max(...counts, 1);
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const w = density.clientWidth || 600;
+      const h = density.clientHeight || 14;
+      density.width = Math.round(w * dpr);
+      density.height = Math.round(h * dpr);
+      const ctx = density.getContext('2d');
+      if (ctx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(120, 160, 200, 0.28)';
+        const bw = w / BUCKETS;
+        for (let i = 0; i < BUCKETS; i++) {
+          if (!counts[i]) continue;
+          const bh = Math.max(1, (counts[i] / peak) * (h - 2));
+          ctx.fillRect(i * bw + 0.5, h - bh, Math.max(1, bw - 1), bh);
+        }
+      }
+    } catch {
+      /* corpus not ready */
+    }
 
     markers.replaceChildren();
     let events: WorldEvent[] = [];

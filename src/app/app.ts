@@ -536,6 +536,7 @@ export class App implements AppApi {
       this.countries
     );
     input.onHover = (pick) => this.applyHover(pick);
+    this.wireBrush(canvas);
     input.onClick = (pick) => {
       if (this.demo.active) return;
       if (!pick) {
@@ -555,6 +556,70 @@ export class App implements AppApi {
       if (this.demo.active || !pick || pick.type === 'country') return;
       this.focus(pick.id);
     };
+  }
+
+  /**
+   * Route brush (kepler arc-brush adapted to the sphere): hold B and
+   * sweep — routes passing within the brush radius of the cursor's
+   * globe point stay lit, the rest dim. Release restores the preset's
+   * own dim baseline. Focus, not filter: nothing is hidden, nothing
+   * is mutated.
+   */
+  private brushHeld = false;
+  private brushRay = new THREE.Raycaster();
+  private brushLastAt = 0;
+
+  private wireBrush(canvas: HTMLCanvasElement): void {
+    const BRUSH_KM = 900;
+    const cosLimit = Math.cos(BRUSH_KM / 6371);
+    window.addEventListener('keydown', (e) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key !== 'b' && e.key !== 'B') return;
+      if (!this.brushHeld) {
+        this.brushHeld = true;
+        this.events.emit('brush', { active: true });
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.key !== 'b' && e.key !== 'B') return;
+      this.brushHeld = false;
+      this.routesLayer.applyBrush(null);
+      this.events.emit('brush', { active: false });
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!this.brushHeld) return;
+      const now = performance.now();
+      if (now - this.brushLastAt < 40) return;
+      this.brushLastAt = now;
+      const ndc = new THREE.Vector2(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        -(e.clientY / window.innerHeight) * 2 + 1
+      );
+      this.brushRay.setFromCamera(ndc, this.engine.camera);
+      const hit = this.brushRay.intersectObject(this.globe.mesh, false)[0];
+      if (!hit) {
+        this.routesLayer.applyBrush(new Set());
+        return;
+      }
+      const p = hit.point.clone().normalize();
+      const lit = new Set<EntityId>();
+      for (const [id, vis] of this.routesLayer.visuals) {
+        const pts = vis.path.points;
+        const stride = Math.max(1, Math.floor(pts.length / 24));
+        for (let i = 0; i < pts.length; i += stride) {
+          const q = pts[i];
+          const dot =
+            (p.x * q.x + p.y * q.y + p.z * q.z) /
+            Math.hypot(q.x, q.y, q.z);
+          if (dot > cosLimit) {
+            lit.add(id);
+            break;
+          }
+        }
+      }
+      this.routesLayer.applyBrush(lit);
+    });
   }
 
   private applyHover(pick: Pick): void {

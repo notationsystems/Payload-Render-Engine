@@ -1,5 +1,5 @@
 /**
- * PAYLOAD EARTH — inspector + timeline instrument styles (.pi-)
+ * PAYLOAD OS — inspector + timeline instrument styles (.pi-)
  * Consumes :root tokens from theme.css; defines none of its own.
  */
 
@@ -11,6 +11,7 @@
   position: fixed;
   right: 14px;
   top: 96px;
+  z-index: 20; /* above 3D labels (5) and docks (12); below commandbar (30) */
   width: 340px;
   max-height: calc(100vh - 260px);
   overflow-y: auto;
@@ -187,6 +188,13 @@
   text-align: right;
   overflow-wrap: anywhere;
 }
+
+/* tone ramp must WIN on data rows — a +7.5% deviation reads amber,
+   never default white */
+.pi-kv-v.pi-tone-ok { color: var(--ok); }
+.pi-kv-v.pi-tone-warn { color: var(--warn); }
+.pi-kv-v.pi-tone-alert { color: var(--alert); }
+.pi-kv-v.pi-tone-dim { color: var(--text-dim); }
 .pi-kv.pi-click {
   cursor: pointer;
 }
@@ -447,6 +455,7 @@
   bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 21; /* the instrument being scrubbed is never occluded */
   width: min(680px, calc(100vw - 360px));
   pointer-events: auto;
   background: var(--glass);
@@ -538,13 +547,21 @@
   color: var(--ok);
   border-color: var(--ok);
 }
+.pi-tl-regime.regime-scenario {
+  color: #d98cff;
+  border-style: dashed;
+  border-color: #d98cff;
+  background: rgba(217, 140, 255, 0.1);
+}
 .pi-tl-regime.regime-forecast {
   color: var(--accent);
   border-color: var(--accent);
+  background: var(--accent-soft);
 }
 .pi-tl-regime.regime-historical {
-  color: var(--text-dim);
+  color: var(--text-hi);
   border-color: var(--line-strong);
+  background: rgba(86, 106, 128, 0.28);
 }
 
 .pi-tl-nowbtn {
@@ -579,6 +596,17 @@
   height: 6px;
   background: var(--line);
 }
+
+/* evidence-density strip riding above the track */
+.pi-tl-density {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  width: 100%;
+  height: 14px;
+  pointer-events: none;
+}
 .pi-tl-played {
   position: absolute;
   left: 0;
@@ -591,9 +619,23 @@
   position: absolute;
   top: -3px;
   bottom: -3px;
-  width: 1px;
-  background: var(--text-mid);
-  pointer-events: none;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ok);
+  box-shadow: 0 0 5px rgba(67, 209, 124, 0.5);
+  z-index: 2;
+}
+
+.pi-tl-future {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(77, 166, 255, 0.16) 0 4px,
+    transparent 4px 8px
+  );
 }
 .pi-tl-evt {
   position: absolute;

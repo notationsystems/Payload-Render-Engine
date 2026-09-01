@@ -535,3 +535,36 @@ authority. The twin mirrors it as the OS's OPERATIONS surface:
   guessing. Hold-to-peek lets the operator sight the lane under the
   panel.
 - The tool surface gains `get_operations` (read-only, refusals typed).
+
+## 16. Design language — PayLoad OS
+
+The brand is a plain wordmark: **PayLoad OS**, unadorned, at the boot
+nameplate and the header — no glyph, no tracking theatrics. Everything
+decorative was spent on legibility instead, in a full critique pass
+(five surface critics + synthesis) that hardened the instrument:
+
+- **Scene**: route tubes render as a luminous core with a soft halo
+  (view-angle profile) and attenuate with altitude, so close range
+  reads as lines, not ribbons; additive stacking soft-clips toward the
+  mode hue, never white; the earth gained a stop of land contrast, a
+  4096px night-light texture with point-crisp metros, and ghost-lit
+  continents on the night side.
+- **Chrome**: one documented z-band system (labels < docks < inspector
+  < timeline < banner < command bar < overlays); the tab strip rides a
+  glass ribbon; the analytics dock yields to center panels; the status
+  bar sheds detail segments before colliding; `prefers-reduced-motion`
+  disables auto-rotation and transitions.
+- **Time**: the forecast zone of the scrubber is striped (provisional,
+  visibly), the NOW tick is a green marker, each regime chip keeps its
+  identity — scenario stays violet-dashed at every indicator — and a
+  kepler-style density strip shows where the corpus actually holds
+  evidence (observation knownAt + event starts).
+- **kepler.gl patterns adapted (MIT, studied not copied)**: cursor
+  tooltip (name · kind · state, or STATE UNOBSERVED), hold-B route
+  brushing (focus, not filter — nothing hidden, nothing mutated), an
+  always-available legend decoding every color incl. the reserved
+  overlay treatments, and the timeline density strip. Aggregation
+  layers and split maps were assessed and deferred.
+- The semantic tone ramp (ok/warn/alert/dim) was resurrected on
+  inspector data rows, and honesty typography sharpened: MEAN OBSERVED
+  (μ died in uppercase), UNOBSERVED meters, NOT ASSERTED promises.

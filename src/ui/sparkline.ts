@@ -50,7 +50,7 @@ export function drawSparkline(
   ctx.clearRect(0, 0, cssW, cssH);
 
   const color = resolveColor(opts.color ?? 'var(--accent)', '#4da6ff');
-  const padTop = 3;
+  const padTop = 6;
   const padBot = 3;
   const baseY = cssH - padBot;
 

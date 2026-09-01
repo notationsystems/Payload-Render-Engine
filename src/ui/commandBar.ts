@@ -25,11 +25,10 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
   const row = document.createElement('div');
   row.className = 'pe-cb-row';
 
+  // plain wordmark — no glyph, no ornament
   const mark = document.createElement('div');
   mark.className = 'pe-cb-mark';
-  const glyph = document.createElement('span');
-  glyph.className = 'pe-cb-glyph';
-  mark.append(glyph, document.createTextNode('PAYLOAD'));
+  mark.textContent = 'PayLoad OS';
 
   const searchWrap = document.createElement('div');
   searchWrap.className = 'pe-cb-searchwrap';
@@ -38,7 +37,7 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
   input.type = 'text';
   input.spellcheck = false;
   input.autocomplete = 'off';
-  input.placeholder = 'Search the physical economy…';
+  input.placeholder = 'Search the physical economy · /';
   const dropdown = document.createElement('div');
   dropdown.className = 'pe-cb-suggest';
   dropdown.hidden = true;
