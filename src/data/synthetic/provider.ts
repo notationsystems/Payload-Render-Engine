@@ -169,30 +169,43 @@ interface Baseline {
   status: LifecycleStatus;
 }
 
+/**
+ * Deterministic state resolution over ANY snapshot — the same pure
+ * dynamics whether the snapshot was built in-process or fetched from
+ * the Spatial API. One resolver on both sides of the wire means the
+ * projection cannot drift between server and client.
+ */
+export function createStateResolver(
+  snap: WorldSnapshot
+): (entityId: EntityId, t: Timestamp) => EntityState {
+  const baselines = new Map<EntityId, Baseline>();
+  for (const n of snap.nodes) {
+    baselines.set(n.id, { base: clamp01(0.3 + 0.45 * n.importance), status: n.status });
+  }
+  for (const r of snap.routes) {
+    baselines.set(r.id, { base: r.utilization, status: r.status });
+  }
+  for (const f of snap.flows) {
+    baselines.set(f.id, { base: clamp01(f.intensity), status: 'active' });
+  }
+  return (entityId, t) => {
+    const bl = baselines.get(entityId) ?? { base: 0.35, status: 'active' as const };
+    return resolveEntityState(entityId, bl.base, bl.status, t, snap.events);
+  };
+}
+
 export class SyntheticProvider implements SpatialDataProvider {
   readonly id = 'synthetic:demo';
   readonly label = 'Synthetic demo world';
 
   private snap: WorldSnapshot | null = null;
-  private baselines = new Map<EntityId, Baseline>();
+  private resolver: ((entityId: EntityId, t: Timestamp) => EntityState) | null = null;
 
   private ensure(): WorldSnapshot {
     if (this.snap) return this.snap;
-    const snap = buildWorldSnapshot();
-    for (const n of snap.nodes) {
-      this.baselines.set(n.id, {
-        base: clamp01(0.3 + 0.45 * n.importance),
-        status: n.status,
-      });
-    }
-    for (const r of snap.routes) {
-      this.baselines.set(r.id, { base: r.utilization, status: r.status });
-    }
-    for (const f of snap.flows) {
-      this.baselines.set(f.id, { base: clamp01(f.intensity), status: 'active' });
-    }
-    this.snap = snap;
-    return snap;
+    this.snap = buildWorldSnapshot();
+    this.resolver = createStateResolver(this.snap);
+    return this.snap;
   }
 
   async load(): Promise<WorldSnapshot> {
@@ -200,8 +213,7 @@ export class SyntheticProvider implements SpatialDataProvider {
   }
 
   stateAt(entityId: EntityId, t: Timestamp): EntityState {
-    const snap = this.ensure();
-    const bl = this.baselines.get(entityId) ?? { base: 0.35, status: 'active' as const };
-    return resolveEntityState(entityId, bl.base, bl.status, t, snap.events);
+    this.ensure();
+    return this.resolver!(entityId, t);
   }
 }

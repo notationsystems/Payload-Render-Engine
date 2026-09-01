@@ -128,6 +128,7 @@ export function buildToolSurface(api: AppApi): TwinTool[] {
       params: [],
       safety: SAFE,
       invoke: () => ({
+        source: api.getDataSourceId(),
         time: api.clock.state(),
         selection: api.getSelection(),
         country: api.getSelectedCountry(),

@@ -93,6 +93,9 @@ export class App implements AppApi {
   private scenarioDeltaIx = new Map<EntityId, ScenarioEntityDelta>();
   private lastTemporalRefresh = 0;
   private lastSimMs = 0;
+  private dataSourceId = 'synthetic-demo';
+  /** Set when the Spatial API was requested but unreachable. */
+  sourceFallbackNote: string | null = null;
 
   // ------------------------------------------------------------------ boot
 
@@ -104,10 +107,25 @@ export class App implements AppApi {
       if (status) status.textContent = msg;
     };
 
-    progress(8, 'LOADING SYNTHETIC CORPUS');
-    const source = sourceRegistry.get('synthetic-demo');
-    if (!source?.makeProvider) throw new Error('no implemented data source registered');
-    const snapshot = await this.store.init(source.makeProvider());
+    progress(8, 'LOADING CORPUS');
+    const wantRemote =
+      typeof location !== 'undefined' && new URLSearchParams(location.search).has('api');
+    let sourceId = wantRemote ? 'payload-spatial-api' : 'synthetic-demo';
+    let snapshot;
+    try {
+      const source = sourceRegistry.get(sourceId);
+      if (!source?.makeProvider) throw new Error(`source '${sourceId}' not implemented`);
+      progress(10, sourceId === 'payload-spatial-api' ? 'CONNECTING · SPATIAL API' : 'LOADING SYNTHETIC CORPUS');
+      snapshot = await this.store.init(source.makeProvider());
+    } catch (err) {
+      if (sourceId !== 'payload-spatial-api') throw err;
+      // honest fallback: note WHY, switch to the in-browser corpus
+      this.sourceFallbackNote = err instanceof Error ? err.message : String(err);
+      sourceId = 'synthetic-demo';
+      progress(10, 'SPATIAL API UNREACHABLE — LOCAL CORPUS');
+      snapshot = await this.store.init(sourceRegistry.get('synthetic-demo')!.makeProvider!());
+    }
+    this.dataSourceId = sourceId;
     this.scenarioCatalog = buildScenarioCatalog(snapshot);
 
     progress(24, 'LOADING WORLD TOPOLOGY');
@@ -836,6 +854,10 @@ export class App implements AppApi {
 
   getActiveScenario(): ScenarioImpact | null {
     return this.activeScenario;
+  }
+
+  getDataSourceId(): string {
+    return this.dataSourceId;
   }
 
   stopFollowTheLoad(): void {

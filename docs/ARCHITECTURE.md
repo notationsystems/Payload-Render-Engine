@@ -454,3 +454,36 @@ This deterministic engine is a stand-in with the seam already in place:
 Payload's real propagation engine + VROOM re-optimization will produce
 `ScenarioImpact` frames through the identical contract, and nothing above
 the data layer changes when they do.
+
+## 14. The backend: the Spatial API (begun)
+
+The twin now has a server — `server/` — begun the way the user asked:
+by **studying, not copying** the sibling Payload repos. What each repo
+actually contains (including which ones are vapor), what was adopted,
+deferred, and rejected is recorded in [`docs/BACKEND_STUDY.md`](./BACKEND_STUDY.md);
+the service's own conventions and endpoint inventory live in
+[`server/README.md`](../server/README.md).
+
+The load-bearing facts:
+
+- **One semantic layer, both sides of the wire.** The server executes
+  the same erasable-TypeScript `src/data/**` the client ships (Node
+  type-stripping — the seam check of §2 is what guarantees this stays
+  possible), and dynamic state resolves through the shared
+  `createStateResolver`. There is no second representation to drift.
+- **Projection only.** No route mutates canonical state — INV-6
+  enforced at the protocol layer, matching the Terminal ledger's
+  anticipation of "a native 3D world view consuming projections over
+  HTTP — a separate client, not a substrate."
+- **The envelope is the discipline.** Every response carries
+  `sourceClass`, `valueKind`, `admissible`+`admissibleBasis`,
+  `knownAt`/`asOf`/`knowledge`/`vintages`, an `EvaluationFrame`, and an
+  `attribution` fingerprint; unanswerable questions return typed
+  SCREAMING_SNAKE refusals with remedies at HTTP 200. Contract tests
+  (`server/test.mjs`) pin all of it inside `npm run check`.
+- **The client chooses its source honestly.** `?api` hydrates the globe
+  from the service via `RemoteSpatialProvider` (registered in the §11
+  source registry as `payload-spatial-api`); if the service is
+  unreachable the client falls back to the in-browser corpus and says
+  so in the UI — never silently. `get_state` on the tool surface
+  reports which source is live.

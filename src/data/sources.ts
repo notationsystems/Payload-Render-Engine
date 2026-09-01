@@ -17,6 +17,16 @@
 import type { DataSource } from './contracts';
 import type { SpatialDataProvider } from './provider';
 import { SyntheticProvider } from './synthetic/provider.ts';
+import { RemoteSpatialProvider } from './remote/provider.ts';
+
+/** ?api=<base> (or bare ?api) selects the Spatial API; default local dev port. */
+export function resolveApiBase(): string {
+  if (typeof location !== 'undefined') {
+    const p = new URLSearchParams(location.search).get('api');
+    if (p && p !== '1') return p.replace(/\/+$/, '');
+  }
+  return 'http://127.0.0.1:8787';
+}
 
 export type Freshness = 'live' | 'delayed' | 'cached' | 'simulated' | 'unavailable';
 
@@ -79,6 +89,19 @@ sourceRegistry.register({
   metered: false,
   freshness: 'simulated',
   makeProvider: () => new SyntheticProvider(),
+});
+
+sourceRegistry.register({
+  id: 'payload-spatial-api',
+  label: 'Payload Spatial API',
+  sourceClass: 'payload:spatial',
+  feeds: ['snapshot', 'temporal-state', 'scenarios', 'viewport-queries', 'deviations'],
+  keyless: true,
+  metered: false,
+  freshness: 'cached',
+  notes:
+    'The twin backend (server/): record-level provenance travels the wire untouched — today it serves the synthetic corpus and every envelope says admissible:false. Typed refusals with remedies; knowledge=best_known|as_known_then.',
+  makeProvider: () => new RemoteSpatialProvider(resolveApiBase()),
 });
 
 // ------------------------------------------------------------------

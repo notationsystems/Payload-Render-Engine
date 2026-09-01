@@ -78,11 +78,22 @@ async function start(): Promise<void> {
     },
   };
 
+  const sourceLabel =
+    app.getDataSourceId() === 'payload-spatial-api'
+      ? 'SOURCE · PAYLOAD SPATIAL API'
+      : 'SOURCE · IN-BROWSER CORPUS';
   app.events.emit('toast', {
     title: 'PAYLOAD EARTH ONLINE',
-    body: `${app.store.snapshot.meta.label} · ${app.store.snapshot.meta.disclaimer}`,
+    body: `${sourceLabel} · ${app.store.snapshot.meta.label} · ${app.store.snapshot.meta.disclaimer}`,
     tone: 'info',
   });
+  if (app.sourceFallbackNote) {
+    app.events.emit('toast', {
+      title: 'SPATIAL API UNREACHABLE',
+      body: `${app.sourceFallbackNote} — running on the in-browser corpus instead.`,
+      tone: 'warn',
+    });
+  }
 }
 
 void start();

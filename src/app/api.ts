@@ -153,6 +153,9 @@ export interface AppApi {
   stopFollowTheLoad(): void;
   isDemoActive(): boolean;
 
+  /** Which registered data source hydrated the store ('synthetic-demo' | 'payload-spatial-api'). */
+  getDataSourceId(): string;
+
   // ---- counterfactual frames (hypothetical — never confused with state)
   listScenarios(): ScenarioSpec[];
   /**
