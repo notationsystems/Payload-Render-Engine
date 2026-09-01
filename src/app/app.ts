@@ -89,6 +89,8 @@ export class App implements AppApi {
   private activeEventIds = new Set<EntityId>();
   private anomaliesSig = '';
   private scenarioCatalog: ScenarioSpec[] = [];
+  /** Why the catalog is empty, when it is empty for a REASON (typed absence). */
+  scenariosUnavailableReason: string | null = null;
   private activeScenario: ScenarioImpact | null = null;
   private scenarioDeltaIx = new Map<EntityId, ScenarioEntityDelta>();
   private lastTemporalRefresh = 0;
@@ -126,7 +128,18 @@ export class App implements AppApi {
       snapshot = await this.store.init(sourceRegistry.get('synthetic-demo')!.makeProvider!());
     }
     this.dataSourceId = sourceId;
-    this.scenarioCatalog = buildScenarioCatalog(snapshot);
+    // Counterfactuals need a resolvable baseline. A corpus whose states
+    // are unobserved (a projected corpus with no dynamics) gets NO
+    // catalog — computing "impact" over placeholder zeros would present
+    // fabricated numbers as intelligence. Same rule the server enforces
+    // with COUNTERFACTUALS_UNSUPPORTED_FOR_CORPUS.
+    const probe = snapshot.routes[0] ?? snapshot.nodes[0];
+    const dynamicsObserved =
+      !!probe && this.store.stateAt(probe.id, snapshot.timeRange.now).observed !== false;
+    this.scenarioCatalog = dynamicsObserved ? buildScenarioCatalog(snapshot) : [];
+    this.scenariosUnavailableReason = dynamicsObserved
+      ? null
+      : 'THIS CORPUS HAS NO OBSERVED DYNAMICS — A COUNTERFACTUAL NEEDS A BASELINE';
 
     progress(24, 'LOADING WORLD TOPOLOGY');
     const [countries, textures] = await Promise.all([

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "check": "node scripts/check-seam.mjs && node scripts/validate-provenance.mjs && node scripts/check-sea-lanes.mjs && node server/test.mjs && tsc --noEmit",
-    "server": "node server/index.mjs"
+    "server": "node server/index.mjs",
+    "server:terminal": "CORPUS=terminal node server/index.mjs"
   },
   "dependencies": {
     "three": "^0.180.0",

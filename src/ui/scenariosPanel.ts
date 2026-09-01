@@ -141,6 +141,14 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
 
   const renderCatalog = (activeId: EntityId | null): void => {
     catalog.innerHTML = '';
+    if (api.scenariosUnavailableReason && api.listScenarios().length === 0) {
+      const note = document.createElement('div');
+      note.className = 'sc-spec-desc';
+      note.style.padding = '10px 12px';
+      note.textContent = api.scenariosUnavailableReason;
+      catalog.appendChild(note);
+      return;
+    }
     for (const spec of api.listScenarios()) {
       if (activeId !== null && spec.id !== activeId) continue;
       const row = document.createElement('div');

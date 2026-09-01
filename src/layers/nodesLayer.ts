@@ -35,10 +35,12 @@ export function categoryOf(kind: NodeKind): NodeCategory {
     case 'industrial_park':
     case 'manufacturing_cluster':
     case 'consumption_center':
+    case 'power_plant':
       return 'industry';
     case 'chokepoint':
       return 'chokepoint';
     case 'city':
+    case 'region':
       return 'world';
   }
 }

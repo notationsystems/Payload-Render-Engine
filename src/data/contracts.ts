@@ -43,6 +43,20 @@ export interface Provenance {
   /** Free-form evidence descriptors (document ids, sensor ids, ...). */
   evidence?: string[];
   confidence?: number; // 0..1
+  /**
+   * Per-record attestation (payload-terminal-v0 vocabulary): the
+   * evidence class of the VALUE this record carries — the source's own
+   * label, or the curation class of a value the source never emitted.
+   * 'representative' marks fixture/demo-class values.
+   */
+  valueKind?: 'reported' | 'estimated' | 'representative' | 'derived';
+  /**
+   * Whether this record is admissible as evidence about the real
+   * world. EARNED per record via the Terminal's rule (a value resting
+   * on a representative input is inadmissible, whatever else is true
+   * of it). Absent = not evaluated, which is not the same as false.
+   */
+  admissible?: boolean;
 }
 
 export type LifecycleStatus =
@@ -75,7 +89,18 @@ export type Geometry = PointGeometry | LineStringGeometry;
 // Transport ontology
 // ------------------------------------------------------------------
 
-export type TransportMode = 'road' | 'rail' | 'maritime' | 'air';
+export type TransportMode =
+  | 'road'
+  | 'rail'
+  | 'maritime'
+  | 'air'
+  // projected corpora (e.g. Terminal economy flows) speak in these too;
+  // they are honest modes, not renderer conveniences
+  | 'pipeline'
+  | 'multimodal'
+  // movement whose mode the upstream record does not state — kept
+  // distinct from every real mode, never defaulted into one
+  | 'unspecified';
 
 export type NodeKind =
   // logistics
@@ -102,8 +127,11 @@ export type NodeKind =
   | 'industrial_park'
   | 'manufacturing_cluster'
   | 'consumption_center'
+  // energy
+  | 'power_plant'
   // world
   | 'city'
+  | 'region'
   | 'chokepoint';
 
 export type EntityKind = NodeKind | 'route' | 'flow' | 'country' | 'corridor';
@@ -205,10 +233,16 @@ export interface Route extends Entity {
   originId: EntityId;
   destinationId: EntityId;
   distanceKm: number;
-  estimatedDurationHours: number;
-  capacity: QuantityRating;
+  /**
+   * Promise-projections of the current Assertion of record. OPTIONAL:
+   * a projected corpus that carries no promise for a route leaves the
+   * field ABSENT — absence is a different fact from zero, and the UI
+   * renders it as unknown, never as 0.
+   */
+  estimatedDurationHours?: number;
+  capacity?: QuantityRating;
   /** Instantaneous utilization 0..1 at `provenance.knownAt`. */
-  utilization: number;
+  utilization?: number;
   constraints: RouteConstraint[];
   /** Sparse historical/forecast state samples (temporal spine). */
   historicalState: RouteStateSample[];
@@ -346,7 +380,16 @@ export interface WorldEvent {
   severity: number; // 0..1
   start: Timestamp;
   end?: Timestamp;
-  category: 'congestion' | 'closure' | 'weather' | 'strike' | 'demand_surge' | 'incident';
+  category:
+    | 'congestion'
+    | 'closure'
+    | 'weather'
+    | 'strike'
+    | 'demand_surge'
+    | 'incident'
+    // projected corpora carry regulatory-class events too
+    | 'policy'
+    | 'sanction';
   provenance: Provenance;
 }
 
@@ -373,6 +416,14 @@ export interface EntityState {
   congestion: number; // 0..1
   status: LifecycleStatus;
   activeEventIds: EntityId[];
+  /**
+   * false = the numeric channels of this state were never observed or
+   * computed — utilization/congestion are placeholders, and any surface
+   * showing them must say UNOBSERVED, never 0%. Absent = resolved.
+   * (`status` may still carry a DECLARED lifecycle — knowing a facility
+   * is disrupted is a different fact from measuring its utilization.)
+   */
+  observed?: boolean;
 }
 
 // ------------------------------------------------------------------

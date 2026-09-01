@@ -26,6 +26,9 @@ const MODE_WORD: Record<TransportMode, string> = {
   rail: 'RAIL',
   maritime: 'VESSEL',
   air: 'AIR FREIGHT',
+  pipeline: 'PIPELINE',
+  multimodal: 'MULTIMODAL',
+  unspecified: 'MOVEMENT',
 };
 
 /** Corridor midpoint for the establishing shot (~Lake St Clair). */

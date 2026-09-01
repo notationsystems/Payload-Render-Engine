@@ -33,9 +33,14 @@ export function createStatusBar(api: AppApi): { el: HTMLElement } {
   chip.textContent = 'SYNTHETIC / DEMO DATA';
   el.appendChild(chip);
 
+  // The badge states what the LOADED corpus is — never a constant. A
+  // Terminal-projection corpus is not "synthetic demo data", and saying
+  // so would misstate provenance in the most visible pixel of the UI.
   const syncDisclaimer = (): void => {
     try {
-      chip.title = api.store.snapshot.meta.disclaimer;
+      const meta = api.store.snapshot.meta;
+      chip.textContent = meta.disclaimer.split('—')[0].trim();
+      chip.title = meta.disclaimer;
     } catch {
       /* snapshot not loaded yet */
     }

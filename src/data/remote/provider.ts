@@ -42,6 +42,8 @@ export class RemoteSpatialProvider implements SpatialDataProvider {
 
   private snap: WorldSnapshot | null = null;
   private resolver: ((entityId: EntityId, t: Timestamp) => EntityState) | null = null;
+  /** Declared lifecycle per entity — surfaced even when nothing resolves dynamics. */
+  private declaredStatus = new Map<EntityId, EntityState['status']>();
 
   constructor(private baseUrl: string) {}
 
@@ -65,20 +67,34 @@ export class RemoteSpatialProvider implements SpatialDataProvider {
   async load(): Promise<WorldSnapshot> {
     const snap = await this.getJson<WorldSnapshot>('/api/snapshot');
     this.snap = snap;
-    this.resolver = createStateResolver(snap);
+    // The deterministic resolver is the SYNTHETIC corpus's dynamics.
+    // Running it over records from any other corpus would fabricate
+    // motion onto real entities — so it is gated on the corpus kind the
+    // envelope declares. A corpus without deterministic dynamics gets
+    // honest 'unknown' states, not synthesized ones.
+    const kind = this.lastMeta?.corpusKind;
+    this.resolver = kind === undefined || kind === 'synthetic' ? createStateResolver(snap) : null;
+    this.declaredStatus.clear();
+    for (const n of snap.nodes) this.declaredStatus.set(n.id, n.status);
+    for (const r of snap.routes) this.declaredStatus.set(r.id, r.status);
     return snap;
   }
 
   stateAt(entityId: EntityId, t: Timestamp): EntityState {
     if (!this.resolver) {
-      // load() has not resolved yet — neutral state, never a fabricated one
+      // load() has not resolved yet, or the corpus has no deterministic
+      // dynamics. The numeric channels are UNOBSERVED (observed: false —
+      // surfaces render them as unknown, never 0%); the DECLARED
+      // lifecycle still carries, because "this facility is disrupted"
+      // is a different fact from "its utilization was measured".
       return {
         entityId,
         t,
         utilization: 0,
         congestion: 0,
-        status: 'unknown',
+        status: this.declaredStatus.get(entityId) ?? 'unknown',
         activeEventIds: [],
+        observed: false,
       };
     }
     return this.resolver(entityId, t);

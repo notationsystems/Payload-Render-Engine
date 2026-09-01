@@ -85,7 +85,17 @@ const FRAG = /* glsl */ `
   }
 `;
 
-const MODE_INDEX = { road: 0, rail: 1, maritime: 2, air: 3 } as const;
+// 4+ get the neutral shader treatment (no rail dash, road-class speed);
+// their color from MODE_COLORS is what distinguishes them
+const MODE_INDEX = {
+  road: 0,
+  rail: 1,
+  maritime: 2,
+  air: 3,
+  pipeline: 4,
+  multimodal: 5,
+  unspecified: 6,
+} as const;
 
 export interface RouteVisual {
   route: Route;
@@ -103,6 +113,9 @@ export class RoutesLayer {
     rail: true,
     maritime: true,
     air: true,
+    pipeline: true,
+    multimodal: true,
+    unspecified: true,
   };
   private dimUndisturbed = false;
   private riskOn = false;
@@ -137,7 +150,8 @@ export class RoutesLayer {
           uColor: { value: new THREE.Color(MODE_COLORS[route.mode]) },
           uTime: { value: 0 },
           uState: { value: 0 },
-          uUtil: { value: route.utilization },
+          // absent utilization = no claimed load → no pulse, not a fake one
+          uUtil: { value: route.utilization ?? 0 },
           uCong: { value: 0 },
           uDim: { value: 0 },
           uMode: { value: MODE_INDEX[route.mode] },

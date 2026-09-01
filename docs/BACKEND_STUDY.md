@@ -84,12 +84,37 @@ Repos studied (cloned read-only, none of their code copied in):
   is the route handlers plus `docs/ARCHITECTURE_LEDGER.md`; study
   those, not the dead directory.
 
-## Integration path (unchanged by the study, sharpened by it)
+## Integration path — SHIPPED (`server/loaders/terminal.mjs`)
 
-The next backend increment is a **Terminal-projections loader**: a
-second corpus loader in `server/` that consumes the Terminal's
-route-per-capability projections over HTTP and maps them into
-`WorldSnapshot` — explicit id mapping table, per-record provenance
-switching from `synthetic:demo` to real source classes, and
-`admissible` earned per record rather than false for the corpus. The
-client does not change; that is what the seam is for.
+The Terminal-projections loader is real: it consumes a live
+payload-terminal-v0 over HTTP and maps `/api/economy` (map view: 76
+geo-anchored real facilities, 58 flows with modes, 14 real historical
+events), `/api/economy/table?limit=0` (~830 bitemporal observations
+with per-record `value_kind`), and `/api/infrastructure` (57 curated
+nuclear facilities) into a `WorldSnapshot`. Per-record provenance
+carries the Terminal's own `valueKind`, and `admissible` is earned per
+record by the Terminal's own rule (`value_kind !== 'representative'`)
+— the corpus mixes ~580 admissible with ~210 inadmissible records and
+says which is which on every record. The client did not change its
+contracts; the one client change was an honesty gate: the deterministic
+state resolver only runs for the synthetic corpus, so a projected
+corpus renders honest unknown states instead of synthesized dynamics.
+
+Facts the loader study added (verified against live wire captures, in
+`server/fixtures/terminal/`):
+
+- `PAYLOAD_DISABLE_LIVE=1` pins the Terminal to its committed
+  snapshots — deterministic, key-free upstream for tests.
+- `limit=0` on the table route is the sanctioned full-corpus pull;
+  nothing in the Terminal paginates (bounded-with-stated-bound idiom).
+- The table carries inline typed refusal rows (unresolved M49 codes,
+  with remedies) — the loader excludes and ACCOUNTS them, never maps
+  them into values.
+- Flows carry no `knownAt` — the loader stamps flow provenance with
+  the fetch instant (when the TWIN learned them), stated as such.
+- The Terminal serves NO routed path geometry from committed data
+  (`/api/directions` is live-network-bound); flow endpoints become
+  great-circle arcs labeled `geometryBasis: 'great_circle_estimate'`.
+- `econ_entities` carries `bottleneckScore` — an UNATTESTED derived
+  number, the exact defect the Terminal's own attestation module
+  documents. The loader deliberately does not ingest it.

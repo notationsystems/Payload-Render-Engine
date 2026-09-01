@@ -8,8 +8,9 @@ This service is that layer, built by studying (not copying)
 their conventions so the twin composes with the rest of Payload.
 
 ```
-npm run server         # http://127.0.0.1:8787
-node server/test.mjs   # contract tests (also part of `npm run check`)
+npm run server            # synthetic corpus · http://127.0.0.1:8787
+npm run server:terminal   # Terminal-projections corpus (TERMINAL_URL=… , default http://127.0.0.1:3000)
+node server/test.mjs      # contract tests, both corpora (also part of `npm run check`)
 ```
 
 Open the globe with `?api` (or `?api=<base-url>`) to hydrate it from
@@ -85,12 +86,52 @@ the wire, so the projection cannot drift between server and client.
   disk-cached responses, response caps, sanitized errors, a
   per-provider credit governor.
 
-## Integration path
+## Corpus loaders — the source seam
 
-Today this service loads the synthetic corpus at boot. The next step is
-a second loader that consumes Terminal projections over HTTP (its
-route-per-capability API) and maps them into `WorldSnapshot` — at which
-point record-level provenance switches from `synthetic:demo` to real
-source classes and `admissible` starts being earned per record rather
-than false for the corpus. The client does not change: that is what the
-seam is for.
+The routes are corpus-blind: `server/loaders/*` hand them a corpus
+object (`snapshot`, `readStateAt`, `scenarios`, `metaDefaults`) and the
+admissibility posture travels with it. `CORPUS=synthetic|terminal`
+selects the loader.
+
+**`loaders/synthetic.mjs`** — the in-repo demo world. Every reading is
+`known` (a computed world has nothing unobserved), and exactly for that
+reason every record is inadmissible: `valueKind: 'representative'`,
+`admissible: false`, basis stated.
+
+**`loaders/terminal.mjs`** — the Terminal-projections loader the
+architecture ledger anticipated, now real. It consumes a live
+payload-terminal-v0 over HTTP (`/api/economy?commodity=copper|aluminium`,
+`/api/economy/table?limit=0`, `/api/infrastructure`) and maps the
+projections into a `WorldSnapshot` through EXPLICIT field-based tables
+(kind+stage → NodeKind, flow mode → TransportMode, severity class →
+0..1, status strings → LifecycleStatus) — never a semantic derived from
+an id string. What that buys:
+
+- **Admissibility earned per record.** Each observation carries the
+  Terminal's own `value_kind`, and `admissible` is computed by the
+  Terminal's own rule (`value_kind !== 'representative'`). The corpus
+  MIXES ~580 admissible reported/estimated observations with ~210
+  inadmissible representative ones — and corpus-level `meta.admissible`
+  is `null`, because a blanket answer is not a fact for a mixed corpus.
+- **Three-valued readings with teeth.** No state variables are observed
+  upstream, so `readStateAt` answers `unobserved` (evidence exists,
+  state channel unmeasured) or `no_history` (no evidence at all) —
+  never a synthesized utilization. The client renders neutral unknown
+  states for the same reason (`RemoteSpatialProvider` gates the
+  deterministic resolver on `meta.corpusKind`).
+- **Conservation accounting.** Every upstream record lands in exactly
+  one bucket — mapped, or excluded with a reason (`/api/health`
+  exposes the `mappingReport`; upstream refusal rows are preserved as
+  exclusions, not mapped into values).
+- **Honest absences.** No promises upstream → `assertions: []`,
+  deviations refuse `NO_ASSERTIONS`, route `estimatedDurationHours` /
+  `capacity` / `utilization` are ABSENT (the UI renders NOT ASSERTED);
+  endpoint-only flow geometry → `geometryBasis: 'great_circle_estimate'`;
+  no counterfactual baseline → scenario routes refuse
+  `COUNTERFACTUALS_UNSUPPORTED_FOR_CORPUS`.
+
+Contract tests for the loader run against **captured bytes from a live
+Terminal** (`fixtures/terminal/`, manifest in `capture.json`; the
+Terminal was pinned to its committed snapshots with
+`PAYLOAD_DISABLE_LIVE=1` so the capture is deterministic and key-free).
+The runtime loader always fetches live.

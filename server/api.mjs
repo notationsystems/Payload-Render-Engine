@@ -5,25 +5,21 @@
  * projects state, it never stores or mutates it (INV-6). Handlers
  * return { status: 'ok', data, meta } or { status: 'refused', refusal }
  * — a typed refusal with a remedy, never a silent zero.
+ *
+ * The corpus itself comes through a loader (server/loaders/*) — the
+ * server's source seam. The synthetic demo world is one loader; the
+ * Terminal-projections loader is another. The routes do not know or
+ * care which one is live: admissibility posture, state readings and
+ * scenario support all travel with the corpus object.
  */
 
-import { pathToFileURL } from 'node:url';
-import { resolve } from 'node:path';
+import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 
-const ROOT = resolve(new URL('..', import.meta.url).pathname);
-const load = (p) => import(pathToFileURL(resolve(ROOT, p)).href);
+export async function registerRoutes(corpus) {
+  corpus = corpus ?? (await selectCorpus(process.env));
 
-export async function registerRoutes() {
-  // the SAME semantic layer the client ships — one corpus, no drift
-  const world = await load('src/data/synthetic/world.ts');
-  const providerMod = await load('src/data/synthetic/provider.ts');
-  const scenarioMod = await load('src/data/scenario.ts');
-
-  const snapshot = world.buildWorldSnapshot();
-  const provider = new providerMod.SyntheticProvider();
-  await provider.load();
-  const stateAt = (id, t) => provider.stateAt(id, t);
-  const scenarios = scenarioMod.buildScenarioCatalog(snapshot);
+  const snapshot = corpus.snapshot;
+  const scenarios = corpus.scenarios;
 
   const RANGE = snapshot.timeRange;
   const startMs = Date.parse(RANGE.start);
@@ -34,23 +30,27 @@ export async function registerRoutes() {
   for (const r of snapshot.routes) entityIndex.set(r.id, r);
   for (const f of snapshot.flows) entityIndex.set(f.id, f);
 
+  // scenario engines evaluate over known states only; a corpus whose
+  // readings can be 'unobserved' does not get a fabricated baseline
+  const knownStateAt = (id, t) => {
+    const r = corpus.readStateAt(id, t);
+    return r.state;
+  };
+
   // ------------------------------------------------------------ envelope
 
   /**
    * Every ok-response carries the same meta block: what class of data
    * this is, when it became knowable, what instant it was evaluated
    * at, under which knowledge mode, and whether it is admissible as
-   * evidence about the real world. The synthetic corpus is
-   * categorically inadmissible — that is a field, not a banner.
+   * evidence about the real world. The admissibility posture comes
+   * from the corpus loader — the synthetic corpus is categorically
+   * inadmissible; a projected corpus earns it per record.
    */
   const meta = (asOf, knowledge, frame) => ({
-    sourceClass: 'synthetic:demo',
-    // the Terminal's admissibility switch: representative fixture data is
-    // categorically inadmissible, and the BASIS is stated, not implied
-    valueKind: 'representative',
-    admissible: false,
-    admissibleBasis: 'rests_on_representative',
+    ...corpus.metaDefaults,
     corpus: snapshot.meta.label,
+    corpusKind: corpus.kind,
     generatedAt: snapshot.meta.generatedAt,
     knownAt: RANGE.now,
     asOf,
@@ -63,7 +63,9 @@ export async function registerRoutes() {
       service: 'payload-earth-spatial-api',
       version: '0.1.0',
       corpus: snapshot.meta.label,
+      corpusKind: corpus.kind,
       corpusGeneratedAt: snapshot.meta.generatedAt,
+      ...(corpus.attributionExtra ?? {}),
     },
     disclaimer: snapshot.meta.disclaimer,
   });
@@ -140,6 +142,7 @@ export async function registerRoutes() {
       service: 'payload-earth-spatial-api',
       version: '0.1.0',
       corpus: snapshot.meta.label,
+      corpusKind: corpus.kind,
       counts: {
         nodes: snapshot.nodes.length,
         routes: snapshot.routes.length,
@@ -150,6 +153,9 @@ export async function registerRoutes() {
         scenarios: scenarios.length,
       },
       timeRange: RANGE,
+      // the loader's conservation report: what mapped, what was excluded
+      // and WHY — an upstream record never disappears silently
+      ...(corpus.mappingReport ? { mappingReport: corpus.mappingReport } : {}),
     })
   );
 
@@ -183,10 +189,10 @@ export async function registerRoutes() {
     if (t.refusal) return t.refusal;
     const k = resolveKnowledge(query);
     if (k.refusal) return k.refusal;
-    // three-valued reading shape (known | unobserved | no_history) — the
-    // deterministic corpus always answers 'known'; the SHAPE ships now so
-    // real telemetry can answer honestly without an API break
-    return ok({ reading: 'known', state: stateAt(id, t.asOf) }, t.asOf, k.knowledge);
+    // three-valued reading (known | unobserved | no_history) — the
+    // corpus loader answers; the deterministic synthetic corpus is
+    // always 'known', a projected corpus answers honestly per record
+    return ok(corpus.readStateAt(id, t.asOf), t.asOf, k.knowledge);
   });
 
   get('/api/states', ({ query }) => {
@@ -198,15 +204,30 @@ export async function registerRoutes() {
     if (t.refusal) return t.refusal;
     const ids = idsRaw.split(',').map((s) => s.trim()).filter(Boolean);
     const states = [];
+    const unreadable = [];
     const unknown = [];
     for (const id of ids) {
-      if (entityIndex.has(id)) states.push(stateAt(id, t.asOf));
-      else unknown.push(id);
+      if (!entityIndex.has(id)) {
+        unknown.push(id);
+        continue;
+      }
+      const r = corpus.readStateAt(id, t.asOf);
+      if (r.reading === 'known') states.push(r.state);
+      else unreadable.push({ id, reading: r.reading });
     }
-    // partial-failure batching with conservation accounting:
-    // examined = resolved + refused, asserted on the wire
+    // partial-failure batching with conservation accounting, asserted
+    // on the wire: examined = resolved + unreadable + refused — every
+    // id is accounted for, and "which kind of nothing" is preserved
+    // (unknown id ≠ known entity with no reading)
     return ok(
-      { states, unknown, examined: ids.length, resolved: states.length, refused: unknown.length },
+      {
+        states,
+        unreadable,
+        unknown,
+        examined: ids.length,
+        resolved: states.length,
+        refused: unknown.length,
+      },
       t.asOf
     );
   });
@@ -284,12 +305,25 @@ export async function registerRoutes() {
     return ok(out);
   });
 
-  get('/api/scenarios', () => ok(scenarios));
+  // a corpus without a scenario engine cannot answer counterfactuals —
+  // that is a typed refusal, never an empty catalog posing as an answer
+  const scenarioGuard = () =>
+    corpus.scenarioEngine
+      ? null
+      : refuse(
+          'COUNTERFACTUALS_UNSUPPORTED_FOR_CORPUS',
+          `corpus '${corpus.kind}' has no scenario engine — its state readings do not support a counterfactual baseline`,
+          'query a corpus with deterministic or observed dynamics (e.g. the synthetic demo corpus)'
+        );
+
+  get('/api/scenarios', () => scenarioGuard() ?? ok(scenarios));
 
   get('/api/scenarios/rank', ({ query }) => {
+    const guard = scenarioGuard();
+    if (guard) return guard;
     const t = resolveAsOf(query);
     if (t.refusal) return t.refusal;
-    const rows = scenarioMod.rankScenarioImpacts(snapshot, stateAt, scenarios, t.asOf);
+    const rows = corpus.scenarioEngine.rank(knownStateAt, scenarios, t.asOf);
     // computed intelligence in a counterfactual frame, never observation
     const frame = { kind: 'counterfactual', asOf: t.asOf, knowledge: 'best_known', scenarioId: null };
     return {
@@ -299,6 +333,8 @@ export async function registerRoutes() {
   });
 
   get('/api/scenarios/:scenarioId/impact', ({ params, query }) => {
+    const guard = scenarioGuard();
+    if (guard) return guard;
     const id = decodeURIComponent(params.scenarioId);
     const spec = scenarios.find((s) => s.id === id);
     if (!spec) {
@@ -310,7 +346,7 @@ export async function registerRoutes() {
     }
     const t = resolveAsOf(query);
     if (t.refusal) return t.refusal;
-    const impact = scenarioMod.computeScenarioImpact(snapshot, stateAt, spec, t.asOf);
+    const impact = corpus.scenarioEngine.impact(knownStateAt, spec, t.asOf);
     const frame = { kind: 'counterfactual', asOf: t.asOf, knowledge: 'best_known', scenarioId: spec.id };
     return {
       ...ok(impact, t.asOf, 'best_known', frame),
@@ -319,4 +355,15 @@ export async function registerRoutes() {
   });
 
   return routes;
+}
+
+/** Corpus selection: the server's source seam, driven by environment. */
+export async function selectCorpus(env = process.env) {
+  const kind = env.CORPUS ?? 'synthetic';
+  if (kind === 'synthetic') return loadSyntheticCorpus();
+  if (kind === 'terminal') {
+    const { loadTerminalCorpus } = await import('./loaders/terminal.mjs');
+    return loadTerminalCorpus({ baseUrl: env.TERMINAL_URL });
+  }
+  throw new Error(`unknown CORPUS '${kind}' — use CORPUS=synthetic or CORPUS=terminal`);
 }

@@ -175,6 +175,11 @@ function fmtKm(km: number): string {
   return Math.round(km).toLocaleString('en-US');
 }
 
+/** A route without a recorded promise says so — never a made-up figure. */
+function fmtPromise(hours: number | undefined): string {
+  return hours === undefined ? 'NO PROMISE' : `${Math.round(hours)}H PROMISED`;
+}
+
 function pct(u: number): string {
   return `${Math.round(u * 100)}%`;
 }
@@ -241,17 +246,19 @@ function runCompare(api: AppApi, aq: string, bq: string): CommandResult {
   const b = findRoute(api, bq);
   if (!a || !b) return err('COMPARE NEEDS TWO ROUTES');
   const t = api.clock.simTime;
-  const ua = api.store.stateAt(a.id, t).utilization;
-  const ub = api.store.stateAt(b.id, t).utilization;
+  const sa = api.store.stateAt(a.id, t);
+  const sb = api.store.stateAt(b.id, t);
+  const ua = sa.observed === false ? 'UNOBSERVED' : pct(sa.utilization);
+  const ub = sb.observed === false ? 'UNOBSERVED' : pct(sb.utilization);
   const line =
-    `${a.name.toUpperCase()} ${fmtKm(a.distanceKm)} KM / ${pct(ua)} · ` +
-    `${b.name.toUpperCase()} ${fmtKm(b.distanceKm)} KM / ${pct(ub)}`;
+    `${a.name.toUpperCase()} ${fmtKm(a.distanceKm)} KM / ${ua} · ` +
+    `${b.name.toUpperCase()} ${fmtKm(b.distanceKm)} KM / ${ub}`;
   api.select(a.id, 'command');
   api.events.emit('toast', {
     title: 'ROUTE COMPARISON',
     body:
-      `${a.name.toUpperCase()} ${fmtKm(a.distanceKm)} KM · ${Math.round(a.estimatedDurationHours)}H PROMISED · ${pct(ua)} · ` +
-      `${b.name.toUpperCase()} ${fmtKm(b.distanceKm)} KM · ${Math.round(b.estimatedDurationHours)}H PROMISED · ${pct(ub)}`,
+      `${a.name.toUpperCase()} ${fmtKm(a.distanceKm)} KM · ${fmtPromise(a.estimatedDurationHours)} · ${ua} · ` +
+      `${b.name.toUpperCase()} ${fmtKm(b.distanceKm)} KM · ${fmtPromise(b.estimatedDurationHours)} · ${ub}`,
     tone: 'info',
   });
   return ok(line);

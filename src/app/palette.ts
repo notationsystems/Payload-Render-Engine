@@ -10,6 +10,11 @@ export const MODE_COLORS: Record<TransportMode, number> = {
   rail: 0xb48cff,
   maritime: 0x38d6c8,
   air: 0x7fb8ff,
+  pipeline: 0xd08770,
+  multimodal: 0x9aa7c7,
+  // unspecified mode renders in the unknown grey — never borrowed
+  // from a real mode's color
+  unspecified: 0x6b7688,
 };
 
 export const MODE_COLORS_CSS: Record<TransportMode, string> = {
@@ -17,6 +22,9 @@ export const MODE_COLORS_CSS: Record<TransportMode, string> = {
   rail: '#b48cff',
   maritime: '#38d6c8',
   air: '#7fb8ff',
+  pipeline: '#d08770',
+  multimodal: '#9aa7c7',
+  unspecified: '#6b7688',
 };
 
 export const ACCENT = 0x4da6ff;

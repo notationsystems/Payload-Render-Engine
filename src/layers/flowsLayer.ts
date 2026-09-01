@@ -115,7 +115,15 @@ const FRAG = /* glsl */ `
   }
 `;
 
-const MODE_TRAVERSAL = { road: 9, rail: 12, maritime: 30, air: 7 } as const;
+const MODE_TRAVERSAL = {
+  road: 9,
+  rail: 12,
+  maritime: 30,
+  air: 7,
+  pipeline: 26,
+  multimodal: 14,
+  unspecified: 14,
+} as const;
 
 export class FlowsLayer {
   readonly points: THREE.Points | null = null;

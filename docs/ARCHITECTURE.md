@@ -487,3 +487,18 @@ The load-bearing facts:
   unreachable the client falls back to the in-browser corpus and says
   so in the UI — never silently. `get_state` on the tool surface
   reports which source is live.
+
+**The Terminal-projections loader (shipped).** `server/loaders/terminal.mjs`
+feeds the twin from a live payload-terminal-v0: real facilities, flows,
+events and ~830 bitemporal observations, mapped through explicit
+field-based tables with conservation accounting (`mappingReport` on
+`/api/health`). Admissibility is earned per record by the Terminal's own
+rule; the corpus mixes admissible and inadmissible records and
+`meta.admissible` is `null` — a blanket answer is not a fact for a mixed
+corpus. State readings answer `unobserved`/`no_history` (nothing
+synthesizes dynamics for a projected corpus — the client gates its
+deterministic resolver on `meta.corpusKind`), promise fields are absent
+rather than zero (the inspectors render NOT ASSERTED), scenario routes
+refuse for lack of a baseline, and endpoint-only geometry says
+`great_circle_estimate`. Details: `server/README.md`,
+`docs/BACKEND_STUDY.md`.

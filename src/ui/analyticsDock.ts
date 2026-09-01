@@ -77,12 +77,17 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
     let disrupted = 0;
     let degraded = 0;
     let utilSum = 0;
+    let unobserved = 0;
     for (const r of snap.routes) {
       const s = api.store.stateAt(r.id, t);
       utilSum += s.utilization;
+      if (s.observed === false) unobserved++;
       if (s.status === 'disrupted') disrupted++;
       else if (s.status === 'degraded') degraded++;
     }
+    // "which kind of nothing": a corpus whose states are unobserved must
+    // never paint 0% as a measured zero
+    const utilKnown = snap.routes.length > 0 && unobserved < snap.routes.length;
     const meanUtil = snap.routes.length ? utilSum / snap.routes.length : 0;
     const dayAgo = new Date(api.clock.simMillis - 86400000).toISOString();
     const meanUtilPrev = meanUtilAt(dayAgo);
@@ -92,40 +97,50 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
 
     kpiGrid.innerHTML =
       kpi('ACTIVE FLOWS', String(movingFlows)) +
-      kpi(
-        'NETWORK UTIL',
-        `${Math.round(meanUtil * 100)}%`,
-        `${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)} / 24H`,
-        deltaPct > 1.5 ? 'warn' : deltaPct < -1.5 ? 'ok' : ''
-      ) +
+      (utilKnown
+        ? kpi(
+            'NETWORK UTIL',
+            `${Math.round(meanUtil * 100)}%`,
+            `${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)} / 24H`,
+            deltaPct > 1.5 ? 'warn' : deltaPct < -1.5 ? 'ok' : ''
+          )
+        : kpi('NETWORK UTIL', '—', 'UNOBSERVED')) +
       kpi('DISRUPTED', String(disrupted), degraded ? `+${degraded} DEGRADED` : undefined, disrupted ? 'alert' : '') +
       kpi('ACTIVE EVENTS', String(activeEvents), undefined, activeEvents > 2 ? 'warn' : '');
 
-    // sparkline across the whole range (cached — deterministic data)
-    if (!sparkPts) {
-      const { startMs, endMs } = api.clock.range;
-      sparkPts = [];
-      for (let i = 0; i < SPARK_SAMPLES; i++) {
-        const ms = startMs + ((endMs - startMs) * i) / (SPARK_SAMPLES - 1);
-        sparkPts.push({ t: ms, v: meanUtilAt(new Date(ms).toISOString()) });
+    // sparkline across the whole range (cached — deterministic data).
+    // With no observed dynamics there is no curve to draw: a flat zero
+    // line would be a fabricated timeseries.
+    sparkCanvas.hidden = !utilKnown;
+    if (utilKnown) {
+      if (!sparkPts) {
+        const { startMs, endMs } = api.clock.range;
+        sparkPts = [];
+        for (let i = 0; i < SPARK_SAMPLES; i++) {
+          const ms = startMs + ((endMs - startMs) * i) / (SPARK_SAMPLES - 1);
+          sparkPts.push({ t: ms, v: meanUtilAt(new Date(ms).toISOString()) });
+        }
       }
+      drawSparkline(sparkCanvas, sparkPts, {
+        min: 0,
+        max: 1,
+        markerT: api.clock.simMillis,
+        nowT: api.clock.range.nowMs,
+      });
     }
-    drawSparkline(sparkCanvas, sparkPts, {
-      min: 0,
-      max: 1,
-      markerT: api.clock.simMillis,
-      nowT: api.clock.range.nowMs,
-    });
 
-    // bottlenecks: chokepoints + routes ranked by live congestion
-    const rows: { id: EntityId; name: string; congestion: number; kind: string }[] = [];
+    // bottlenecks: chokepoints + routes ranked by live congestion. An
+    // unknown state ranks nowhere and shows UNOBSERVED — never LOW 0%.
+    const rows: { id: EntityId; name: string; congestion: number; kind: string; known: boolean }[] = [];
     for (const n of snap.nodes) {
       if (n.kind !== 'chokepoint') continue;
-      rows.push({ id: n.id, name: n.name, congestion: api.store.stateAt(n.id, t).congestion, kind: 'CHOKEPOINT' });
+      const s = api.store.stateAt(n.id, t);
+      rows.push({ id: n.id, name: n.name, congestion: s.congestion, kind: 'CHOKEPOINT', known: s.observed !== false });
     }
     for (const r of snap.routes) {
       const s = api.store.stateAt(r.id, t);
-      if (s.congestion > 0.55) rows.push({ id: r.id, name: r.name, congestion: s.congestion, kind: r.mode.toUpperCase() });
+      if (s.observed !== false && s.congestion > 0.55)
+        rows.push({ id: r.id, name: r.name, congestion: s.congestion, kind: r.mode.toUpperCase(), known: true });
     }
     rows.sort((a, b) => b.congestion - a.congestion);
     bnList.replaceChildren(
@@ -133,11 +148,17 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
         const div = document.createElement('div');
         div.className = 'os-bn-row';
         const sev = row.congestion > 0.66 ? 'HIGH' : row.congestion > 0.45 ? 'MED' : 'LOW';
-        div.innerHTML = `
+        div.innerHTML = row.known
+          ? `
           <span class="os-bn-rank">${i + 1}</span>
           <span class="os-bn-name">${esc(row.name)}</span>
           <span class="os-bn-chip ${sev.toLowerCase()}">${sev}</span>
-          <span class="os-bn-val">${Math.round(row.congestion * 100)}%</span>`;
+          <span class="os-bn-val">${Math.round(row.congestion * 100)}%</span>`
+          : `
+          <span class="os-bn-rank">${i + 1}</span>
+          <span class="os-bn-name">${esc(row.name)}</span>
+          <span class="os-bn-chip">UNOBSERVED</span>
+          <span class="os-bn-val">—</span>`;
         div.title = row.kind;
         div.addEventListener('click', () => api.focus(row.id));
         return div;

@@ -183,7 +183,12 @@ export function createStateResolver(
     baselines.set(n.id, { base: clamp01(0.3 + 0.45 * n.importance), status: n.status });
   }
   for (const r of snap.routes) {
-    baselines.set(r.id, { base: r.utilization, status: r.status });
+    // synthetic routes always carry a rated utilization; the fallback
+    // mirrors the node baseline for corpora that omit the promise
+    baselines.set(r.id, {
+      base: r.utilization ?? clamp01(0.3 + 0.45 * r.importance),
+      status: r.status,
+    });
   }
   for (const f of snap.flows) {
     baselines.set(f.id, { base: clamp01(f.intensity), status: 'active' });

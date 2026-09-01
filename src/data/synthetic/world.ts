@@ -358,9 +358,13 @@ function buildNodes(): Facility[] {
 // Routes
 // ------------------------------------------------------------------
 
-const MODE_SPEED_KMH: Record<TransportMode, number> = { road: 75, rail: 45, maritime: 33, air: 830 };
-const MODE_DWELL_H: Record<TransportMode, number> = { road: 1, rail: 8, maritime: 24, air: 4 };
-const MODE_CAPACITY: Record<TransportMode, QuantityRating> = {
+/** The synthetic generator speaks the four classic modes only — typed
+ *  so, rather than inventing speeds for modes it never generates. */
+type SyntheticMode = 'road' | 'rail' | 'maritime' | 'air';
+
+const MODE_SPEED_KMH: Record<SyntheticMode, number> = { road: 75, rail: 45, maritime: 33, air: 830 };
+const MODE_DWELL_H: Record<SyntheticMode, number> = { road: 1, rail: 8, maritime: 24, air: 4 };
+const MODE_CAPACITY: Record<SyntheticMode, QuantityRating> = {
   road: { value: 320, unit: 'loads/day' },
   rail: { value: 36, unit: 'trains/day' },
   maritime: { value: 14, unit: 'vessels/day' },
@@ -377,7 +381,7 @@ interface RouteConstraintSpec {
 interface RouteSpec {
   id: string;
   name: string;
-  mode: TransportMode;
+  mode: SyntheticMode;
   origin: string;
   dest: string;
   pts: LonLat[];
@@ -1870,7 +1874,9 @@ function buildAssertionsAndObservations(
   ];
   for (const s of transitSpecs) {
     const r = routesById.get(s.entityId);
-    if (!r) continue;
+    // no recorded promise → nothing to assert (synthetic routes always
+    // carry one; the guard keeps the promise/evidence join honest)
+    if (!r || r.estimatedDurationHours === undefined) continue;
     assertions.push({
       id: `assert:${s.entityId}:transit`,
       entityId: s.entityId,
@@ -2205,7 +2211,7 @@ export function buildWorldSnapshot(): WorldSnapshot {
   for (const r of routes) {
     const samples: RouteStateSample[] = [];
     for (let ms = START_MS; ms <= END_MS; ms += stepMs) {
-      const st = resolveEntityState(r.id, r.utilization, r.status, new Date(ms).toISOString(), events);
+      const st = resolveEntityState(r.id, r.utilization ?? 0.5, r.status, new Date(ms).toISOString(), events);
       samples.push({ t: st.t, utilization: st.utilization, congestion: st.congestion, status: st.status });
     }
     r.historicalState = samples;

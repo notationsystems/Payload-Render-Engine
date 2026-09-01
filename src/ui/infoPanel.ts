@@ -24,6 +24,9 @@ const MODE_COLOR: Record<TransportMode, string> = {
   rail: 'var(--mode-rail)',
   maritime: 'var(--mode-maritime)',
   air: 'var(--mode-air)',
+  pipeline: '#d08770',
+  multimodal: '#9aa7c7',
+  unspecified: '#6b7688',
 };
 
 const MODE_ORDER: TransportMode[] = ['road', 'rail', 'maritime', 'air'];
@@ -139,13 +142,15 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     return row;
   }
 
-  function meter(label: string, frac: number, color: string): HTMLElement {
+  function meter(label: string, frac: number, color: string, observed = true): HTMLElement {
     const m = div('pi-meter');
     const head = div('pi-meter-head');
-    head.append(div('pi-meter-label', label), div('pi-meter-value', fmtPct(frac)));
+    // an unobserved channel says so — an empty bar at "0%" would pose
+    // as a measured zero
+    head.append(div('pi-meter-label', label), div('pi-meter-value', observed ? fmtPct(frac) : 'UNOBSERVED'));
     const track = div('pi-meter-track');
     const fill = div('pi-meter-fill');
-    fill.style.width = `${Math.min(100, Math.max(0, frac * 100))}%`;
+    fill.style.width = observed ? `${Math.min(100, Math.max(0, frac * 100))}%` : '0%';
     fill.style.background = color;
     track.append(fill);
     m.append(head, track);
@@ -202,6 +207,9 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
   function sparkSection(title: string, entityId: EntityId, color?: string): HTMLElement | null {
     const { startMs, endMs, nowMs } = api.clock.range;
     if (!(endMs > startMs)) return null;
+    // no observed dynamics → no history curve; a flat line at zero
+    // would be a fabricated timeseries
+    if (api.store.stateAt(entityId, api.clock.simTime).observed === false) return null;
     const canvas = document.createElement('canvas');
     canvas.className = 'pi-spark';
     const N = 56;
@@ -257,8 +265,8 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
       section(
         'STATUS',
         kv('STATUS', s.status.toUpperCase(), { tone: statusTone(s.status) }),
-        meter('UTILIZATION', s.utilization, 'var(--accent)'),
-        meter('CONGESTION', s.congestion, 'var(--warn)')
+        meter('UTILIZATION', s.utilization, 'var(--accent)', s.observed !== false),
+        meter('CONGESTION', s.congestion, 'var(--warn)', s.observed !== false)
       )
     );
 
@@ -407,9 +415,12 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
       )
     );
 
-    // TRANSIT — the promise / evidence split
+    // TRANSIT — the promise / evidence split. A route without a
+    // recorded promise says NOT ASSERTED, never a fabricated figure.
     const transitRows: (HTMLElement | null)[] = [
-      kv('PROMISED', `${fmt(r.estimatedDurationHours)} H`),
+      r.estimatedDurationHours !== undefined
+        ? kv('PROMISED', `${fmt(r.estimatedDurationHours)} H`)
+        : kv('PROMISED', 'NOT ASSERTED', { tone: 'dim' }),
     ];
     const dev = api.store
       .deviationsFor(r.id)
@@ -432,8 +443,10 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     content.append(
       section(
         'CAPACITY',
-        kv('RATED', `${fmt(r.capacity.value)} ${r.capacity.unit}`),
-        meter('LIVE UTILIZATION', s.utilization, modeColor)
+        r.capacity
+          ? kv('RATED', `${fmt(r.capacity.value)} ${r.capacity.unit}`)
+          : kv('RATED', 'NOT ASSERTED', { tone: 'dim' }),
+        meter('LIVE UTILIZATION', s.utilization, modeColor, s.observed !== false)
       )
     );
 
@@ -515,12 +528,16 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     const steps: HTMLElement[] = [];
     let totalKm = 0;
     let totalH = 0;
+    // one leg without a promise makes the chain total unknowable —
+    // a partial sum posing as the journey time would be a fabrication
+    let promisesComplete = true;
     const ordered = [...fl.segments].sort((a, b) => a.sequence - b.sequence);
     for (const seg of ordered) {
       const route = api.store.route(seg.routeId);
       if (route) {
         totalKm += route.distanceKm;
-        totalH += route.estimatedDurationHours;
+        if (route.estimatedDurationHours !== undefined) totalH += route.estimatedDurationHours;
+        else promisesComplete = false;
       }
       const step = div('pi-step');
       step.style.borderLeftColor = MODE_COLOR[seg.mode];
@@ -538,7 +555,9 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
         'ROUTE CHAIN',
         ...steps,
         kv('TOTAL DISTANCE', `${fmt(totalKm)} KM`),
-        kv('EST TRANSIT', `${fmt(totalH)} H`)
+        promisesComplete
+          ? kv('EST TRANSIT', `${fmt(totalH)} H`)
+          : kv('EST TRANSIT', 'NOT ASSERTED', { tone: 'dim' })
       )
     );
 

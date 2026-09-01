@@ -1,0 +1,14 @@
+{
+  "what": "Captured HTTP responses from a live payload-terminal-v0 instance — REAL bytes from the Terminal's own committed corpus, not fabricated fixtures.",
+  "capturedAt": "2026-09-01T00:26:00Z",
+  "from": "http://127.0.0.1:3000 (payload-terminal-v0 @ next dev, PAYLOAD_DISABLE_LIVE=1)",
+  "terminalPin": "PAYLOAD_DISABLE_LIVE=1 pins the Terminal to its committed snapshot corpus, so these captures are deterministic and key-free",
+  "files": {
+    "economy-copper.json": "GET /api/economy?commodity=copper",
+    "economy-aluminium.json": "GET /api/economy?commodity=aluminium",
+    "table-copper.json": "GET /api/economy/table?commodity=copper&format=json&limit=0",
+    "table-aluminium.json": "GET /api/economy/table?commodity=aluminium&format=json&limit=0",
+    "infrastructure.json": "GET /api/infrastructure"
+  },
+  "purpose": "hermetic contract tests for server/loaders/terminal.mjs inside `npm run check`; the runtime loader always fetches live over HTTP"
+}

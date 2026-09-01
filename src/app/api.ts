@@ -158,6 +158,9 @@ export interface AppApi {
 
   // ---- counterfactual frames (hypothetical — never confused with state)
   listScenarios(): ScenarioSpec[];
+  /** Non-null when the catalog is empty for a stated reason (e.g. a
+   *  projected corpus with no observed baseline). */
+  scenariosUnavailableReason: string | null;
   /**
    * Chokepoint criticality: every catalog frame computed (not entered)
    * at the current sim time, ranked by simulated network damage.
