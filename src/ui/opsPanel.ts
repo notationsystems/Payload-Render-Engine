@@ -26,6 +26,7 @@ import {
   sortOpsLoads,
   type OpsLoad,
   type OpsReadResult,
+  type OpsSnapshot,
 } from '../data/operations';
 import { resolveApiBase } from '../data/sources';
 import './ops.css';
@@ -229,6 +230,105 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
     return row;
   };
 
+  /**
+   * Schedule strip — the dispatcher's Gantt over the tower's own
+   * instants. DECLARED windows (pickup, delivery — promises) draw
+   * HOLLOW; OBSERVED events (dispatch, last tracking) draw SOLID; the
+   * tower's asOf is the NOW line. A load with no tracking says so on
+   * the row — an empty stretch of track is stated, never smoothed.
+   */
+  const buildGantt = (snap: OpsSnapshot): HTMLElement | null => {
+    const loads = sortOpsLoads(snap.loads);
+    const ts: number[] = [];
+    for (const l of loads) {
+      for (const w of [l.timing.pickupWindow, l.timing.deliveryWindow]) {
+        if (w) ts.push(Date.parse(w.start), Date.parse(w.end));
+      }
+      if (l.timing.dispatchedAt) ts.push(Date.parse(l.timing.dispatchedAt));
+      if (l.timing.lastTrackingOccurredAt) ts.push(Date.parse(l.timing.lastTrackingOccurredAt));
+    }
+    if (!ts.length) return null; // no declared or observed instants — no strip to draw
+    const asOf = Date.parse(snap.asOf);
+    ts.push(asOf);
+    let t0 = Math.min(...ts);
+    let t1 = Math.max(...ts);
+    const span = Math.max(t1 - t0, 3600_000);
+    t0 -= span * 0.04;
+    t1 += span * 0.04;
+    const X = (t: number): number => ((t - t0) / (t1 - t0)) * 100;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'ops-gantt';
+    wrap.innerHTML = `
+      <div class="os-card-title">SCHEDULE — DECLARED WINDOWS (HOLLOW) VS OBSERVED EVENTS (SOLID) · DASH = TOWER AS OF</div>
+      <div class="ops-g-axis"><span></span><span class="ops-g-axis-track"><span>${esc(fmtInstant(new Date(t0).toISOString()))}</span><span>${esc(fmtInstant(new Date(t1).toISOString()))}</span></span></div>`;
+
+    const rows = document.createElement('div');
+    rows.className = 'ops-g-rows';
+
+    for (const l of loads) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'ops-g-row';
+      const label = document.createElement('span');
+      label.className = 'ops-g-label';
+      label.innerHTML = `<i class="ops-g-sev ops-sev-${l.attentionLevel}"></i>${esc(l.loadId ?? l.operationId)}`;
+      const track = document.createElement('span');
+      track.className = 'ops-g-track';
+
+      const win = (w: { start: string; end: string } | null, cls: string, name: string): void => {
+        if (!w) return;
+        const a = Date.parse(w.start);
+        const b = Date.parse(w.end);
+        const bar = document.createElement('i');
+        bar.className = `ops-g-win ${cls}`;
+        bar.style.left = `${X(a).toFixed(2)}%`;
+        bar.style.width = `${Math.max(0.6, X(b) - X(a)).toFixed(2)}%`;
+        bar.title = `${name} WINDOW (DECLARED) ${fmtInstant(w.start)} → ${fmtInstant(w.end)}`;
+        track.appendChild(bar);
+      };
+      win(l.timing.pickupWindow, 'pickup', 'PICKUP');
+      win(l.timing.deliveryWindow, 'delivery', 'DELIVERY');
+
+      const evt = (t: string | null, cls: string, name: string): void => {
+        if (!t) return;
+        const dot = document.createElement('i');
+        dot.className = `ops-g-evt ${cls}`;
+        dot.style.left = `${X(Date.parse(t)).toFixed(2)}%`;
+        dot.title = `${name} (OBSERVED) ${fmtInstant(t)}`;
+        track.appendChild(dot);
+      };
+      evt(l.timing.dispatchedAt, 'dispatch', 'DISPATCHED');
+      evt(l.timing.lastTrackingOccurredAt, 'tracking', 'LAST TRACKING');
+      // the tower's asOf, tick on every track (column-aligned NOW line)
+      const tick = document.createElement('i');
+      tick.className = 'ops-g-tick';
+      tick.style.left = `${X(asOf).toFixed(2)}%`;
+      tick.title = `TOWER AS OF ${fmtInstant(snap.asOf)}`;
+      track.appendChild(tick);
+      if (!opsTrackingObserved(l)) {
+        const note = document.createElement('i');
+        note.className = 'ops-g-none';
+        note.textContent = 'TRACKING UNOBSERVED';
+        track.appendChild(note);
+      }
+
+      row.append(label, track);
+      row.addEventListener('click', () => {
+        expanded = expanded === l.operationId ? null : l.operationId;
+        if (expanded) focusLane(l);
+        else {
+          api.clearOperationsLane();
+          selectedLane = null;
+        }
+        renderBody();
+      });
+      rows.appendChild(row);
+    }
+    wrap.appendChild(rows);
+    return wrap;
+  };
+
   const renderBody = (): void => {
     body.innerHTML = '';
     renderStatus();
@@ -268,6 +368,9 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
     policy.className = 'ops-policy';
     policy.innerHTML = `OPERATIONAL POLICY (STATED, NOT IMPLIED) — ACK GRACE ${snap.policy.acknowledgementGraceMinutes}M · TRACKING STALE AFTER ${snap.policy.trackingStaleMinutes}M · SETTLEMENT DUE ${Math.round(snap.policy.settlementGraceMinutes / 60)}H AFTER DELIVERY`;
     body.appendChild(policy);
+
+    const gantt = buildGantt(snap);
+    if (gantt) body.appendChild(gantt);
 
     const queueTitle = document.createElement('div');
     queueTitle.className = 'os-card-title ops-queue-title';

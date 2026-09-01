@@ -84,7 +84,8 @@ async function start(): Promise<void> {
     else if (
       app.getPreset() === 'agents' ||
       app.getPreset() === 'scenarios' ||
-      app.getPreset() === 'markets'
+      app.getPreset() === 'markets' ||
+      app.getPreset() === 'operations'
     ) {
       app.setPreset(app.getLastLayerPreset());
     } else {

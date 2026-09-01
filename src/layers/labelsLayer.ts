@@ -83,7 +83,8 @@ export class LabelsLayer {
       if (_p.z > 1) continue;
       const x = ((_p.x + 1) / 2) * w;
       const y = ((1 - _p.y) / 2) * h;
-      const hw = e.node.name.length * 3.6 + 8;
+      const isChip = altitude < 0.5 && e.category !== 'world';
+      const hw = e.node.name.length * 3.6 + (isChip ? 16 : 8);
       let collides = false;
       for (const q of placed) {
         if (Math.abs(y - q.y) < 16 && Math.abs(x - q.x) < hw + q.hw) {
@@ -100,6 +101,27 @@ export class LabelsLayer {
       const edgeFade = Math.min(1, Math.max(0, (facing - horizon) * 9));
       el.style.opacity = String(0.35 + 0.65 * edgeFade);
       el.style.color = e.node.id === this.selectedId ? '#dbe7f4' : '#8fa3b8';
+      // annotation chips at close zoom: infrastructure labels box up
+      // (the command-map idiom); cities stay plain text. Style writes
+      // only on mode change — no per-frame style churn.
+      const chip = isChip;
+      const mode = chip ? '1' : '0';
+      if (el.dataset.chip !== mode) {
+        el.dataset.chip = mode;
+        if (chip) {
+          el.style.background = 'rgba(6, 10, 16, 0.78)';
+          el.style.border = '1px solid rgba(139, 163, 184, 0.4)';
+          el.style.padding = '2px 6px';
+          el.style.borderRadius = '2px';
+          el.style.textShadow = 'none';
+        } else {
+          el.style.background = 'transparent';
+          el.style.border = 'none';
+          el.style.padding = '0';
+          el.style.borderRadius = '0';
+          el.style.textShadow = '0 1px 3px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.6)';
+        }
+      }
       el.style.display = 'block';
     }
     for (; i < POOL; i++) this.pool[i].style.display = 'none';

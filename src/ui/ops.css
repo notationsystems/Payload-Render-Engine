@@ -230,3 +230,111 @@
 .ops-panel { transition: opacity 0.18s ease; }
 
 [hidden] { display: none !important; }
+
+/* ------------------------------------------------------------------ */
+/* schedule strip — declared windows (hollow) vs observed (solid)      */
+/* ------------------------------------------------------------------ */
+.ops-gantt {
+  margin: 10px 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--glass-soft);
+  padding: 8px 10px 10px;
+}
+.ops-g-axis {
+  display: grid;
+  grid-template-columns: 124px 1fr;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.ops-g-axis-track {
+  display: flex;
+  justify-content: space-between;
+}
+.ops-g-rows {
+  position: relative;
+}
+.ops-g-tick {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 0;
+  border-left: 1px dashed rgba(210, 226, 240, 0.5);
+  z-index: 1;
+}
+.ops-g-row {
+  display: grid;
+  grid-template-columns: 124px 1fr;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 3px 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.ops-g-row:hover .ops-g-label { color: var(--text-hi); }
+.ops-g-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ops-g-sev {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: var(--text-dim);
+}
+.ops-g-sev.ops-sev-critical { background: var(--alert); }
+.ops-g-sev.ops-sev-high { background: var(--warn); }
+.ops-g-sev.ops-sev-medium { background: #c9a86a; }
+.ops-g-track {
+  position: relative;
+  height: 16px;
+  border-bottom: 1px solid rgba(120, 160, 200, 0.14);
+}
+.ops-g-win {
+  position: absolute;
+  top: 3px;
+  height: 9px;
+  border: 1px solid rgba(127, 184, 255, 0.65);
+  border-radius: 2px;
+  background: rgba(127, 184, 255, 0.07); /* hollow: declared, not observed */
+}
+.ops-g-win.delivery {
+  border-color: rgba(56, 214, 200, 0.6);
+  background: rgba(56, 214, 200, 0.06);
+}
+.ops-g-evt {
+  position: absolute;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -4px 0 0 -3px;
+  border-radius: 50%;
+  background: var(--text-hi); /* solid: observed */
+  z-index: 2;
+}
+.ops-g-evt.tracking { background: var(--ok); }
+.ops-g-none {
+  position: absolute;
+  right: 2px;
+  top: 0;
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 7.5px;
+  letter-spacing: 0.1em;
+  color: var(--warn);
+  opacity: 0.85;
+}

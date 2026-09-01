@@ -133,12 +133,23 @@ const FRAG = /* glsl */ `
     vec2 p = gl_PointCoord * 2.0 - 1.0;
     float d = sdf(p, vGlyph);
 
-    float fill = smoothstep(0.05, -0.05, d) * 0.55;
-    float edge = smoothstep(0.10, 0.02, abs(d)) * 1.1;
-    float glow = exp(-length(p) * 2.2) * 0.5;
+    // instrument-chip reading: quiet interior, crisp derivative-AA rim,
+    // a precision pip at the surveyed point, restrained glow
+    float aa = fwidth(d) * 1.4 + 0.01;
+    float fill = smoothstep(aa, -aa, d) * 0.30;
+    float edge = smoothstep(aa * 2.0, 0.0, abs(d)) * 1.45;
+    float pip = (vGlyph < 3.6 || vGlyph > 5.5)
+      ? smoothstep(0.14, 0.03, length(p)) * 0.85
+      : 0.0;
+    float glow = exp(-length(p) * 3.0) * 0.32;
 
     vec3 col = vColor;
-    float k = fill + edge + glow;
+    float k = fill + edge + pip + glow;
+
+    // chokepoint: second, outer ring — the watched-narrows signature
+    if (vGlyph > 3.5 && vGlyph < 4.5) {
+      k += smoothstep(aa * 2.0, 0.0, abs(length(p) - 0.78)) * 0.55;
+    }
 
     if (vState > 1.5) {
       float ringR = 0.72 + 0.12 * sin(uTime * 5.0);
@@ -246,6 +257,8 @@ export class NodesLayer {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
+    // fwidth() in the glyph shader — core in WebGL2, extension on WebGL1
+    (mat as unknown as { extensions: { derivatives: boolean } }).extensions = { derivatives: true };
     this.points = new THREE.Points(geo, mat);
     this.points.renderOrder = 6;
     // browser zoom / monitor moves change devicePixelRatio at runtime
