@@ -48,6 +48,8 @@ export async function registerRoutes(corpus) {
    * inadmissible; a projected corpus earns it per record.
    */
   const meta = (asOf, knowledge, frame) => ({
+    // vintages travels IN metaDefaults — a per-corpus claim, never a
+    // route-level constant
     ...corpus.metaDefaults,
     corpus: snapshot.meta.label,
     corpusKind: corpus.kind,
@@ -55,7 +57,6 @@ export async function registerRoutes(corpus) {
     knownAt: RANGE.now,
     asOf,
     knowledge,
-    vintages: 1, // single-vintage corpus: as_known_then === best_known, honestly
     // EvaluationFrame (payload-terminal-v0 engine.ts vocabulary)
     frame: frame ?? { kind: 'reconstruction', asOf, knowledge },
     // attribution fingerprint — otherwise "this number looks wrong" is an anecdote
@@ -124,7 +125,36 @@ export async function registerRoutes(corpus) {
         ),
       };
     }
+    // a corpus that cannot honestly answer a mode REFUSES it — accepting
+    // as_known_then over a single unreplayable capture would silently
+    // alias it to best_known, which is a lie about what was known when
+    const supported = corpus.knowledgeModes ?? ['best_known', 'as_known_then'];
+    if (!supported.includes(k)) {
+      return {
+        refusal: refuse(
+          'KNOWLEDGE_MODE_UNSUPPORTED_FOR_CORPUS',
+          `corpus '${corpus.kind}' cannot answer knowledge=${k} — it is a single capture whose revision chains (supersedes) are not replayable`,
+          `use knowledge=${supported.join(' or knowledge=')}, or ingest a multi-vintage corpus`
+        ),
+      };
+    }
     return { knowledge: k };
+  };
+
+  // a path segment that is not valid percent-encoding is a malformed
+  // question, not a server fault — refuse it with a remedy, never a 500
+  const decodeId = (raw) => {
+    try {
+      return { id: decodeURIComponent(raw) };
+    } catch {
+      return {
+        refusal: refuse(
+          'UNPARSEABLE_ID',
+          `'${raw}' is not valid percent-encoding`,
+          'URL-encode the entity id (e.g. node%3Aport-rotterdam)'
+        ),
+      };
+    }
   };
 
   // -------------------------------------------------------------- routes
@@ -177,7 +207,9 @@ export async function registerRoutes(corpus) {
   });
 
   get('/api/state/:entityId', ({ params, query }) => {
-    const id = decodeURIComponent(params.entityId);
+    const dec = decodeId(params.entityId);
+    if (dec.refusal) return dec.refusal;
+    const id = dec.id;
     if (!entityIndex.has(id)) {
       return refuse(
         'UNKNOWN_ENTITY',
@@ -236,7 +268,9 @@ export async function registerRoutes(corpus) {
     const bboxRaw = query.get('bbox');
     let nodes = snapshot.nodes;
     if (bboxRaw) {
-      const parts = bboxRaw.split(',').map(Number);
+      // Number('') is 0 — an empty component must fail the finite guard,
+      // not silently read as a coordinate
+      const parts = bboxRaw.split(',').map((s) => (s.trim() === '' ? NaN : Number(s)));
       if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n))) {
         return refuse(
           'UNPARSEABLE_BBOX',
@@ -278,7 +312,9 @@ export async function registerRoutes(corpus) {
   });
 
   get('/api/deviations/:entityId', ({ params }) => {
-    const id = decodeURIComponent(params.entityId);
+    const dec = decodeId(params.entityId);
+    if (dec.refusal) return dec.refusal;
+    const id = dec.id;
     const assertions = snapshot.assertions.filter((a) => a.entityId === id);
     if (!assertions.length) {
       return refuse(
@@ -335,7 +371,9 @@ export async function registerRoutes(corpus) {
   get('/api/scenarios/:scenarioId/impact', ({ params, query }) => {
     const guard = scenarioGuard();
     if (guard) return guard;
-    const id = decodeURIComponent(params.scenarioId);
+    const dec = decodeId(params.scenarioId);
+    if (dec.refusal) return dec.refusal;
+    const id = dec.id;
     const spec = scenarios.find((s) => s.id === id);
     if (!spec) {
       return refuse(

@@ -374,7 +374,15 @@ export class App implements AppApi {
       this.labelsLayer.setEnabled(v);
       this.nodesLayer.setBucketVisible('world.cities', v);
     });
-    for (const mode of ['road', 'rail', 'maritime', 'air'] as const) {
+    for (const mode of [
+      'road',
+      'rail',
+      'maritime',
+      'air',
+      'pipeline',
+      'multimodal',
+      'unspecified',
+    ] as const) {
       m.register(`transport.${mode}` as LayerId, (v) =>
         this.routesLayer.setModeVisible(mode, v)
       );
@@ -452,7 +460,13 @@ export class App implements AppApi {
         continue;
       }
       const s = this.store.stateAt(route.id, t);
-      this.routesLayer.setTemporalState(route.id, s.utilization, s.congestion, s.status);
+      this.routesLayer.setTemporalState(
+        route.id,
+        s.utilization,
+        s.congestion,
+        s.status,
+        s.observed !== false
+      );
     }
     if (this.anomalies.visible) this.refreshAnomaliesIfChanged();
 

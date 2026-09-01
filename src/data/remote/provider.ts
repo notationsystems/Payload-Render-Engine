@@ -70,10 +70,11 @@ export class RemoteSpatialProvider implements SpatialDataProvider {
     // The deterministic resolver is the SYNTHETIC corpus's dynamics.
     // Running it over records from any other corpus would fabricate
     // motion onto real entities — so it is gated on the corpus kind the
-    // envelope declares. A corpus without deterministic dynamics gets
-    // honest 'unknown' states, not synthesized ones.
+    // envelope declares, FAIL CLOSED: only an explicit 'synthetic'
+    // declaration builds it. An undeclared corpus gets honest
+    // observed:false unknown states, never synthesized ones.
     const kind = this.lastMeta?.corpusKind;
-    this.resolver = kind === undefined || kind === 'synthetic' ? createStateResolver(snap) : null;
+    this.resolver = kind === 'synthetic' ? createStateResolver(snap) : null;
     this.declaredStatus.clear();
     for (const n of snap.nodes) this.declaredStatus.set(n.id, n.status);
     for (const r of snap.routes) this.declaredStatus.set(r.id, r.status);

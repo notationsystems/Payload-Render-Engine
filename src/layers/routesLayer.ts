@@ -30,6 +30,7 @@ const FRAG = /* glsl */ `
   uniform float uStatus;     // 0 ok, 1 degraded, 2 disrupted
   uniform float uRisk;       // risk layer on/off
   uniform float uHypo;       // hypothetical frame: 0 none, 1 perturbed, 2 spillover
+  uniform float uHasLoad;    // 1 = utilization asserted/observed; 0 = absent → no pulse
   varying vec2 vUv;
 
   void main() {
@@ -38,7 +39,9 @@ const FRAG = /* glsl */ `
     // traveling pulse: bright head, decaying tail, moving origin→destination
     float speed = uMode == 3.0 ? 0.55 : (uMode == 2.0 ? 0.10 : 0.22);
     float ph = fract(u * uPulses - uTime * speed * uPulses);
-    float pulse = pow(1.0 - ph, 7.0);
+    // a route with no asserted/observed load does not pulse — the moving
+    // head reads as traffic, and absence of a claim must not animate
+    float pulse = pow(1.0 - ph, 7.0) * uHasLoad;
 
     // rail tie banding
     float pattern = 1.0;
@@ -152,6 +155,7 @@ export class RoutesLayer {
           uState: { value: 0 },
           // absent utilization = no claimed load → no pulse, not a fake one
           uUtil: { value: route.utilization ?? 0 },
+          uHasLoad: { value: route.utilization !== undefined ? 1 : 0 },
           uCong: { value: 0 },
           uDim: { value: 0 },
           uMode: { value: MODE_INDEX[route.mode] },
@@ -288,10 +292,17 @@ export class RoutesLayer {
     for (const vis of this.visuals.values()) vis.material.uniforms.uHypo.value = 0;
   }
 
-  setTemporalState(routeId: EntityId, util: number, congestion: number, status: string): void {
+  setTemporalState(
+    routeId: EntityId,
+    util: number,
+    congestion: number,
+    status: string,
+    observed = true
+  ): void {
     const vis = this.visuals.get(routeId);
     if (!vis) return;
     vis.material.uniforms.uUtil.value = util;
+    vis.material.uniforms.uHasLoad.value = observed ? 1 : 0;
     vis.material.uniforms.uCong.value = congestion;
     vis.material.uniforms.uStatus.value =
       status === 'disrupted' ? 2 : status === 'degraded' ? 1 : 0;

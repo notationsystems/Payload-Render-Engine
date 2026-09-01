@@ -18,6 +18,9 @@ const MODE_SWATCH: Partial<Record<LayerId, string>> = {
   'transport.rail': 'var(--mode-rail)',
   'transport.maritime': 'var(--mode-maritime)',
   'transport.air': 'var(--mode-air)',
+  'transport.pipeline': '#d08770',
+  'transport.multimodal': '#9aa7c7',
+  'transport.unspecified': '#6b7688',
 };
 
 export function createLayerPanel(api: AppApi): { el: HTMLElement } {

@@ -29,7 +29,7 @@ const MODE_COLOR: Record<TransportMode, string> = {
   unspecified: '#6b7688',
 };
 
-const MODE_ORDER: TransportMode[] = ['road', 'rail', 'maritime', 'air'];
+const MODE_ORDER: TransportMode[] = ['road', 'rail', 'maritime', 'air', 'pipeline', 'multimodal', 'unspecified'];
 
 type Tone = 'ok' | 'warn' | 'alert' | 'dim';
 
@@ -245,6 +245,22 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
       rows.push(chipWrap);
       rows.push(kv('KNOWN AT', prov.knownAt.slice(0, 10)));
       if (prov.confidence !== undefined) rows.push(kv('CONFIDENCE', fmtPct(prov.confidence)));
+      // the per-record admissibility switch, rendered where the record is
+      // read — absent means NOT EVALUATED, a third state, never defaulted
+      if (prov.valueKind !== undefined) {
+        rows.push(
+          kv('VALUE KIND', prov.valueKind.toUpperCase(), {
+            tone: prov.valueKind === 'representative' ? 'warn' : undefined,
+          })
+        );
+      }
+      if (prov.admissible !== undefined) {
+        rows.push(
+          kv('ADMISSIBLE', prov.admissible ? 'YES' : 'NO — RESTS ON REPRESENTATIVE', {
+            tone: prov.admissible ? 'ok' : 'warn',
+          })
+        );
+      }
     }
     for (const [k, v] of extraRows ?? []) rows.push(kv(k, v));
     return section('EVIDENCE', ...rows);
@@ -601,7 +617,7 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
       content.append(
         evidence(undefined, [
           ['GEOMETRY', 'Natural Earth via world-atlas'],
-          ['STATS', 'derived from synthetic demo corpus'],
+          ['STATS', `derived from ${api.store.snapshot.meta.label}`],
         ])
       );
       return;
@@ -690,7 +706,7 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     content.append(
       evidence(undefined, [
         ['GEOMETRY', 'Natural Earth via world-atlas'],
-        ['STATS', 'derived from synthetic demo corpus'],
+        ['STATS', `derived from ${api.store.snapshot.meta.label}`],
       ])
     );
   }

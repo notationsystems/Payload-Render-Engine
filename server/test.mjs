@@ -159,5 +159,38 @@ check(
 const nid = new Set(tsnap.data.nodes.map((n) => n.id));
 check(tsnap.data.flows.every((f) => nid.has(f.originId) && nid.has(f.destinationId)), 'no dangling flow endpoints in the mapped graph');
 
+// review regressions ------------------------------------------------------
+// (1) observation ids are unique — the Terminal reuses record ids ACROSS
+// commodity tables; the loader namespaces them so 31 real records survive
+check(new Set(obs.map((o) => o.id)).size === obs.length, `observation ids unique after commodity namespacing (${obs.length})`);
+check(obs.every((o) => o.provenance.evidence.some((e) => e.startsWith('upstream_record:'))), 'upstream record ids preserved in evidence');
+// (2) timeRange honors VALID time, not just transaction time
+const earliestValid = Math.min(...obs.map((o) => Date.parse(o.t)).filter(Number.isFinite));
+check(Date.parse(tsnap.data.timeRange.start) <= earliestValid, 'timeRange.start covers earliest valid-time observation');
+const oldT = tcall('GET', `/api/state/${encodeURIComponent('ent:mine:escondida')}?t=${encodeURIComponent(new Date(earliestValid).toISOString())}`);
+check(oldT?.status === 'ok', 'an instant the corpus describes is answerable, not refused');
+// (3) flows are stamped (loader curation class, stated), events are NOT
+// (upstream emits no class — absent means not evaluated, never fabricated)
+check(tsnap.data.flows.every((f) => f.provenance.valueKind === 'estimated' && f.provenance.admissible === true), 'flows stamped estimated (loader curation, stated in evidence)');
+check(tsnap.data.events.every((e) => e.provenance.valueKind === undefined && e.provenance.admissible === undefined), 'events carry NO fabricated evidence class');
+// (4) minted routes say derived, not reported
+check(tsnap.data.routes.every((r) => r.provenance.valueKind === 'derived'), 'loader-minted routes stamped derived');
+// (5) event affects refs resolve or are recorded — nothing dangles silently
+const allIds = new Set([...tsnap.data.nodes, ...tsnap.data.routes, ...tsnap.data.flows].map((x) => x.id));
+check(tsnap.data.events.every((e) => e.affects.every((id) => allIds.has(id))), 'event affects refs all resolve in the mapped graph');
+check(Array.isArray(th.data.mappingReport.unresolvedRefs), 'unresolved refs are recorded in the mapping report');
+// (6) as_known_then honestly refused for a single unreplayable capture
+const akt = tcall('GET', '/api/snapshot?knowledge=as_known_then');
+check(akt?.status === 'refused' && akt.refusal.kind === 'KNOWLEDGE_MODE_UNSUPPORTED_FOR_CORPUS', 'as_known_then refused, never silently aliased to best_known');
+check(th.meta.vintages === 1, 'vintages travels with the corpus metaDefaults');
+// (7) upstream reconciliation on the record
+check(th.data.mappingReport.upstreamReconciliation?.length === 2, 'upstream declared-vs-delivered reconciliation recorded per commodity');
+
+// malformed inputs are refused, never 500s or silent zeros
+const badId = tcall('GET', '/api/state/%ZZ');
+check(badId?.status === 'refused' && badId.refusal.kind === 'UNPARSEABLE_ID', 'invalid percent-encoding → typed refusal, not a crash');
+const badBox = tcall('GET', '/api/entities?bbox=1,2,3,');
+check(badBox?.status === 'refused' && badBox.refusal.kind === 'UNPARSEABLE_BBOX', "bbox with empty component refused (Number('') must not read as 0)");
+
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');
 process.exit(failures ? 1 : 0);

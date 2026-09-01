@@ -65,6 +65,9 @@ const LAYER_LABELS: Record<LayerId, string> = {
   'world.nightlights': 'NIGHT LIGHTS',
   'transport.road': 'ROAD',
   'transport.rail': 'RAIL',
+  'transport.pipeline': 'PIPELINE',
+  'transport.multimodal': 'MULTIMODAL',
+  'transport.unspecified': 'UNSPECIFIED MODE',
   'transport.maritime': 'MARITIME',
   'transport.air': 'AIR',
   'infra.ports': 'PORTS',
@@ -328,7 +331,7 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
     lower === 'rank scenarios'
   ) {
     const rows = api.rankScenarios();
-    if (!rows.length) return err('NO FRAMES TO RANK');
+    if (!rows.length) return err(api.scenariosUnavailableReason ?? 'NO FRAMES TO RANK');
     api.setPreset('scenarios');
     const top = rows
       .slice(0, 3)
@@ -349,6 +352,9 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   const frameMatch = /^(?:scenario|run frame|what if)\s+(.+)$/.exec(lower);
   if (frameMatch) {
     const q = frameMatch[1].replace(/\b(closes?|closure|closed|shuts?( down)?)\b/g, ' ').trim();
+    if (api.scenariosUnavailableReason && !api.listScenarios().length) {
+      return err(api.scenariosUnavailableReason);
+    }
     const spec = api
       .listScenarios()
       .find((sp) => sp.name.toLowerCase().includes(q) || sp.id.toLowerCase().includes(q));

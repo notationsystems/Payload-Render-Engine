@@ -53,6 +53,9 @@ export async function loadSyntheticCorpus() {
       valueKind: 'representative',
       admissible: false,
       admissibleBasis: 'rests_on_representative',
+      vintages: 1, // single-vintage: as_known_then === best_known, honestly
     },
+    // one vintage means the two modes genuinely coincide — both are honest
+    knowledgeModes: ['best_known', 'as_known_then'],
   };
 }

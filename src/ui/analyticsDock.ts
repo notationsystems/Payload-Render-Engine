@@ -80,15 +80,18 @@ export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
     let unobserved = 0;
     for (const r of snap.routes) {
       const s = api.store.stateAt(r.id, t);
-      utilSum += s.utilization;
+      // unobserved placeholders never enter the mean — averaging their
+      // zeros into a mixed corpus would skew a real number
       if (s.observed === false) unobserved++;
+      else utilSum += s.utilization;
       if (s.status === 'disrupted') disrupted++;
       else if (s.status === 'degraded') degraded++;
     }
     // "which kind of nothing": a corpus whose states are unobserved must
     // never paint 0% as a measured zero
-    const utilKnown = snap.routes.length > 0 && unobserved < snap.routes.length;
-    const meanUtil = snap.routes.length ? utilSum / snap.routes.length : 0;
+    const observedCount = snap.routes.length - unobserved;
+    const utilKnown = observedCount > 0;
+    const meanUtil = observedCount ? utilSum / observedCount : 0;
     const dayAgo = new Date(api.clock.simMillis - 86400000).toISOString();
     const meanUtilPrev = meanUtilAt(dayAgo);
     const deltaPct = (meanUtil - meanUtilPrev) * 100;

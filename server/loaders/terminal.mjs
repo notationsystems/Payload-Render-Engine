@@ -197,13 +197,19 @@ export async function loadTerminalCorpus({
   const events = [];
   const observations = [];
   const fingerprints = [];
+  // what the upstream DECLARES it holds vs what this capture DELIVERED vs
+  // what mapped — a gap here is a fact about the projection, on the record
+  const upstreamReconciliation = [];
 
-  const nodeProv = (evidence) => ({
+  // valueKind is a CLAIM about the record's evidence class — parameterized
+  // so a loader-derived record (a minted route) says 'derived', never a
+  // class the upstream didn't earn
+  const nodeProv = (evidence, valueKind = 'reported') => ({
     source: 'terminal:projection',
     knownAt: now,
     evidence,
-    valueKind: 'reported',
-    admissible: admissibleOf('reported'),
+    valueKind,
+    admissible: admissibleOf(valueKind),
   });
 
   // ------------------------------------------------------------ economy
@@ -212,6 +218,21 @@ export async function loadTerminalCorpus({
     const fp = root.attribution?.state?.fingerprint ?? 'unknown';
     fingerprints.push(`${c.key}:${fp}`);
     const upstream = `${baseUrl}/api/economy?commodity=${c.key}`;
+    upstreamReconciliation.push({
+      commodity: c.key,
+      fingerprint: fp,
+      declared: {
+        observations: root.attribution?.state?.observations ?? null,
+        flows: root.attribution?.state?.flows ?? null,
+      },
+      delivered: {
+        entities: root.econ_entities.length,
+        flows: root.econ_flows.length,
+        events: root.econ_events.length,
+        tableRows: table.rows.length,
+      },
+      note: 'declared counts are the upstream state; the map view and table deliver a projection of it (e.g. flows without mappable geo endpoints are not served) — the gap is upstream filtering, not loader loss',
+    });
 
     for (const e of root.econ_entities) {
       const kind = nodeKindOf(e.kind, e.stage);
@@ -265,7 +286,8 @@ export async function loadTerminalCorpus({
           name: `${f.from.split(':').pop()} → ${f.to.split(':').pop()} (${mode})`,
           geometry: { type: 'LineString', coordinates: coords },
           status: f.disrupted ? 'disrupted' : 'active',
-          provenance: nodeProv([`upstream:${upstream}`, `derived_from:${f.id}`]),
+          // the route is minted BY THE LOADER from flow endpoints — derived
+          provenance: nodeProv([`upstream:${upstream}`, `derived_from:${f.id}`], 'derived'),
           importance: 0.5,
           mode,
           originId: f.from,
@@ -299,22 +321,39 @@ export async function loadTerminalCorpus({
             `quantity:${f.quantity} ${f.unit}`,
             `confidence:${f.confidence}`,
             `basis:${f.basis ?? 'unspecified'}`,
+            'curation:loader-stamped estimated (upstream flow records carry confidence but no value_kind)',
           ],
+          // the honest class for an annual trade-flow estimate; stamped by
+          // the loader and stated as such above, evaluated per record
+          valueKind: 'estimated',
+          admissible: admissibleOf('estimated'),
         },
         tags: [`form:${f.form}`, `commodity:${c.key}`],
       });
     }
 
     for (const ev of root.econ_events) {
+      // strict tables, like nodes and flows: an unmapped type or severity
+      // class is excluded + accounted, never guessed into a default
+      const category = EVENT_CATEGORY.get(ev.type);
+      if (!category) {
+        account(ev.id, `unmapped event type ${ev.type}`);
+        continue;
+      }
+      const severity = SEVERITY.get(ev.severity);
+      if (severity === undefined) {
+        account(ev.id, `unmapped severity class ${ev.severity}`);
+        continue;
+      }
       events.push({
         id: ev.id,
         name: ev.title,
         description: ev.description ?? ev.magnitude?.note ?? ev.title,
         affects: [ev.entityId],
-        severity: SEVERITY.get(ev.severity) ?? 0.5,
+        severity,
         start: isoDay(ev.start),
         end: ev.end ? isoDay(ev.end) : undefined,
-        category: EVENT_CATEGORY.get(ev.type) ?? 'incident',
+        category,
         provenance: {
           source: 'terminal:projection',
           // bitemporal honesty: the event became KNOWABLE when first
@@ -326,23 +365,33 @@ export async function loadTerminalCorpus({
             `severity_class:${ev.severity}`,
             `curation:${ev.curation ?? 'unstated'}`,
           ],
-          valueKind: 'reported',
-          admissible: admissibleOf('reported'),
+          // valueKind/admissible deliberately ABSENT: the upstream event
+          // records emit no evidence class, and asserting one here would
+          // fabricate a standing the record never earned. Absent = not
+          // evaluated, which is a different fact from either answer.
         },
       });
     }
 
     for (const r of table.rows) {
+      // twin-side id is namespaced by the commodity table the row came
+      // from — a loader-held field, not anything parsed from an id. The
+      // Terminal's usgs-mcs source reuses record ids ACROSS commodity
+      // tables (obs:usgs-mcs2025:production:au:2023 exists in copper AND
+      // aluminium with different values), so the upstream id alone would
+      // silently collapse 31 real records into one for any id-keyed
+      // consumer. The upstream id survives in evidence.
+      const twinId = `${c.key}:${r.record_id}`;
       if (r.refusal) {
-        account(r.record_id, `upstream refusal: ${r.refusal.type}`);
+        account(twinId, `upstream refusal: ${r.refusal.type}`);
         continue;
       }
       if (r.value === null || r.value === undefined || !r.value_kind) {
-        account(r.record_id, 'no value / no value_kind');
+        account(twinId, 'no value / no value_kind');
         continue;
       }
       observations.push({
-        id: r.record_id,
+        id: twinId,
         entityId: r.subject_id,
         t: isoDay(r.period_end),
         metric: r.metric,
@@ -354,6 +403,8 @@ export async function loadTerminalCorpus({
           validFrom: isoDay(r.period_start),
           validTo: isoDay(r.period_end),
           evidence: [
+            `upstream_record:${r.record_id}`,
+            `commodity:${c.key}`,
             `source:${r.source_id ?? 'unstated'}`,
             `source_name:${r.source_name ?? 'unstated'}`,
             `confidence:${r.confidence ?? 'unstated'}`,
@@ -398,9 +449,34 @@ export async function loadTerminalCorpus({
   }
 
   // --------------------------------------------------------------- corpus
+  // event `affects` refs can name entities the projection does not carry
+  // (ent:company:*, ent:country:*) — the event stays, the unresolved ref
+  // is moved to evidence and RECORDED, so nothing dangles silently
+  const allEntityIds = new Set([
+    ...nodes.map((n) => n.id),
+    ...routes.map((r) => r.id),
+    ...flows.map((f) => f.id),
+  ]);
+  const unresolvedRefs = [];
+  for (const ev of events) {
+    const resolved = ev.affects.filter((id) => allEntityIds.has(id));
+    const dangling = ev.affects.filter((id) => !allEntityIds.has(id));
+    if (dangling.length) {
+      ev.affects = resolved;
+      ev.provenance.evidence.push(...dangling.map((id) => `affects_unresolved:${id}`));
+      unresolvedRefs.push({ eventId: ev.id, refs: dangling });
+    }
+  }
+
+  // the corpus covers an instant if evidence DESCRIBES it (valid time) or
+  // was KNOWN by it (transaction time) — start must honor both, or the
+  // range refusal lies about records the snapshot itself carries
   const knownAts = observations.map((o) => Date.parse(o.provenance.knownAt)).filter(Number.isFinite);
+  const validTimes = observations
+    .flatMap((o) => [Date.parse(o.t), Date.parse(o.provenance.validFrom ?? '')])
+    .filter(Number.isFinite);
   const eventStarts = events.map((e) => Date.parse(e.start)).filter(Number.isFinite);
-  const startMs = Math.min(...knownAts, ...eventStarts, Date.parse(now));
+  const startMs = Math.min(...knownAts, ...validTimes, ...eventStarts, Date.parse(now));
 
   const snapshot = {
     nodes,
@@ -449,7 +525,14 @@ export async function loadTerminalCorpus({
       valueKind: 'per_record',
       admissible: null, // corpus-level admissibility is NOT a fact for a mixed corpus
       admissibleBasis: 'earned_per_record',
+      // one capture of the upstream state. The corpus CONTAINS revision
+      // chains (supersedes in evidence) but this projection cannot replay
+      // them — so as_known_then is REFUSED, not silently aliased
+      vintages: 1,
     },
+    // knowledge modes this corpus can honestly answer: a single capture
+    // with unreplayable revision chains speaks best_known only
+    knowledgeModes: ['best_known'],
     attributionExtra: {
       upstream: {
         service: 'payload-terminal-v0',
@@ -468,6 +551,8 @@ export async function loadTerminalCorpus({
         observations: observations.length,
       },
       excluded,
+      unresolvedRefs,
+      upstreamReconciliation,
     },
   };
 }
