@@ -55,6 +55,10 @@ export function createLegend(api: AppApi): { el: HTMLElement } {
     ${row(dot('var(--warn)'), 'Degraded')}
     ${row(dot('var(--alert)'), 'Disrupted')}
     ${row(dot('#6b7688'), 'Unknown / unobserved')}
+    <div class="pe-lg-group">LIVE FEEDS</div>
+    ${row(dot('#ffd9a0'), 'Stations (ISS…) — computed, SGP4')}
+    ${row(dot('#7fb8ff'), 'GPS')} ${row(dot('#b48cff'), 'GLONASS')} ${row(dot('#38d6c8'), 'Galileo')}
+    ${row(dot('var(--warn)'), 'Quake M4+ (ring = magnitude, fade = age)')}
     <div class="pe-lg-group">OVERLAYS</div>
     ${row(line('#d98cff', true), 'Hypothetical frame — computed, not observed')}
     ${row(line('#e8f1fb', true), 'Operational lane — dashed when untracked')}`;
@@ -80,7 +84,11 @@ export function createLegend(api: AppApi): { el: HTMLElement } {
     el.classList.toggle('pe-legend-tucked', panelOpen || inspecting);
   };
   api.events.on('preset', ({ preset }) => {
-    panelOpen = preset === 'operations' || preset === 'agents' || preset === 'scenarios';
+    panelOpen =
+      preset === 'operations' ||
+      preset === 'agents' ||
+      preset === 'scenarios' ||
+      preset === 'commodities';
     sync2();
   });
   api.events.on('select', ({ id }) => {

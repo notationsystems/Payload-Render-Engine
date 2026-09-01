@@ -42,6 +42,10 @@ import { RoutesLayer } from '../layers/routesLayer';
 import { NodesLayer } from '../layers/nodesLayer';
 import { FlowsLayer } from '../layers/flowsLayer';
 import { OpsArcLayer } from '../layers/opsArcLayer';
+import { SatsLayer } from '../layers/satsLayer';
+import { QuakesLayer } from '../layers/quakesLayer';
+import { fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
+import { resolveApiBase } from '../data/sources';
 import { LabelsLayer } from '../layers/labelsLayer';
 import { SelectionInput, type Pick } from '../interaction/selection';
 import { FollowTheLoad } from '../interaction/followTheLoad';
@@ -76,6 +80,9 @@ export class App implements AppApi {
   private nodesLayer!: NodesLayer;
   private flowsLayer!: FlowsLayer;
   private opsArc = new OpsArcLayer();
+  private satsLayer = new SatsLayer();
+  private quakesLayer = new QuakesLayer();
+  private liveLoaded = { sats: false, quakes: false };
   private labelsLayer!: LabelsLayer;
   private anomalies!: THREE.Points;
   private anomaliesMat!: THREE.PointsMaterial;
@@ -172,6 +179,8 @@ export class App implements AppApi {
     this.flowsLayer = new FlowsLayer(snapshot.flows, routeIx, this.routesLayer);
     scene.add(this.flowsLayer.group);
     scene.add(this.opsArc.group);
+    scene.add(this.satsLayer.points);
+    scene.add(this.quakesLayer.group);
     this.labelsLayer = new LabelsLayer(hud);
     scene.add(this.depOverlay);
     this.buildAnomalies();
@@ -218,6 +227,8 @@ export class App implements AppApi {
       this.nodesLayer.update(dt);
       this.flowsLayer.update(dt);
       this.opsArc.update(dt);
+      this.satsLayer.update();
+      this.quakesLayer.update(dt);
       this.labelsLayer.update(this.engine.camera, this.nodesLayer, alt);
       this.pulseAnomalies(dt);
     });
@@ -392,6 +403,14 @@ export class App implements AppApi {
         this.routesLayer.setModeVisible(mode, v)
       );
     }
+    m.register('live.satellites', (v) => {
+      this.satsLayer.setVisible(v);
+      if (v && !this.liveLoaded.sats) void this.loadLiveSatellites();
+    });
+    m.register('live.seismic', (v) => {
+      this.quakesLayer.setVisible(v);
+      if (v && !this.liveLoaded.quakes) void this.loadLiveQuakes();
+    });
     for (const bucket of [
       'infra.ports',
       'infra.airports',
@@ -584,7 +603,8 @@ export class App implements AppApi {
     window.addEventListener('keyup', (e) => {
       if (e.key !== 'b' && e.key !== 'B') return;
       this.brushHeld = false;
-      this.routesLayer.applyBrush(null);
+      // release restores the standing commodity focus, if one is active
+      this.routesLayer.applyBrush(this.commodityFocusSet);
       this.events.emit('brush', { active: false });
     });
     canvas.addEventListener('pointermove', (e) => {
@@ -690,6 +710,75 @@ export class App implements AppApi {
 
   clearOperationsLane(): void {
     this.opsArc.clear();
+  }
+
+  /**
+   * Live feeds (gods-eye-view substrate): fetched lazily on first
+   * toggle, THROUGH the spatial API proxy. A failure is a toast with
+   * the refusal's remedy — the layer stays empty, never fabricated.
+   */
+  private async loadLiveSatellites(): Promise<void> {
+    const r = await fetchLiveSatellites(resolveApiBase());
+    if (r.kind !== 'ok') {
+      this.events.emit('toast', {
+        title: 'LIVE SATELLITES UNAVAILABLE',
+        body: r.kind === 'refused' ? `${r.refusal.message} — ${r.refusal.remedy}` : r.note,
+        tone: 'warn',
+      });
+      return;
+    }
+    this.liveLoaded.sats = true;
+    this.satsLayer.setSats(r.data.sats);
+    this.satsLayer.setVisible(this.layerMgr.list().find((l) => l.id === 'live.satellites')?.visible ?? false);
+    this.events.emit('toast', {
+      title: 'LIVE SATELLITES',
+      body: `${r.data.sats.length} objects · ${r.data.upstream} · positions COMPUTED by SGP4, repropagated 1/s`,
+      tone: 'info',
+    });
+  }
+
+  private async loadLiveQuakes(): Promise<void> {
+    const r = await fetchLiveQuakes(resolveApiBase());
+    if (r.kind !== 'ok') {
+      this.events.emit('toast', {
+        title: 'LIVE SEISMIC UNAVAILABLE',
+        body: r.kind === 'refused' ? `${r.refusal.message} — ${r.refusal.remedy}` : r.note,
+        tone: 'warn',
+      });
+      return;
+    }
+    this.liveLoaded.quakes = true;
+    this.quakesLayer.setQuakes(r.data.quakes);
+    this.events.emit('toast', {
+      title: 'LIVE SEISMIC',
+      body: `${r.data.quakes.length} reported events (M2.5+, 24h) · ${r.data.upstream}`,
+      tone: 'info',
+    });
+  }
+
+  /** Active commodity focus — survives a B-brush release. */
+  private commodityFocusSet: Set<EntityId> | null = null;
+
+  setCommodityFocus(commodityId: EntityId | null): void {
+    if (!commodityId) {
+      this.commodityFocusSet = null;
+      this.routesLayer.applyBrush(null);
+      this.events.emit('commodityFocus', { commodityId: null, name: null, routes: 0, flows: 0 });
+      return;
+    }
+    const flows = this.store.snapshot.flows.filter((f) => f.commodityId === commodityId);
+    const lit = new Set<EntityId>();
+    for (const f of flows) for (const seg of f.segments) lit.add(seg.routeId);
+    this.commodityFocusSet = lit;
+    this.routesLayer.applyBrush(lit);
+    const name =
+      this.store.snapshot.commodities.find((c) => c.id === commodityId)?.name ?? commodityId;
+    this.events.emit('commodityFocus', {
+      commodityId,
+      name,
+      routes: lit.size,
+      flows: flows.length,
+    });
   }
 
   getPreset(): ViewPreset {

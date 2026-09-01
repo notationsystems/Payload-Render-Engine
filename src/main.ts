@@ -20,6 +20,7 @@ import { createScenariosPanel } from './ui/scenariosPanel';
 import { createOpsPanel } from './ui/opsPanel';
 import { createTooltip } from './ui/tooltip';
 import { createLegend } from './ui/legend';
+import { createCommoditiesPanel } from './ui/commoditiesPanel';
 import { createArchOverlay } from './ui/archOverlay';
 import { createScenarioBanner } from './ui/scenarioBanner';
 
@@ -52,6 +53,7 @@ async function start(): Promise<void> {
   hud.appendChild(createOpsPanel(app).el);
   hud.appendChild(createTooltip(app).el);
   hud.appendChild(createLegend(app).el);
+  hud.appendChild(createCommoditiesPanel(app).el);
   hud.appendChild(createArchOverlay(app).el);
   hud.appendChild(createScenarioBanner(app).el);
 

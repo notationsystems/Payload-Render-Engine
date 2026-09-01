@@ -405,6 +405,7 @@ export async function loadTerminalCorpus({
           evidence: [
             `upstream_record:${r.record_id}`,
             `commodity:${c.key}`,
+            ...(r.subject_label ? [`subject_label:${r.subject_label}`] : []),
             `source:${r.source_id ?? 'unstated'}`,
             `source_name:${r.source_name ?? 'unstated'}`,
             `confidence:${r.confidence ?? 'unstated'}`,

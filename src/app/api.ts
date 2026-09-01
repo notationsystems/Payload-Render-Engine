@@ -25,7 +25,7 @@ export type ViewPreset =
 export interface LayerDef {
   id: LayerId;
   label: string;
-  group: 'WORLD' | 'TRANSPORT' | 'INFRASTRUCTURE' | 'ECONOMY' | 'INTELLIGENCE';
+  group: 'WORLD' | 'TRANSPORT' | 'INFRASTRUCTURE' | 'ECONOMY' | 'INTELLIGENCE' | 'LIVE';
   visible: boolean;
 }
 
@@ -54,7 +54,9 @@ export type LayerId =
   | 'intel.constraints'
   | 'intel.anomalies'
   | 'intel.dependencies'
-  | 'intel.risk';
+  | 'intel.risk'
+  | 'live.satellites'
+  | 'live.seismic';
 
 export interface CountryInfo {
   code: string;
@@ -89,6 +91,8 @@ export interface AppEvents extends Record<string, unknown> {
   scenario: { active: boolean; impact?: ScenarioImpact };
   /** Route brush focus (hold B) engaged or released. */
   brush: { active: boolean };
+  /** Commodity focus applied from the commodities workspace. */
+  commodityFocus: { commodityId: EntityId | null; name: string | null; routes: number; flows: number };
   toast: { title: string; body?: string; tone?: 'info' | 'warn' | 'alert' };
   status: {
     fps: number;
@@ -140,6 +144,9 @@ export interface AppApi {
   /** Control-tower lane overlay (read-only; tracking honesty in the arc). */
   showOperationsLane(origin: LonLat, destination: LonLat, tracked: boolean): void;
   clearOperationsLane(): void;
+  /** Commodity focus: dim routes carrying nothing of this commodity.
+   *  Emphasis only — nothing hidden, nothing mutated. null clears. */
+  setCommodityFocus(commodityId: EntityId | null): void;
   setFlowMode(enabled: boolean): void;
   getFlowMode(): boolean;
 

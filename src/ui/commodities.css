@@ -1,0 +1,177 @@
+/* COMMODITIES workspace — market tiles in the instrument idiom. Numbers
+   are mono/tabular; every tile states its evidence; absence is typed. */
+
+.cm-panel {
+  width: min(740px, calc(100vw - 640px));
+}
+
+.cm-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 4px 0 8px;
+}
+.cm-chip {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-mid);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 4px 9px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.cm-chip:hover { color: var(--text-hi); border-color: var(--line-strong); }
+.cm-chip.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.cm-focus-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-style: italic;
+  margin-bottom: 10px;
+}
+
+.cm-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.cm-tile {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--glass-soft);
+  padding: 9px 11px;
+}
+.cm-tile-wide { margin-bottom: 8px; }
+
+.cm-tile-title {
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.cm-tile-latest {
+  font-family: var(--font-mono);
+  font-size: 19px;
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+.cm-unit { font-size: 10px; color: var(--text-mid); margin-left: 5px; }
+.cm-tile-when {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+}
+.cm-spark {
+  width: 100%;
+  height: 38px;
+  margin-top: 6px;
+  display: block;
+}
+.cm-tile-range {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  color: var(--text-mid);
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.cm-tile-evidence {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  padding-top: 5px;
+}
+
+.cm-none {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  padding: 10px 0 6px;
+  font-style: italic;
+}
+
+.cm-prod-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 120px 96px;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 0;
+}
+.cm-prod-name {
+  font-size: 11px;
+  color: var(--text-hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cm-prod-bar {
+  height: 5px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.cm-prod-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.cm-prod-val {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-mid);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cm-prod-vk {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 1px 4px;
+  text-align: center;
+}
+.cm-prod-vk.warn { color: var(--warn); border-color: rgba(255, 180, 84, 0.5); }
+
+.cm-flows { margin-top: 4px; }
+.cm-flow-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 5px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.cm-flow-row:hover { border-color: var(--line-strong); }
+.cm-flow-name { font-size: 11px; color: var(--text-hi); }
+.cm-flow-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.cm-prod-group {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  margin: 8px 0 3px;
+}
+.cm-click { cursor: pointer; border-radius: 2px; }
+.cm-click:hover .cm-prod-name { color: var(--accent); }
