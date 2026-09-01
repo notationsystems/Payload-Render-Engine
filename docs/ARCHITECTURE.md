@@ -502,3 +502,36 @@ rather than zero (the inspectors render NOT ASSERTED), scenario routes
 refuse for lack of a baseline, and endpoint-only geometry says
 `great_circle_estimate`. Details: `server/README.md`,
 `docs/BACKEND_STUDY.md`.
+
+## 15. The operations mirror (control tower)
+
+The Terminal's backend direction added a **brokerage control tower** —
+live load operations over append-only, hash-chained journals, with an
+exception-first queue (named issues, severities, deadlines, operator
+remedies — never a composite score) behind a fail-closed operations
+authority. The twin mirrors it as the OS's OPERATIONS surface:
+
+- **`GET /api/operations`** on the Spatial API proxies the Terminal's
+  `/api/freight/control-tower`. The operations credential lives in the
+  SERVER environment and never reaches a browser (the Terminal's own
+  posture). Every upstream outcome is a typed answer: unconfigured,
+  unauthorized, unreachable, and the tower's own refusals (journal
+  corrupt/unavailable) pass through as refusals with remedies — the
+  mirror never renders an empty desk it cannot vouch for.
+- **The OPERATIONS panel** (`src/ui/opsPanel.ts`) adopts the desk's
+  design contract: exception-first ordering, OBSERVED / OPERATOR REMEDY
+  split per issue, stated policy thresholds, portfolio as components,
+  per-number attestation on economics (a quote flagged NEGOTIATING
+  POSITION — the interest axis routes to measurement, it does not
+  discount), and a standing READ-ONLY MIRROR banner: propose →
+  authorize → execute lives in the Terminal desk; the twin renders, it
+  never commands (INV-6 extended to operations).
+- **Position honesty on the globe.** The tower serves tracking
+  timestamps, never coordinates — so selecting a load draws its
+  DECLARED lane as an arc (solid when tracking evidence exists, DASHED
+  when movement is unobserved) between endpoints resolved through an
+  explicit curated place table, and **no vehicle marker is ever
+  drawn**. An endpoint not in the table draws nothing rather than
+  guessing. Hold-to-peek lets the operator sight the lane under the
+  panel.
+- The tool surface gains `get_operations` (read-only, refusals typed).

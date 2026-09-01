@@ -17,6 +17,7 @@ import { createTimeline } from './ui/timeline';
 import { createAnalyticsDock } from './ui/analyticsDock';
 import { createAgentsPanel } from './ui/agentsPanel';
 import { createScenariosPanel } from './ui/scenariosPanel';
+import { createOpsPanel } from './ui/opsPanel';
 import { createArchOverlay } from './ui/archOverlay';
 import { createScenarioBanner } from './ui/scenarioBanner';
 
@@ -46,6 +47,7 @@ async function start(): Promise<void> {
   hud.appendChild(createAnalyticsDock(app).el);
   hud.appendChild(createAgentsPanel(app, tools).el);
   hud.appendChild(createScenariosPanel(app).el);
+  hud.appendChild(createOpsPanel(app).el);
   hud.appendChild(createArchOverlay(app).el);
   hud.appendChild(createScenarioBanner(app).el);
 

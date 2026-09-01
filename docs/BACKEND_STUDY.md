@@ -118,3 +118,26 @@ Facts the loader study added (verified against live wire captures, in
 - `econ_entities` carries `bottleneckScore` — an UNATTESTED derived
   number, the exact defect the Terminal's own attestation module
   documents. The loader deliberately does not ingest it.
+
+## Addendum — the control-tower direction (studied 2026-09-01)
+
+The Terminal's `claude/osiris-physical-economy-7o9g2w` branch added the
+**freight operations control tower**: load operations as an append-only
+hash-chained journal with a 7-phase lifecycle behind typed command
+refusals, carrier communications with idempotent at-least-once tender
+delivery, decision episodes with research-safe cohorts and guarded
+exploration, authoritative FMCSA/EIA source pulls with per-response
+attestation, and `GET /api/freight/control-tower` — an exception-first
+projection (named issue + severity + deadline + operator remedy +
+evidence refs; no composite scores; refuses on journal corruption
+rather than showing an empty desk) behind a fail-closed
+`PAYLOAD_OPERATIONS_TOKEN`.
+
+Adopted into the twin (front-of-OS): the OPERATIONS tab + panel
+(`src/ui/opsPanel.ts`), the `/api/operations` server mirror (credential
+server-side), the OBSERVED/REMEDY issue split, stated policy
+thresholds, per-number attestation with the interest flag, and lane
+arcs with position honesty (dashed when tracking is unobserved; no
+vehicle markers — the tower serves timestamps, not coordinates).
+Deliberately NOT adopted: any write surface — the twin renders the
+projection and never commands.

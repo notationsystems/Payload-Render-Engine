@@ -11,6 +11,7 @@ import type {
   EntityId,
   Facility,
   Flow,
+  LonLat,
   Route,
   TemporalState,
 } from '../data/contracts';
@@ -40,6 +41,7 @@ import { LayerManager } from '../layers/layerManager';
 import { RoutesLayer } from '../layers/routesLayer';
 import { NodesLayer } from '../layers/nodesLayer';
 import { FlowsLayer } from '../layers/flowsLayer';
+import { OpsArcLayer } from '../layers/opsArcLayer';
 import { LabelsLayer } from '../layers/labelsLayer';
 import { SelectionInput, type Pick } from '../interaction/selection';
 import { FollowTheLoad } from '../interaction/followTheLoad';
@@ -73,6 +75,7 @@ export class App implements AppApi {
   private routesLayer!: RoutesLayer;
   private nodesLayer!: NodesLayer;
   private flowsLayer!: FlowsLayer;
+  private opsArc = new OpsArcLayer();
   private labelsLayer!: LabelsLayer;
   private anomalies!: THREE.Points;
   private anomaliesMat!: THREE.PointsMaterial;
@@ -168,6 +171,7 @@ export class App implements AppApi {
     const routeIx = new Map(snapshot.routes.map((r) => [r.id, r]));
     this.flowsLayer = new FlowsLayer(snapshot.flows, routeIx, this.routesLayer);
     scene.add(this.flowsLayer.group);
+    scene.add(this.opsArc.group);
     this.labelsLayer = new LabelsLayer(hud);
     scene.add(this.depOverlay);
     this.buildAnomalies();
@@ -213,6 +217,7 @@ export class App implements AppApi {
       this.routesLayer.update(dt);
       this.nodesLayer.update(dt);
       this.flowsLayer.update(dt);
+      this.opsArc.update(dt);
       this.labelsLayer.update(this.engine.camera, this.nodesLayer, alt);
       this.pulseAnomalies(dt);
     });
@@ -589,7 +594,7 @@ export class App implements AppApi {
     // legacy alias from the original brief
     if ((preset as string) === 'exceptions') preset = 'intelligence';
     this.preset = preset;
-    if (preset !== 'agents' && preset !== 'scenarios') {
+    if (preset !== 'agents' && preset !== 'scenarios' && preset !== 'operations') {
       this.lastLayerPreset = preset;
       this.layerMgr.applyPreset(preset);
       this.routesLayer.setDimUndisturbed(this.layerMgr.presetDimsHealthy(preset));
@@ -601,6 +606,25 @@ export class App implements AppApi {
   /** Where a closing panel view should land. */
   getLastLayerPreset(): ViewPreset {
     return this.lastLayerPreset;
+  }
+
+  /**
+   * Draw a control-tower lane on the globe (read-only overlay). The
+   * arc's treatment carries tracking honesty: solid when tracking
+   * evidence exists, dashed when the lane is declared but movement is
+   * unobserved. No vehicle marker is ever drawn — the tower serves
+   * timestamps, not positions.
+   */
+  showOperationsLane(origin: LonLat, destination: LonLat, tracked: boolean): void {
+    this.opsArc.show(origin, destination, tracked);
+    const a = latLonToVec3(origin[1], origin[0], 1);
+    const b = latLonToVec3(destination[1], destination[0], 1);
+    const mid = vec3ToLatLon(slerpSurface(a, b, 0.5, 1));
+    this.cameraCtl.flyToLatLon(mid.lat, mid.lon, { distance: 1.35, durationMs: 1600 });
+  }
+
+  clearOperationsLane(): void {
+    this.opsArc.clear();
   }
 
   getPreset(): ViewPreset {

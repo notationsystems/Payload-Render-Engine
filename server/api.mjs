@@ -352,6 +352,84 @@ export async function registerRoutes(corpus) {
           'query a corpus with deterministic or observed dynamics (e.g. the synthetic demo corpus)'
         );
 
+  // ------------------------------------------------- operations mirror
+  // The Terminal's brokerage control tower, mirrored READ-ONLY. The
+  // operations credential lives in THIS server's environment and never
+  // reaches a browser (matching the Terminal's own posture: not in
+  // URLs, not in storage, not in a rendered page). Every upstream
+  // outcome maps to a typed answer — an unconfigured or unauthorized
+  // desk is a refusal with a remedy, never an empty desk.
+  get('/api/operations', async () => {
+    const upstreamBase = process.env.TERMINAL_URL ?? 'http://127.0.0.1:3000';
+    const token = process.env.PAYLOAD_OPERATIONS_TOKEN;
+    if (!token?.trim()) {
+      return refuse(
+        'OPERATIONS_NOT_CONFIGURED',
+        'this spatial API holds no operations authority — the mirror is fail-closed',
+        'set PAYLOAD_OPERATIONS_TOKEN (and TERMINAL_URL) in the spatial API server environment; the credential never reaches the browser'
+      );
+    }
+    let res;
+    try {
+      res = await fetch(`${upstreamBase}/api/freight/control-tower`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      });
+    } catch (err) {
+      return refuse(
+        'OPERATIONS_UPSTREAM_UNREACHABLE',
+        `the Terminal at ${upstreamBase} did not answer: ${err?.message ?? err}`,
+        'start payload-terminal-v0 (TERMINAL_URL) with its operations journals mounted'
+      );
+    }
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      return refuse(
+        'OPERATIONS_UPSTREAM_UNREADABLE',
+        `the Terminal answered HTTP ${res.status} without readable JSON`,
+        'check the Terminal deployment; the mirror never renders a desk it cannot read'
+      );
+    }
+    if (res.status === 401 || res.status === 403) {
+      return refuse(
+        'OPERATIONS_UNAUTHORIZED',
+        body?.detail ?? 'the Terminal refused this mirror\'s operations authority',
+        body?.remedy ?? 'align PAYLOAD_OPERATIONS_TOKEN between the spatial API and the Terminal'
+      );
+    }
+    if (body?.error === 'operations_not_configured') {
+      return refuse('OPERATIONS_NOT_CONFIGURED', body.detail ?? 'upstream operations are fail-closed', body.remedy ?? 'configure the Terminal operations token');
+    }
+    if (body?.kind === 'refusal') {
+      // the tower refusing (journal corrupt/unavailable) IS the answer —
+      // it passes through typed, never softened into an empty desk
+      return refuse(body.code ?? 'OPERATIONS_REFUSED', body.detail ?? 'the control tower refused', body.remedy ?? 'see the Terminal operations runbook');
+    }
+    if (body?.kind !== 'control_tower_snapshot') {
+      return refuse(
+        'OPERATIONS_UPSTREAM_UNREADABLE',
+        `the Terminal answered with kind '${body?.kind}' — not a control-tower snapshot`,
+        'check the Terminal version; this mirror speaks the control-tower contract'
+      );
+    }
+    return {
+      ...ok(body, body.asOf),
+      meta: {
+        ...meta(body.asOf, 'best_known'),
+        // live journal projection, not the loaded corpus — say so
+        sourceClass: 'terminal:operations',
+        valueKind: 'per_record',
+        admissible: null,
+        admissibleBasis: 'journal_projection',
+        readOnlyMirror: true,
+        upstream: `${upstreamBase}/api/freight/control-tower`,
+        disclaimer:
+          'READ-ONLY MIRROR of the Terminal brokerage control tower — a projection over append-only operation journals; commands execute only in the Terminal desk',
+      },
+    };
+  });
+
   get('/api/scenarios', () => scenarioGuard() ?? ok(scenarios));
 
   get('/api/scenarios/rank', ({ query }) => {

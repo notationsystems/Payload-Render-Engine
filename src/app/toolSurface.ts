@@ -12,6 +12,8 @@
  */
 
 import type { AppApi, LayerId, ViewPreset } from './api';
+import { fetchOperations } from '../data/operations';
+import { resolveApiBase } from '../data/sources';
 
 export interface ToolParam {
   name: string;
@@ -119,6 +121,33 @@ export function buildToolSurface(api: AppApi): TwinTool[] {
       params: [{ name: 'command', type: 'string', description: 'Command text', required: true }],
       safety: SAFE,
       invoke: (a) => api.runCommand(String(a.command)),
+    },
+    {
+      name: 'get_operations',
+      description:
+        'READ-ONLY mirror of the Terminal brokerage control tower: exception-first load queue, portfolio, policy. Refusals pass through typed; the twin never issues an operations command.',
+      category: 'query',
+      params: [],
+      safety: SAFE,
+      invoke: async () => {
+        const r = await fetchOperations(resolveApiBase());
+        if (r.kind !== 'ok') return r;
+        return {
+          kind: 'ok',
+          asOf: r.snapshot.asOf,
+          portfolio: r.snapshot.portfolio,
+          policy: r.snapshot.policy,
+          queue: r.snapshot.loads.map((l) => ({
+            operationId: l.operationId,
+            lane: `${l.route.origin ?? '?'} -> ${l.route.destination ?? '?'}`,
+            phase: l.state.operationPhase,
+            attention: l.attentionLevel,
+            nextAction: l.nextAction?.code ?? null,
+            remedy: l.nextAction?.remedy ?? null,
+          })),
+          readOnlyMirror: true,
+        };
+      },
     },
     {
       name: 'get_state',

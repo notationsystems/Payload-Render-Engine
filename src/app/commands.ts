@@ -104,6 +104,7 @@ const INFRA_LAYERS: LayerId[] = [
 const PRESETS: ViewPreset[] = [
   'world',
   'freight',
+  'operations',
   'trade',
   'commodities',
   'network',
@@ -116,7 +117,7 @@ const HINT = 'TRY: find <place> · show <layer> · follow the load';
 
 const HELP_MESSAGE =
   'FIND <NAME> · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
-  'COMPARE <A> VS <B> · WORLD/FREIGHT/TRADE/COMMODITIES/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · FOLLOW THE LOAD · EXIT';
+  'COMPARE <A> VS <B> · WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · FOLLOW THE LOAD · EXIT';
 
 const STARTERS: Suggestion[] = [
   { text: 'Find Toronto', label: 'Find Toronto', hint: 'SEARCH' },
@@ -154,6 +155,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'commodities', label: 'commodities', hint: 'PRESET' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
+  { text: 'operations', label: 'operations', hint: 'VIEW' },
   { text: 'agents', label: 'agents', hint: 'VIEW' },
   { text: 'scenarios', label: 'scenarios', hint: 'VIEW' },
   { text: 'help', label: 'help', hint: 'HELP' },
@@ -368,6 +370,10 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'exceptions') {
     api.setPreset('intelligence');
     return { ok: true, message: 'PRESET INTELLIGENCE' };
+  }
+  if (lower === 'ops' || lower === 'tower' || lower === 'control tower' || lower === 'desk') {
+    api.setPreset('operations');
+    return ok('OPERATIONS — CONTROL TOWER MIRROR');
   }
   if ((PRESETS as string[]).includes(lower)) {
     api.setPreset(lower as ViewPreset);

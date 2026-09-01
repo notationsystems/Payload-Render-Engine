@@ -186,6 +186,29 @@ check(th.meta.vintages === 1, 'vintages travels with the corpus metaDefaults');
 // (7) upstream reconciliation on the record
 check(th.data.mappingReport.upstreamReconciliation?.length === 2, 'upstream declared-vs-delivered reconciliation recorded per commodity');
 
+// operations mirror: fail-closed without authority, typed either way
+console.log('\n— operations mirror —');
+const savedToken = process.env.PAYLOAD_OPERATIONS_TOKEN;
+const savedUrl = process.env.TERMINAL_URL;
+delete process.env.PAYLOAD_OPERATIONS_TOKEN;
+const opsNoAuth = await call('GET', '/api/operations');
+check(
+  opsNoAuth?.status === 'refused' && opsNoAuth.refusal.kind === 'OPERATIONS_NOT_CONFIGURED',
+  'no operations authority → fail-closed typed refusal'
+);
+check(/never reaches the browser/.test(opsNoAuth?.refusal?.remedy ?? ''), 'remedy states the credential posture');
+process.env.PAYLOAD_OPERATIONS_TOKEN = 'test-token';
+process.env.TERMINAL_URL = 'http://127.0.0.1:1'; // nothing listens here
+const opsDown = await call('GET', '/api/operations');
+check(
+  opsDown?.status === 'refused' && opsDown.refusal.kind === 'OPERATIONS_UPSTREAM_UNREACHABLE',
+  'unreachable Terminal → typed refusal, never an empty desk'
+);
+if (savedToken === undefined) delete process.env.PAYLOAD_OPERATIONS_TOKEN;
+else process.env.PAYLOAD_OPERATIONS_TOKEN = savedToken;
+if (savedUrl === undefined) delete process.env.TERMINAL_URL;
+else process.env.TERMINAL_URL = savedUrl;
+
 // malformed inputs are refused, never 500s or silent zeros
 const badId = tcall('GET', '/api/state/%ZZ');
 check(badId?.status === 'refused' && badId.refusal.kind === 'UNPARSEABLE_ID', 'invalid percent-encoding → typed refusal, not a crash');

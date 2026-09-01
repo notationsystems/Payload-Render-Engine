@@ -63,7 +63,7 @@ const server = createServer(async (req, res) => {
     for (const route of routes) {
       const match = route.pattern.exec(url.pathname);
       if (!match || req.method !== route.method) continue;
-      const result = route.handler({ params: match.groups ?? {}, query: url.searchParams });
+      const result = await route.handler({ params: match.groups ?? {}, query: url.searchParams });
       const { httpStatus, ...body } = result;
       send(httpStatus ?? (result.status === 'refused' ? 422 : 200), body);
       return;

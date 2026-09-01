@@ -19,7 +19,8 @@ export type ViewPreset =
   | 'network'
   | 'intelligence' // formerly 'exceptions' — setPreset still accepts the old word
   | 'agents' // panel views: no layer change, they open an instrument panel
-  | 'scenarios';
+  | 'scenarios'
+  | 'operations';
 
 export interface LayerDef {
   id: LayerId;
@@ -134,6 +135,9 @@ export interface AppApi {
   getPreset(): ViewPreset;
   /** Last layer-changing preset — where a closing panel view returns. */
   getLastLayerPreset(): ViewPreset;
+  /** Control-tower lane overlay (read-only; tracking honesty in the arc). */
+  showOperationsLane(origin: LonLat, destination: LonLat, tracked: boolean): void;
+  clearOperationsLane(): void;
   setFlowMode(enabled: boolean): void;
   getFlowMode(): boolean;
 

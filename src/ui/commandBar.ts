@@ -8,6 +8,7 @@ import type { AppApi, Suggestion, ViewPreset } from '../app/api';
 const PRESETS: { id: ViewPreset; label: string }[] = [
   { id: 'world', label: 'WORLD' },
   { id: 'freight', label: 'FREIGHT' },
+  { id: 'operations', label: 'OPERATIONS' },
   { id: 'trade', label: 'TRADE' },
   { id: 'commodities', label: 'COMMODITIES' },
   { id: 'network', label: 'NETWORK' },

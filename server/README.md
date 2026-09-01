@@ -135,3 +135,17 @@ Terminal** (`fixtures/terminal/`, manifest in `capture.json`; the
 Terminal was pinned to its committed snapshots with
 `PAYLOAD_DISABLE_LIVE=1` so the capture is deterministic and key-free).
 The runtime loader always fetches live.
+
+## The operations mirror
+
+`GET /api/operations` mirrors the Terminal's brokerage control tower
+(`/api/freight/control-tower`) READ-ONLY. Configure the server with
+`TERMINAL_URL` and `PAYLOAD_OPERATIONS_TOKEN` — the credential stays in
+this process and never reaches a browser. Fail-closed and typed in
+every direction: no token → `OPERATIONS_NOT_CONFIGURED`; Terminal down
+→ `OPERATIONS_UPSTREAM_UNREACHABLE`; wrong authority →
+`OPERATIONS_UNAUTHORIZED`; and the tower's own refusals (journal
+corrupt or unavailable) pass through with their remedies. The mirror
+never renders an empty desk it cannot vouch for, and it never issues an
+operations command — propose → authorize → execute belongs to the
+Terminal desk.

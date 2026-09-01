@@ -1,0 +1,232 @@
+/* OPERATIONS panel — the control-tower mirror. Same instrument idiom as
+   the rest of the OS: dense, quiet, mono where values live. The only new
+   color is the severity ramp, which reuses ok/warn/alert tokens. */
+
+.ops-panel {
+  width: min(760px, calc(100vw - 640px));
+}
+
+.ops-mirror {
+  margin: 4px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-mid);
+  background: var(--glass-soft);
+}
+
+.ops-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-mid);
+  margin-bottom: 10px;
+}
+.ops-status b { color: var(--text-hi); font-weight: 500; }
+.ops-src { color: var(--text-dim); letter-spacing: 0.06em; }
+.ops-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 6px var(--ok);
+}
+.ops-dot-down { background: var(--alert); box-shadow: 0 0 6px var(--alert); }
+
+/* refusal-first: the typed refusal is a first-class rendering */
+.ops-refusal {
+  border: 1px solid rgba(255, 93, 110, 0.4);
+  border-left: 3px solid var(--alert);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: rgba(255, 93, 110, 0.06);
+}
+.ops-refusal-kind {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--alert);
+  margin-bottom: 6px;
+}
+.ops-refusal-detail { font-size: 12px; color: var(--text-hi); line-height: 1.55; }
+.ops-refusal-remedy-label {
+  margin-top: 10px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+.ops-refusal-remedy { font-size: 11.5px; color: var(--text-mid); line-height: 1.55; margin-top: 2px; }
+.ops-refusal-note { margin-top: 10px; font-size: 10px; color: var(--text-dim); font-style: italic; }
+
+/* portfolio: components, not a score */
+.ops-kpis {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ops-kpi {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 7px 4px 5px;
+  text-align: center;
+  background: var(--glass-soft);
+}
+.ops-kpi-v {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+.ops-kpi-l { font-size: 8.5px; letter-spacing: 0.12em; color: var(--text-dim); margin-top: 2px; }
+.ops-kpi.warn .ops-kpi-v { color: var(--warn); }
+.ops-kpi.alert .ops-kpi-v { color: var(--alert); }
+
+.ops-policy {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.ops-queue-title { margin-bottom: 8px; }
+
+.ops-empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-mid);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+/* queue rows */
+.ops-row {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  background: var(--glass-soft);
+}
+.ops-row:hover { border-color: var(--line-strong); background: rgba(20, 30, 44, 0.6); }
+.ops-row.open { border-color: var(--line-strong); }
+.ops-row.laned { border-left: 2px solid var(--text-hi); }
+
+.ops-row-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ops-lane { font-size: 12.5px; color: var(--text-hi); font-weight: 600; }
+.ops-arrow { color: var(--accent); }
+.ops-ids { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.ops-phase {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-mid);
+}
+
+.ops-sev {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  padding: 2px 6px;
+  border-radius: 2px;
+  border: 1px solid;
+}
+.ops-sev-critical { color: var(--alert); border-color: var(--alert); background: rgba(255, 93, 110, 0.12); }
+.ops-sev-high { color: var(--warn); border-color: var(--warn); background: rgba(255, 180, 84, 0.1); }
+.ops-sev-medium { color: var(--warn); border-color: rgba(255, 180, 84, 0.5); }
+.ops-sev-low { color: var(--text-mid); border-color: var(--line-strong); }
+.ops-sev-none { color: var(--ok); border-color: var(--ok); }
+
+.ops-row-next {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.ops-next-code { font-family: var(--font-mono); font-size: 10px; color: var(--warn); letter-spacing: 0.06em; }
+.ops-next-remedy { font-size: 11px; color: var(--text-mid); }
+.ops-next-clear { font-family: var(--font-mono); font-size: 10px; color: var(--ok); letter-spacing: 0.06em; }
+
+.ops-row-states { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+.ops-state {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  color: var(--text-dim);
+}
+.ops-state.ok { color: var(--ok); border-color: rgba(67, 209, 124, 0.45); }
+.ops-state.warn { color: var(--warn); border-color: rgba(255, 180, 84, 0.45); }
+.ops-state.alert { color: var(--alert); border-color: rgba(255, 93, 110, 0.5); }
+
+/* expanded detail */
+.ops-detail { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ops-econ { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-hi); }
+.ops-interest {
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--warn);
+  border: 1px dotted rgba(255, 180, 84, 0.6);
+  padding: 1px 4px;
+  border-radius: 2px;
+  margin-left: 4px;
+}
+.ops-times { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-dim); margin: 6px 0 10px; }
+
+.ops-issue {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 9px 11px;
+  margin-bottom: 7px;
+}
+.ops-issue-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.ops-issue-code { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-hi); letter-spacing: 0.06em; }
+.ops-deadline { font-family: var(--font-mono); font-size: 9px; color: var(--warn); }
+.ops-evidence { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; color: var(--text-dim); letter-spacing: 0.08em; }
+.ops-issue-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 7px;
+}
+.ops-col-label { font-size: 8.5px; letter-spacing: 0.14em; color: var(--text-dim); }
+.ops-col-text { font-size: 11px; color: var(--text-mid); line-height: 1.5; margin-top: 3px; }
+
+.ops-lane-note { font-size: 9.5px; color: var(--text-dim); font-style: italic; margin-top: 4px; }
+
+.ops-peek-btn {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--text-mid);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 5px 10px;
+  background: transparent;
+  cursor: pointer;
+}
+.ops-peek-btn:hover { color: var(--text-hi); border-color: var(--accent); }
+
+/* hold-to-peek: the panel yields to the globe while held */
+.ops-panel.ops-peek { opacity: 0.06; transition: opacity 0.18s ease; }
+.ops-panel { transition: opacity 0.18s ease; }
+
+[hidden] { display: none !important; }

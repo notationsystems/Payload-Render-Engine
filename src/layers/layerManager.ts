@@ -121,7 +121,7 @@ const PRESETS: Partial<Record<ViewPreset, Partial<Record<LayerId, boolean>>>> = 
 };
 
 // panel presets change no layers
-const PANEL_PRESETS = new Set(['agents', 'scenarios']);
+const PANEL_PRESETS = new Set(['agents', 'scenarios', 'operations']);
 
 export class LayerManager {
   private defs: LayerDef[];
