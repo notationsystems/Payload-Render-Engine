@@ -130,7 +130,7 @@ const HINT = 'TRY: find <place> · show <layer> · follow the load';
 const HELP_MESSAGE =
   'FIND <NAME> · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
   'COMPARE <A> VS <B> · HOLD B = ROUTE BRUSH · CLICK LIVE CONTACT = TRACK (ESC RELEASES) · D = DETECTIONS · KEYS 1–5 = SENSOR STYLE · ' +
-  'WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/MARKETS/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · FOLLOW THE LOAD · EXIT';
+  'WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/MARKETS/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · BRIEF = SITREP · FOLLOW THE LOAD · EXIT';
 
 const STARTERS: Suggestion[] = [
   { text: 'Find Toronto', label: 'Find Toronto', hint: 'SEARCH' },
@@ -167,6 +167,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'trade', label: 'trade', hint: 'PRESET' },
   { text: 'commodities', label: 'commodities', hint: 'PRESET' },
   { text: 'markets', label: 'markets', hint: 'VIEW' },
+  { text: 'brief', label: 'brief', hint: 'SITREP' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -294,6 +295,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
 
   // -- 8. help
   if (lower === 'help' || lower === '?') return ok(HELP_MESSAGE);
+
+  // -- sitrep: the composed brief
+  if (lower === 'brief' || lower === 'sitrep') {
+    window.dispatchEvent(new CustomEvent('pe:sitrep-toggle'));
+    return ok('SITUATION REPORT — composed from loaded surfaces, basis labeled');
+  }
 
   // -- 6. time controls
   if (lower === 'play') {

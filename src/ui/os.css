@@ -326,6 +326,73 @@
 }
 .os-seed-actions button:hover { color: var(--accent); border-color: var(--accent); }
 
+/* --------------------------------------------------------------- sitrep */
+/* rides the arch overlay's scrim; the sheet is a readable document      */
+
+.pe-sitrep-sheet {
+  width: min(860px, calc(100vw - 40px));
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+.pe-sitrep-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.pe-sitrep-copy {
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.pe-sitrep-copy:hover { color: var(--text-hi); border-color: var(--text-dim); }
+.pe-sitrep-meta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  border-left: 2px solid var(--line-strong);
+  padding: 4px 8px;
+  margin-bottom: 12px;
+}
+.pe-sitrep-block {
+  margin-bottom: 12px;
+}
+.pe-sitrep-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--text-hi);
+}
+.pe-sitrep-basis {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin: 1px 0 5px;
+}
+.pe-sitrep-line {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
+  color: var(--text-mid);
+  padding: 1.5px 0 1.5px 10px;
+  border-left: 2px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+.pe-sitrep-line b { color: var(--text-hi); font-weight: 500; }
+.pe-sitrep-line i { color: var(--text-dim); font-style: normal; font-size: 9px; }
+.pe-sitrep-line.warn { border-left-color: var(--warn); }
+.pe-sitrep-line.alert { border-left-color: var(--alert); }
+.pe-sitrep-body { min-height: 60px; }
+
 /* --------------------------------------------------- architecture overlay */
 
 .os-arch {

@@ -70,6 +70,16 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
   api.events.on('time', (ts) => renderClock(ts.t, ts.regime));
   renderClock(api.clock.state().t, api.clock.state().regime);
 
+  // SITREP — the composed brief of everything the loaded surfaces vouch for
+  const briefBtn = document.createElement('button');
+  briefBtn.className = 'pe-chip pe-cb-os';
+  briefBtn.type = 'button';
+  briefBtn.textContent = 'BRIEF';
+  briefBtn.title = 'Situation report — composed from loaded surfaces, basis labeled';
+  briefBtn.addEventListener('click', () =>
+    window.dispatchEvent(new CustomEvent('pe:sitrep-toggle'))
+  );
+
   // OS architecture overlay toggle
   const osBtn = document.createElement('button');
   osBtn.className = 'pe-chip pe-cb-os';
@@ -80,7 +90,7 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
     window.dispatchEvent(new CustomEvent('pe:arch-toggle'))
   );
 
-  row.append(mark, searchWrap, flowChip, followBtn, timeChip, osBtn);
+  row.append(mark, searchWrap, flowChip, followBtn, timeChip, briefBtn, osBtn);
 
   // ---------------------------------------------------------------- tabs
   const tabs = document.createElement('div');
