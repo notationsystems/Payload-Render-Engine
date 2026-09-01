@@ -45,6 +45,8 @@ import { OpsArcLayer } from '../layers/opsArcLayer';
 import { SatsLayer } from '../layers/satsLayer';
 import { AircraftLayer } from '../layers/aircraftLayer';
 import { QuakesLayer } from '../layers/quakesLayer';
+import { BeaconsLayer } from '../layers/beaconsLayer';
+import { correlateQuakes } from '../intel/proximity';
 import { deadReckon, fetchLiveAircraft, fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
 import { resolveApiBase } from '../data/sources';
 import { LabelsLayer } from '../layers/labelsLayer';
@@ -86,6 +88,7 @@ export class App implements AppApi {
   private opsArc = new OpsArcLayer();
   private satsLayer = new SatsLayer();
   private quakesLayer = new QuakesLayer();
+  private beacons = new BeaconsLayer();
   private liveLoaded = { sats: false, quakes: false };
   private aircraftLayer!: AircraftLayer;
   private aircraftTimer: number | undefined;
@@ -193,6 +196,7 @@ export class App implements AppApi {
     this.flowsLayer = new FlowsLayer(snapshot.flows, routeIx, this.routesLayer);
     scene.add(this.flowsLayer.group);
     scene.add(this.opsArc.group);
+    scene.add(this.beacons.mesh);
     scene.add(this.satsLayer.points);
     this.aircraftLayer = new AircraftLayer(this.engine.camera);
     scene.add(this.aircraftLayer.points);
@@ -233,7 +237,7 @@ export class App implements AppApi {
     this.refreshTemporalStates(true);
 
     // frame loop
-    this.engine.onFrame((dt) => {
+    this.engine.onFrame((dt, elapsed) => {
       this.clock.tick(dt);
       this.cameraCtl.update(dt);
       const alt = this.cameraCtl.altitudeRadii();
@@ -247,10 +251,17 @@ export class App implements AppApi {
       this.aircraftLayer.update();
       this.updateLiveTrack();
       this.quakesLayer.update(dt);
+      this.beacons.update(elapsed);
       this.labelsLayer.update(this.engine.camera, this.nodesLayer, alt);
       this.pulseAnomalies(dt);
     });
     this.engine.start();
+
+    // attention beams: corpus disruptions flag assets from boot; live
+    // hazard correlations join when the seismic feed loads. Re-evaluated
+    // on a quiet cadence so sim-time jumps and report ages stay honest.
+    this.refreshBeacons();
+    setInterval(() => this.refreshBeacons(), 60_000);
 
     // status heartbeat
     setInterval(() => {
@@ -587,7 +598,11 @@ export class App implements AppApi {
       const now = performance.now();
       if (now - liveHoverAt < 120) return;
       liveHoverAt = now;
-      const live = this.hoverId || this.demo.active ? null : this.pickLive(e.clientX, e.clientY);
+      let live = this.hoverId || this.demo.active ? null : this.pickLive(e.clientX, e.clientY);
+      // the tracked contact is already identified by reticle + card
+      if (live && this.liveTracked && live.kind === this.liveTracked.kind && live.i === this.liveTracked.i) {
+        live = null;
+      }
       if (!live) {
         if (liveHoverKey) {
           liveHoverKey = '';
@@ -827,6 +842,7 @@ export class App implements AppApi {
     this.liveLoaded.quakes = true;
     this.liveQuakesList = r.data.quakes;
     this.quakesLayer.setQuakes(r.data.quakes);
+    this.refreshBeacons();
     this.events.emit('liveQuakes', { count: r.data.quakes.length });
     this.events.emit('toast', {
       title: 'LIVE SEISMIC',
@@ -929,6 +945,35 @@ export class App implements AppApi {
 
   getLiveQuakes(): import('../live/feeds').LiveQuake[] | null {
     return this.liveQuakesList;
+  }
+
+  /**
+   * Attention beams mark assets the intelligence layer flags: hazard
+   * correlations (COMPUTED PROXIMITY) and high-severity disruptions
+   * active at sim time. A beam is a marker of an alert that exists
+   * elsewhere with its basis — it adds attention, never information.
+   */
+  private refreshBeacons(): void {
+    const flagged = new Map<EntityId, 'alert' | 'warn'>();
+    if (this.liveQuakesList) {
+      for (const a of correlateQuakes(this.liveQuakesList, this.store.snapshot.nodes, Date.now())) {
+        if (flagged.get(a.nodeId) !== 'alert') flagged.set(a.nodeId, a.severity);
+      }
+    }
+    const t = Date.parse(this.clock.simTime);
+    for (const e of this.store.snapshot.events) {
+      if (e.severity < 0.7) continue;
+      if (Date.parse(e.start) > t || (e.end && Date.parse(e.end) < t)) continue;
+      for (const id of e.affects) {
+        if (this.store.node(id)) flagged.set(id, 'alert');
+      }
+    }
+    this.beacons.set(
+      [...flagged].map(([id, tone]) => ({
+        lonLat: this.store.node(id)!.geometry.coordinates,
+        tone,
+      }))
+    );
   }
 
   releaseLiveTrack(): void {
@@ -1072,6 +1117,24 @@ export class App implements AppApi {
         age: `TLE ${p.tleAgeHours.toFixed(1)}H OLD`,
       };
     }
+    // screen-space anchor for the tracking reticle, from the SAME buffer
+    // the dart/dot renders from — the ring sits on the rendered object
+    const attr =
+      this.liveTracked.kind === 'aircraft'
+        ? this.aircraftLayer.points.geometry.getAttribute('position')
+        : this.satsLayer.points.geometry.getAttribute('position');
+    if (attr) {
+      const i = this.liveTracked.i;
+      const wx = attr.getX(i);
+      const wy = attr.getY(i);
+      const wz = attr.getZ(i);
+      const proj = new THREE.Vector3(wx, wy, wz).project(this.engine.camera);
+      info.sx = ((proj.x + 1) / 2) * window.innerWidth;
+      info.sy = ((1 - proj.y) / 2) * window.innerHeight;
+      info.behind = proj.z > 1 || this.occludedByGlobe(wx, wy, wz);
+    }
+    info.lat = lat;
+    info.lon = lon;
     this.cameraCtl.followLatLon(lat, lon, force ? 1 : 0.06);
     this.events.emit('liveTrack', info);
 

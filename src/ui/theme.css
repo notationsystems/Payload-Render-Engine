@@ -1029,6 +1029,69 @@ input {
 .pe-track-release:hover { color: var(--warn); border-color: var(--warn); }
 
 /* ------------------------------------------------------------------ */
+/* tracking reticle — HUD ring on the tracked live contact             */
+/* ------------------------------------------------------------------ */
+.pe-reticle {
+  position: fixed;
+  left: -34px;
+  top: -34px;
+  width: 68px;
+  height: 68px;
+  pointer-events: none;
+  z-index: 9; /* over the scene, under the detection overlay */
+  --ret: rgba(191, 224, 255, 0.85);
+}
+.pe-reticle[data-kind='satellite'] { --ret: rgba(255, 217, 160, 0.85); }
+.pe-reticle-ring {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid var(--ret);
+  border-radius: 50%;
+  opacity: 0.55;
+}
+.pe-reticle-arc {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid transparent;
+  border-top-color: var(--ret);
+  border-right-color: var(--ret);
+  border-radius: 50%;
+  animation: pe-ret-spin 6s linear infinite;
+}
+.pe-reticle-arc2 {
+  inset: 0;
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-bottom-color: var(--ret);
+  opacity: 0.5;
+  animation: pe-ret-spin 9s linear infinite reverse;
+}
+.pe-reticle-ticks,
+.pe-reticle-ticks2 {
+  position: absolute;
+  inset: 0;
+}
+.pe-reticle-ticks::before,
+.pe-reticle-ticks::after,
+.pe-reticle-ticks2::before,
+.pe-reticle-ticks2::after {
+  content: '';
+  position: absolute;
+  background: var(--ret);
+  opacity: 0.8;
+}
+.pe-reticle-ticks::before { left: 50%; top: 0; width: 1px; height: 5px; }
+.pe-reticle-ticks::after { left: 50%; bottom: 0; width: 1px; height: 5px; }
+.pe-reticle-ticks2::before { top: 50%; left: 0; height: 1px; width: 5px; }
+.pe-reticle-ticks2::after { top: 50%; right: 0; height: 1px; width: 5px; }
+@keyframes pe-ret-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pe-reticle-arc { animation: none; }
+}
+
+/* ------------------------------------------------------------------ */
 /* sensor styles — feed treatment chips (keys 1–5)                     */
 /* ------------------------------------------------------------------ */
 .pe-sensor {

@@ -114,6 +114,14 @@ export interface AppEvents extends Record<string, unknown> {
     basis?: string;
     age?: string;
     contactsNearby?: number;
+    /** geodetic position of the resolved fix/propagation */
+    lat?: number;
+    lon?: number;
+    /** screen-space position (CSS px) for the tracking reticle */
+    sx?: number;
+    sy?: number;
+    /** contact currently behind the globe (reticle hides, card stays) */
+    behind?: boolean;
   };
   /** Sensor style changed (0 normal · 1 nvg · 2 flir · 3 crt · 4 noir). */
   sensor: { mode: 0 | 1 | 2 | 3 | 4; label: string };

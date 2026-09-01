@@ -64,7 +64,8 @@ export function createLegend(api: AppApi): { el: HTMLElement } {
     <div class="pe-lg-row" style="color:var(--text-dim)">Click a live contact to track · D boxes contacts · 1–5 sensor styles</div>
     <div class="pe-lg-group">OVERLAYS</div>
     ${row(line('#d98cff', true), 'Hypothetical frame — computed, not observed')}
-    ${row(line('#e8f1fb', true), 'Operational lane — dashed when untracked')}`;
+    ${row(line('#e8f1fb', true), 'Operational lane — dashed when untracked')}
+    ${row(dot('#ff5d6e'), 'Attention beam — alert-flagged asset (see ALERTS rail)')}`;
 
   el.append(head, body);
 

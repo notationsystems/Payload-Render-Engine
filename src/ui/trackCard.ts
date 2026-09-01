@@ -20,6 +20,11 @@ export interface LiveTrackInfo {
   basis?: string;
   age?: string;
   contactsNearby?: number;
+  lat?: number;
+  lon?: number;
+  sx?: number;
+  sy?: number;
+  behind?: boolean;
 }
 
 export function createTrackCard(api: AppApi): { el: HTMLElement } {
@@ -68,6 +73,10 @@ export function createTrackCard(api: AppApi): { el: HTMLElement } {
       parts.push(`ALT <b>${info.altKm >= 100 ? Math.round(info.altKm) : info.altKm.toFixed(1)} KM</b>`);
     if (info.gsKt !== null && info.gsKt !== undefined) parts.push(`GS <b>${Math.round(info.gsKt)} KT</b>`);
     if (info.track !== null && info.track !== undefined) parts.push(`TRK <b>${Math.round(info.track)}°</b>`);
+    if (info.lat !== undefined && info.lon !== undefined)
+      parts.push(
+        `${info.lat >= 0 ? 'N' : 'S'} <b>${Math.abs(info.lat).toFixed(2)}°</b> ${info.lon >= 0 ? 'E' : 'W'} <b>${Math.abs(info.lon).toFixed(2)}°</b>`
+      );
     tele.innerHTML = parts.join(' · ') || '—';
     basis.textContent = `${info.basis ?? ''}${info.age ? ` · ${info.age}` : ''}`;
     next.hidden = info.kind !== 'aircraft' || !(info.contactsNearby && info.contactsNearby > 1);
