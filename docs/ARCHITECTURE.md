@@ -568,3 +568,29 @@ decorative was spent on legibility instead, in a full critique pass
 - The semantic tone ramp (ok/warn/alert/dim) was resurrected on
   inspector data rows, and honesty typography sharpened: MEAN OBSERVED
   (μ died in uppercase), UNOBSERVED meters, NOT ASSERTED promises.
+
+## 17. The live substrate (gods-eye-view under PayLoad OS)
+
+The LIVE layer group integrates gods-eye-view (MIT, adapted — see
+docs/ATTRIBUTIONS.md) as a substrate under this OS's chrome and
+through its backend:
+
+- **`/api/live/*` on the Spatial API**: keyless public upstreams only
+  (celestrak TLE groups, USGS M2.5+ quakes), behind the
+  budget-governed proxy posture — hosts fixed in code, disk-cached
+  with stated TTLs, response caps, per-URL partial delivery with
+  failures stated, stale-cache-with-stated-age over silence, typed
+  refusals otherwise. Live meta carries its own sourceClass /
+  disclaimer — a public feed is never conflated with the loaded corpus.
+- **Satellites** (`live.satellites`): four constellations (stations
+  incl. ISS, GPS, GLONASS, Galileo) at TRUE orbital scale, positions
+  COMPUTED client-side by SGP4 from the TLE epoch and repropagated at
+  1 Hz — a failed propagation renders nothing, never a ghost. The
+  toast and legend say COMPUTED; the TLE age is part of the record.
+- **Seismic** (`live.seismic`): reported epicenters as rings sized by
+  magnitude and faded by report age; strong recent events pulse.
+  Supply-chain relevance is the point of putting a quake feed on an
+  operations globe.
+- Both layers load lazily on first toggle; an unreachable feed is a
+  toast with the refusal's remedy and an empty layer — never
+  fabricated points.

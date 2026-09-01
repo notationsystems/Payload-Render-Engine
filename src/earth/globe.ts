@@ -55,8 +55,8 @@ const FRAG = /* glsl */ `
     vec3 col = mix(nightSide, lit, dayFactor);
 
     // warm band along the terminator
-    float band = smoothstep(0.18, 0.0, abs(d - 0.03));
-    col += vec3(0.30, 0.13, 0.04) * band * 0.20;
+    float band = smoothstep(0.10, 0.0, abs(d - 0.02));
+    col += vec3(0.30, 0.13, 0.04) * band * 0.09;
 
     // ocean specular glint — tight highlight, not a searchlight
     vec3 R = reflect(-sun, n);

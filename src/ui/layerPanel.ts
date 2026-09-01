@@ -11,6 +11,7 @@ const GROUP_ORDER: LayerDef['group'][] = [
   'INFRASTRUCTURE',
   'ECONOMY',
   'INTELLIGENCE',
+  'LIVE',
 ];
 
 const MODE_SWATCH: Partial<Record<LayerId, string>> = {

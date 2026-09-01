@@ -31,6 +31,9 @@ const DEFS: [LayerId, string, LayerDef['group'], boolean][] = [
   ['intel.anomalies', 'Anomalies', 'INTELLIGENCE', false],
   ['intel.dependencies', 'Dependencies', 'INTELLIGENCE', false],
   ['intel.risk', 'Risk', 'INTELLIGENCE', false],
+  // gods-eye-view substrate: live public feeds through the spatial API
+  ['live.satellites', 'Satellites (live)', 'LIVE', false],
+  ['live.seismic', 'Seismic (live)', 'LIVE', false],
 ];
 
 const PRESETS: Partial<Record<ViewPreset, Partial<Record<LayerId, boolean>>>> = {

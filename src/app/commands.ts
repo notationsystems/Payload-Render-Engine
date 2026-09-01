@@ -55,6 +55,11 @@ const LAYER_ALIASES: Record<string, LayerId> = {
   dependencies: 'intel.dependencies',
   'supply dependencies': 'intel.dependencies',
   risk: 'intel.risk',
+  satellites: 'live.satellites',
+  sats: 'live.satellites',
+  seismic: 'live.seismic',
+  earthquakes: 'live.seismic',
+  quakes: 'live.seismic',
 };
 
 /** Display names for layer toggle result messages. */
@@ -84,6 +89,8 @@ const LAYER_LABELS: Record<LayerId, string> = {
   'intel.anomalies': 'ANOMALIES',
   'intel.dependencies': 'DEPENDENCIES',
   'intel.risk': 'RISK',
+  'live.satellites': 'LIVE SATELLITES',
+  'live.seismic': 'LIVE SEISMIC',
 };
 
 const TRANSPORT_LAYERS: LayerId[] = [
