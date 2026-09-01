@@ -65,9 +65,16 @@ npm run check    # seam + provenance + types
 - **Drag** — rotate the globe
 - **Wheel** — zoom (altitude drives level of detail and progressive disclosure)
 - **Click** — select a facility, route, or flow; click a country to open its summary
+- **Click a live contact** — track it: the camera chases the aircraft/satellite, a trail
+  draws behind it, and a readout card carries its telemetry with its basis
+  (OBSERVED ADS-B fix age, or COMPUTED SGP4 with TLE age). **Esc** releases.
+- **Hold B** — route brush: sweep the cursor, nearby routes stay lit
+- **D** — detection overlay: corner-bracket boxes + ids on every live contact in view
+- **1–5** — sensor style over the rendered feed: NORMAL / NVG / FLIR / CRT / NOIR
+  (a GLSL post-pass on the WebGL canvas only — instruments stay untouched)
 - **`/`** — focus the command bar / search
 - **Space** — play / pause simulation time
-- Command examples: `find toronto` · `show maritime` · `show bottlenecks` · `follow the load`
+- Command examples: `find toronto` · `show maritime` · `show aircraft` · `follow the load`
 
 ## Layer reference
 
@@ -80,6 +87,7 @@ Layers are grouped as declared in `src/app/api.ts` (`LayerDef` / `LayerId`):
 | INFRASTRUCTURE | `infra.ports` · `infra.airports` · `infra.rail_terminals` · `infra.warehouses` · `infra.industrial` |
 | ECONOMY | `economy.production` · `economy.demand` · `economy.inventory` · `economy.flows` |
 | INTELLIGENCE | `intel.bottlenecks` · `intel.constraints` · `intel.anomalies` · `intel.dependencies` · `intel.risk` |
+| LIVE | `live.satellites` · `live.aircraft` · `live.seismic` |
 
 ## Command reference
 
@@ -107,6 +115,34 @@ command bar (`what if suez closes`): pick a chokepoint closure and enter the
 hypothetical frame — the regime becomes `'scenario'`, the impact renders in the
 violet dashed scenario treatment with a persistent banner, and `exit frame`
 returns to observed state.
+
+## Live substrate (gods-eye-view, under PayLoad OS chrome)
+
+The LIVE layer group carries real public feeds, adapted from
+[bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/gods-eye-view) (MIT —
+see [`docs/ATTRIBUTIONS.md`](docs/ATTRIBUTIONS.md)) and served through the
+spatial API's keyless proxy (`server/live.mjs`; upstream hosts fixed in code,
+disk-cached, response-capped). A public feed is never conflated with the loaded
+corpus: live records carry their own source class, disclaimer, and basis.
+
+Working today, no keys required:
+
+| Feed | Upstream | Basis shown in the UI |
+|---|---|---|
+| Satellites (ISS + GNSS shells, true-scale orbits) | celestrak elements | COMPUTED · SGP4, repropagated 1/s, TLE age stated |
+| Aircraft (250 NM around the camera subpoint) | adsb.lol (ODbL) | OBSERVED · ADS-B fix, dead-reckoned ≤180 s between fixes, fix age stated |
+| Seismic (M2.5+, 24 h) | USGS | REPORTED · report time, ring fades with age |
+
+**Power-up ladder** — features that exist in the codebase or design but stay
+dark until a key or account is configured. A missing key is a typed refusal
+with a remedy, never a faked surface:
+
+| Power-up | Needs | Status |
+|---|---|---|
+| Active fires overlay | `FIRMS_MAP_KEY` (free: https://firms.modaps.eosdis.nasa.gov/api/map_key/) | Proxy route implemented (`/api/live/fires`); refuses with the remedy until keyed |
+| Live vessels (AIS) | AISStream account/key | Documented design; not implemented until a key path exists |
+| Voice control | OpenAI realtime key | Not implemented; the command bar is the hands-on equivalent |
+| Photoreal 3D tiles | Cesium ion / Google tiles key | Not implemented; the procedural globe is the keyless default |
 
 ## Architecture
 

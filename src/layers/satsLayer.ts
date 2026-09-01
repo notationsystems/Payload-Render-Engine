@@ -32,6 +32,8 @@ export class SatsLayer {
   private colors!: Float32Array;
   private sizes!: Float32Array;
   private lastPropagate = 0;
+  /** last propagated geodetic fix per sat (null = failed/decayed) */
+  lastProp: ({ lonLat: [number, number]; altitudeKm: number; tleAgeHours: number } | null)[] = [];
   visible = false;
 
   constructor() {
@@ -81,12 +83,17 @@ export class SatsLayer {
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geo.setAttribute('aColor', new THREE.BufferAttribute(this.colors, 3));
     this.geo.setAttribute('aSize', new THREE.BufferAttribute(this.sizes, 1));
+    this.lastProp = new Array(sats.length).fill(null);
     this.lastPropagate = 0; // force immediate propagation
   }
 
   setVisible(v: boolean): void {
     this.visible = v;
     this.points.visible = v && this.sats.length > 0;
+  }
+
+  get contacts(): LiveSat[] {
+    return this.sats;
   }
 
   /** Repropagate at 1 Hz of wall time — SGP4 over ~700 sats is cheap. */
@@ -98,6 +105,7 @@ export class SatsLayer {
     const at = new Date();
     for (let i = 0; i < this.sats.length; i++) {
       const p = propagateSat(this.sats[i], at);
+      this.lastProp[i] = p ? { lonLat: p.lonLat, altitudeKm: p.altitudeKm, tleAgeHours: p.tleAgeHours } : null;
       if (!p) {
         // failed propagation: park at origin with zero size — never ghosts
         this.positions[i * 3] = 0;

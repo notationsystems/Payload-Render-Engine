@@ -24,7 +24,7 @@ export class SelectionInput {
   private lastHoverCheck = 0;
 
   onHover: ((pick: Pick) => void) | null = null;
-  onClick: ((pick: Pick) => void) | null = null;
+  onClick: ((pick: Pick, clientX: number, clientY: number) => void) | null = null;
   onDoubleClick: ((pick: Pick) => void) | null = null;
 
   constructor(
@@ -52,7 +52,7 @@ export class SelectionInput {
       const moved = Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y);
       this.downAt = null;
       if (moved < 5 && e.target === canvas) {
-        this.onClick?.(this.pick(e.clientX, e.clientY, true));
+        this.onClick?.(this.pick(e.clientX, e.clientY, true), e.clientX, e.clientY);
       }
     });
     canvas.addEventListener('dblclick', (e) => {

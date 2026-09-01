@@ -20,7 +20,30 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Egress: Node's fetch ignores HTTP(S)_PROXY, so environments whose only
+// outbound path is a proxy would see every upstream refused. Honor the
+// standard proxy variables when they are set (NO_PROXY keeps localhost
+// direct); without them this is a no-op and fetch behaves as before.
+// TLS trust for an intercepting proxy still comes from the standard
+// NODE_EXTRA_CA_CERTS variable at process start.
+if (process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy) {
+  try {
+    const { EnvHttpProxyAgent, setGlobalDispatcher } = await import('undici');
+    setGlobalDispatcher(new EnvHttpProxyAgent());
+  } catch {
+    console.warn('[live] proxy env set but undici unavailable — using direct egress');
+  }
+}
+
 const CACHE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../.live-cache');
+
+// Identify honestly to upstreams. Node's fetch sends no User-Agent at
+// all, and at least adsb.lol (Cloudflare-fronted) rejects UA-less
+// requests with 403 — a self-naming agent string is both the fix and
+// the polite posture toward free public feeds.
+const FETCH_HEADERS = {
+  'user-agent': 'payload-os-live-proxy/0.1 (+https://github.com/notationsystems/Payload-Render-Engine)',
+};
 
 /** The whole reachable upstream surface — fixed in code, never a parameter. */
 const FEEDS = {
@@ -46,6 +69,11 @@ const FEEDS = {
   },
 };
 
+/** adsb.lol point snapshots: bucketed by rounded degree, short TTL. */
+const AIRCRAFT_TTL_MS = 30_000;
+const AIRCRAFT_CAP = 400;
+const aircraftCache = new Map(); // bucket → {fetchedAt, ac}
+
 async function cachedFetch(name, feed) {
   await mkdir(CACHE_DIR, { recursive: true });
   const cachePath = resolve(CACHE_DIR, `${name}.json`);
@@ -64,7 +92,7 @@ async function cachedFetch(name, feed) {
   const failures = [];
   for (const url of feed.urls) {
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(20_000), headers: FETCH_HEADERS });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       if (text.length > feed.capBytes) throw new Error(`exceeds ${feed.capBytes}B cap`);
@@ -100,6 +128,113 @@ function parseTle(text) {
 }
 
 export function registerLiveRoutes(get, { ok, refuse, meta }) {
+  const liveMeta = (base, over) => ({ ...base, ...over });
+
+  // observed air traffic around a point — gods-eye-view's adsb.lol
+  // fallback pattern: regional observed context, never claimed as
+  // worldwide completeness (ODbL — attribution in the envelope)
+  get('/api/live/aircraft', async ({ query }) => {
+    const lat = Number(query.get('lat'));
+    const lon = Number(query.get('lon'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 85 || Math.abs(lon) > 180) {
+      return refuse('UNPARSEABLE_POINT', 'lat/lon required (abs(lat) ≤ 85)', 'pass lat=51.9&lon=4.5 — the snapshot covers 250 nm around the point');
+    }
+    const bucket = `${Math.round(lat)}:${Math.round(lon)}`;
+    const cached = aircraftCache.get(bucket);
+    let entry = cached;
+    if (!cached || Date.now() - Date.parse(cached.fetchedAt) > AIRCRAFT_TTL_MS) {
+      try {
+        const res = await fetch(
+          `https://api.adsb.lol/v2/lat/${Math.round(lat)}/lon/${Math.round(lon)}/dist/250`,
+          { signal: AbortSignal.timeout(20_000), headers: FETCH_HEADERS }
+        );
+        if (!res.ok) throw new Error(`api.adsb.lol → HTTP ${res.status}`);
+        const body = await res.json();
+        const ac = (body.ac ?? [])
+          .filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lon))
+          .sort((a, b) => (a.dst ?? 999) - (b.dst ?? 999))
+          .slice(0, AIRCRAFT_CAP)
+          .map((a) => ({
+            hex: a.hex,
+            flight: (a.flight ?? '').trim() || null,
+            lat: a.lat,
+            lon: a.lon,
+            altFt: typeof a.alt_baro === 'number' ? a.alt_baro : null,
+            gsKt: a.gs ?? null,
+            track: a.track ?? a.mag_heading ?? null,
+            seenPosSec: a.seen_pos ?? null,
+          }));
+        entry = { fetchedAt: new Date().toISOString(), ac };
+        aircraftCache.set(bucket, entry);
+        if (aircraftCache.size > 64) aircraftCache.delete(aircraftCache.keys().next().value);
+      } catch (err) {
+        if (!cached) {
+          return refuse('LIVE_FEED_UNAVAILABLE', `adsb.lol did not answer: ${err?.message ?? err}`, 'retry shortly; snapshots cache for 30s per region once one fetch succeeds');
+        }
+        entry = cached; // stale-with-stated-age below
+      }
+    }
+    const ageMs = Date.now() - Date.parse(entry.fetchedAt);
+    return {
+      ...ok({ aircraft: entry.ac, fetchedAt: entry.fetchedAt, cacheAgeMs: ageMs, center: { lat: Math.round(lat), lon: Math.round(lon) }, radiusNm: 250 }),
+      meta: liveMeta(meta(entry.fetchedAt, 'best_known'), {
+        sourceClass: 'external:adsb-lol',
+        valueKind: 'reported',
+        admissible: true,
+        admissibleBasis: 'reported_disinterested',
+        knownAt: entry.fetchedAt,
+        upstream: 'api.adsb.lol 250nm point snapshot (keyless, ODbL — © adsb.lol contributors)',
+        disclaimer: 'LIVE PUBLIC FEED — ADS-B position reports around the requested point; regional observed context, not worldwide completeness',
+      }),
+    };
+  });
+
+  // NASA FIRMS active fires — key-gated: fail-closed until configured
+  get('/api/live/fires', async () => {
+    const key = process.env.FIRMS_MAP_KEY;
+    if (!key?.trim()) {
+      return refuse(
+        'LIVE_FEED_NOT_CONFIGURED',
+        'NASA FIRMS requires a (free) MAP_KEY; the fires layer is fail-closed without it',
+        'get a key at https://firms.modaps.eosdis.nasa.gov/api/map_key/ and set FIRMS_MAP_KEY in the spatial API environment'
+      );
+    }
+    try {
+      const res = await fetch(
+        `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/VIIRS_NOAA20_NRT/world/1`,
+        { signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS }
+      );
+      if (!res.ok) throw new Error(`firms → HTTP ${res.status}`);
+      const text = await res.text();
+      const lines = text.split('\n');
+      const header = lines[0].split(',');
+      const ix = (n) => header.indexOf(n);
+      const [iLat, iLon, iFrp, iConf, iDate, iTime] = [ix('latitude'), ix('longitude'), ix('frp'), ix('confidence'), ix('acq_date'), ix('acq_time')];
+      const fires = [];
+      for (let i = 1; i < lines.length; i++) {
+        const c = lines[i].split(',');
+        if (c.length < header.length) continue;
+        fires.push({ lat: Number(c[iLat]), lon: Number(c[iLon]), frp: Number(c[iFrp]) || 0, confidence: c[iConf], acq: `${c[iDate]}T${String(c[iTime]).padStart(4, '0').replace(/(..)(..)/, '$1:$2')}:00Z` });
+      }
+      fires.sort((a, b) => b.frp - a.frp);
+      const fetchedAt = new Date().toISOString();
+      return {
+        ...ok({ fires: fires.slice(0, 1500), total: fires.length, fetchedAt }),
+        meta: liveMeta(meta(fetchedAt, 'best_known'), {
+          sourceClass: 'external:nasa-firms',
+          valueKind: 'reported',
+          admissible: true,
+          admissibleBasis: 'reported_disinterested',
+          knownAt: fetchedAt,
+          upstream: 'NASA FIRMS VIIRS NOAA-20 NRT, world/24h (keyed); NASA EOSDIS acknowledgement applies',
+          disclaimer: 'LIVE PUBLIC FEED — satellite-detected thermal anomalies, top 1500 by fire radiative power',
+        }),
+      };
+    } catch (err) {
+      return refuse('LIVE_FEED_UNAVAILABLE', `FIRMS did not answer: ${err?.message ?? err}`, 'retry later or check the MAP_KEY quota');
+    }
+  });
+
   get('/api/live/satellites', async () => {
     let r;
     try {

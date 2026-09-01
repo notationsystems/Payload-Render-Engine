@@ -43,8 +43,9 @@ import { NodesLayer } from '../layers/nodesLayer';
 import { FlowsLayer } from '../layers/flowsLayer';
 import { OpsArcLayer } from '../layers/opsArcLayer';
 import { SatsLayer } from '../layers/satsLayer';
+import { AircraftLayer } from '../layers/aircraftLayer';
 import { QuakesLayer } from '../layers/quakesLayer';
-import { fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
+import { deadReckon, fetchLiveAircraft, fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
 import { resolveApiBase } from '../data/sources';
 import { LabelsLayer } from '../layers/labelsLayer';
 import { SelectionInput, type Pick } from '../interaction/selection';
@@ -58,9 +59,12 @@ import type {
   CountryInfo,
   LayerDef,
   LayerId,
+  LiveScreenContact,
   Suggestion,
   ViewPreset,
 } from './api';
+
+const SENSOR_LABELS = ['NORMAL', 'NVG', 'FLIR', 'CRT', 'NOIR'] as const;
 
 export class App implements AppApi {
   readonly events = new EventBus<AppEvents>();
@@ -83,6 +87,14 @@ export class App implements AppApi {
   private satsLayer = new SatsLayer();
   private quakesLayer = new QuakesLayer();
   private liveLoaded = { sats: false, quakes: false };
+  private aircraftLayer!: AircraftLayer;
+  private aircraftTimer: number | undefined;
+  private aircraftBucket = '';
+  private liveTracked: { kind: 'aircraft' | 'satellite'; i: number } | null = null;
+  private sensorMode: 0 | 1 | 2 | 3 | 4 = 0;
+  private trail: THREE.Line | null = null;
+  private trailPts: THREE.Vector3[] = [];
+  private trailLastPush = 0;
   private labelsLayer!: LabelsLayer;
   private anomalies!: THREE.Points;
   private anomaliesMat!: THREE.PointsMaterial;
@@ -180,6 +192,8 @@ export class App implements AppApi {
     scene.add(this.flowsLayer.group);
     scene.add(this.opsArc.group);
     scene.add(this.satsLayer.points);
+    this.aircraftLayer = new AircraftLayer(this.engine.camera);
+    scene.add(this.aircraftLayer.points);
     scene.add(this.quakesLayer.group);
     this.labelsLayer = new LabelsLayer(hud);
     scene.add(this.depOverlay);
@@ -228,6 +242,8 @@ export class App implements AppApi {
       this.flowsLayer.update(dt);
       this.opsArc.update(dt);
       this.satsLayer.update();
+      this.aircraftLayer.update();
+      this.updateLiveTrack();
       this.quakesLayer.update(dt);
       this.labelsLayer.update(this.engine.camera, this.nodesLayer, alt);
       this.pulseAnomalies(dt);
@@ -407,6 +423,11 @@ export class App implements AppApi {
       this.satsLayer.setVisible(v);
       if (v && !this.liveLoaded.sats) void this.loadLiveSatellites();
     });
+    m.register('live.aircraft', (v) => {
+      this.aircraftLayer.setVisible(v);
+      if (v) this.startAircraftPolling();
+      else this.stopAircraftPolling();
+    });
     m.register('live.seismic', (v) => {
       this.quakesLayer.setVisible(v);
       if (v && !this.liveLoaded.quakes) void this.loadLiveQuakes();
@@ -556,8 +577,23 @@ export class App implements AppApi {
     );
     input.onHover = (pick) => this.applyHover(pick);
     this.wireBrush(canvas);
-    input.onClick = (pick) => {
+    input.onClick = (pick, x, y) => {
       if (this.demo.active) return;
+      // live contacts outrank empty space AND the country pick — an
+      // aircraft dart hugs the globe, so the sphere hit would otherwise
+      // always swallow the click. Corpus nodes/routes still win.
+      if (!pick || pick.type === 'country') {
+        const live = this.pickLive(x, y);
+        if (live) {
+          this.select(null, 'pick');
+          this.selectCountry(null);
+          this.startLiveTrack(live);
+          return;
+        }
+      }
+      // any click that lands elsewhere lets the tracked contact go —
+      // the chase camera must never fight a fly-to or country focus
+      if (this.liveTracked) this.releaseLiveTrack();
       if (!pick) {
         this.select(null, 'pick');
         this.selectCountry(null);
@@ -754,6 +790,264 @@ export class App implements AppApi {
       body: `${r.data.quakes.length} reported events (M2.5+, 24h) · ${r.data.upstream}`,
       tone: 'info',
     });
+  }
+
+  // ---------------------------------------------------- live tracking
+
+  /** Poll observed air traffic around the camera subpoint (30s cadence,
+   *  immediate refetch when the subpoint moves to a new degree bucket). */
+  private startAircraftPolling(): void {
+    if (this.aircraftTimer !== undefined) return;
+    const poll = async (): Promise<void> => {
+      const sub = vec3ToLatLon(this.engine.camera.position.clone().normalize());
+      const bucket = `${Math.round(sub.lat)}:${Math.round(sub.lon)}`;
+      this.aircraftBucket = bucket;
+      const r = await fetchLiveAircraft(resolveApiBase(), [sub.lon, sub.lat]);
+      if (r.kind !== 'ok') {
+        this.events.emit('toast', {
+          title: 'LIVE AIRCRAFT UNAVAILABLE',
+          body: r.kind === 'refused' ? `${r.refusal.message} — ${r.refusal.remedy}` : r.note,
+          tone: 'warn',
+        });
+        return;
+      }
+      this.aircraftLayer.setAircraft(r.data.aircraft);
+      this.events.emit('toast', {
+        title: 'LIVE AIRCRAFT',
+        body: `${r.data.aircraft.length} ADS-B contacts within 250 NM of ${r.data.center.lat}°, ${r.data.center.lon}° · OBSERVED, dead-reckoned between fixes`,
+        tone: 'info',
+      });
+    };
+    void poll();
+    this.aircraftTimer = window.setInterval(() => {
+      const sub = vec3ToLatLon(this.engine.camera.position.clone().normalize());
+      const bucket = `${Math.round(sub.lat)}:${Math.round(sub.lon)}`;
+      if (bucket !== this.aircraftBucket) void poll();
+      else void poll();
+    }, 30_000);
+  }
+
+  private stopAircraftPolling(): void {
+    if (this.aircraftTimer !== undefined) {
+      window.clearInterval(this.aircraftTimer);
+      this.aircraftTimer = undefined;
+    }
+  }
+
+  /** Nearest live object (aircraft or satellite) within px of a screen point. */
+  private pickLive(clientX: number, clientY: number): { kind: 'aircraft' | 'satellite'; i: number } | null {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const proj = new THREE.Vector3();
+    let best: { kind: 'aircraft' | 'satellite'; i: number; d: number } | null = null;
+    const consider = (kind: 'aircraft' | 'satellite', i: number, x: number, y: number, z: number): void => {
+      if (this.occludedByGlobe(x, y, z)) return; // never pick behind the planet
+      proj.set(x, y, z).project(this.engine.camera);
+      if (proj.z > 1) return;
+      const sx = ((proj.x + 1) / 2) * w;
+      const sy = ((1 - proj.y) / 2) * h;
+      const d = Math.hypot(sx - clientX, sy - clientY);
+      if (d < 16 && (!best || d < best.d)) best = { kind, i, d };
+    };
+    if (this.aircraftLayer.points.visible) {
+      const pos = this.aircraftLayer.points.geometry.getAttribute('position');
+      const alive = this.aircraftLayer.points.geometry.getAttribute('aAlive');
+      for (let i = 0; i < pos.count; i++) {
+        if (alive.getX(i) < 0.5) continue;
+        consider('aircraft', i, pos.getX(i), pos.getY(i), pos.getZ(i));
+      }
+    }
+    if (this.satsLayer.points.visible) {
+      const pos = this.satsLayer.points.geometry.getAttribute('position');
+      if (pos) {
+        for (let i = 0; i < pos.count; i++) {
+          if (this.satsLayer.lastProp[i]) consider('satellite', i, pos.getX(i), pos.getY(i), pos.getZ(i));
+        }
+      }
+    }
+    return best ? { kind: (best as { kind: 'aircraft' | 'satellite' }).kind, i: (best as { i: number }).i } : null;
+  }
+
+  private startLiveTrack(t: { kind: 'aircraft' | 'satellite'; i: number }): void {
+    this.liveTracked = t;
+    this.trailPts = [];
+    if (this.trail) {
+      this.engine.scene.remove(this.trail);
+      this.trail.geometry.dispose();
+      (this.trail.material as THREE.Material).dispose();
+      this.trail = null;
+    }
+    this.updateLiveTrack(true);
+  }
+
+  isLiveTracking(): boolean {
+    return this.liveTracked !== null;
+  }
+
+  releaseLiveTrack(): void {
+    this.liveTracked = null;
+    if (this.trail) {
+      this.engine.scene.remove(this.trail);
+      this.trail.geometry.dispose();
+      (this.trail.material as THREE.Material).dispose();
+      this.trail = null;
+    }
+    this.events.emit('liveTrack', { active: false });
+  }
+
+  nextLiveContact(): void {
+    if (!this.liveTracked || this.liveTracked.kind !== 'aircraft') return;
+    const contacts = this.aircraftLayer.contacts;
+    if (contacts.length < 2) return;
+    const cur = contacts[this.liveTracked.i];
+    const nowMs = Date.now();
+    const here = deadReckon(cur, nowMs) ?? cur.lonLat;
+    // nearest other alive contact by great-circle angle
+    let bestI = -1;
+    let bestD = Infinity;
+    for (let i = 0; i < contacts.length; i++) {
+      if (i === this.liveTracked.i) continue;
+      const ll = deadReckon(contacts[i], nowMs);
+      if (!ll) continue;
+      const d = Math.hypot(ll[0] - here[0], ll[1] - here[1]);
+      if (d < bestD) {
+        bestD = d;
+        bestI = i;
+      }
+    }
+    if (bestI >= 0) this.startLiveTrack({ kind: 'aircraft', i: bestI });
+  }
+
+  // ---------------------------------------------- sensor styles / detection
+
+  setSensorMode(mode: 0 | 1 | 2 | 3 | 4): void {
+    if (mode === this.sensorMode) return;
+    this.sensorMode = mode;
+    this.engine.setSensorMode(mode);
+    this.events.emit('sensor', { mode, label: SENSOR_LABELS[mode] });
+  }
+
+  getSensorMode(): 0 | 1 | 2 | 3 | 4 {
+    return this.sensorMode;
+  }
+
+  /** True when the straight line camera→point passes through the globe. */
+  private occludedByGlobe(x: number, y: number, z: number): boolean {
+    const c = this.engine.camera.position;
+    const dx = x - c.x;
+    const dy = y - c.y;
+    const dz = z - c.z;
+    const dist = Math.hypot(dx, dy, dz);
+    const inv = 1 / dist;
+    const b = c.x * dx * inv + c.y * dy * inv + c.z * dz * inv;
+    const q = c.x * c.x + c.y * c.y + c.z * c.z - 1;
+    const disc = b * b - q;
+    if (disc < 0) return false;
+    const t = -b - Math.sqrt(disc);
+    return t >= 0 && t < dist - 0.002;
+  }
+
+  liveScreenContacts(): LiveScreenContact[] {
+    const out: LiveScreenContact[] = [];
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const proj = new THREE.Vector3();
+    const push = (kind: 'aircraft' | 'satellite', name: string, x: number, y: number, z: number): void => {
+      if (this.occludedByGlobe(x, y, z)) return;
+      proj.set(x, y, z).project(this.engine.camera);
+      if (proj.z > 1) return;
+      const sx = ((proj.x + 1) / 2) * w;
+      const sy = ((1 - proj.y) / 2) * h;
+      if (sx < -20 || sx > w + 20 || sy < -20 || sy > h + 20) return;
+      out.push({ kind, name, x: sx, y: sy });
+    };
+    if (this.aircraftLayer?.points.visible) {
+      const pos = this.aircraftLayer.points.geometry.getAttribute('position');
+      const alive = this.aircraftLayer.points.geometry.getAttribute('aAlive');
+      const contacts = this.aircraftLayer.contacts;
+      for (let i = 0; i < pos.count; i++) {
+        if (alive.getX(i) < 0.5) continue;
+        const a = contacts[i];
+        push('aircraft', a.flight ?? a.hex.toUpperCase(), pos.getX(i), pos.getY(i), pos.getZ(i));
+      }
+    }
+    if (this.satsLayer.points.visible) {
+      const pos = this.satsLayer.points.geometry.getAttribute('position');
+      if (pos) {
+        for (let i = 0; i < pos.count; i++) {
+          if (!this.satsLayer.lastProp[i]) continue;
+          push('satellite', this.satsLayer.contacts[i].name, pos.getX(i), pos.getY(i), pos.getZ(i));
+        }
+      }
+    }
+    return out;
+  }
+
+  /** Per-frame: chase the tracked contact, extend its trail, refresh
+   *  the readout. Basis honesty rides in every readout emit. */
+  private updateLiveTrack(force = false): void {
+    if (!this.liveTracked) return;
+    const nowMs = Date.now();
+    let lat: number;
+    let lon: number;
+    let info: AppEvents['liveTrack'];
+    if (this.liveTracked.kind === 'aircraft') {
+      const a = this.aircraftLayer.contacts[this.liveTracked.i];
+      if (!a) return this.releaseLiveTrack();
+      const ll = deadReckon(a, nowMs);
+      if (!ll) return this.releaseLiveTrack();
+      [lon, lat] = ll;
+      const fixAge = Math.round((nowMs - a.fetchedAtMs) / 1000 + (a.seenPosSec ?? 0));
+      info = {
+        active: true,
+        kind: 'aircraft',
+        name: a.flight ?? a.hex.toUpperCase(),
+        altKm: a.altFt !== null ? (a.altFt * 0.0003048) : null,
+        gsKt: a.gsKt,
+        track: a.track,
+        basis: 'OBSERVED · ADS-B (adsb.lol, ODbL)',
+        age: `FIX ${fixAge}S AGO · DEAD-RECKONED SINCE`,
+        contactsNearby: this.aircraftLayer.contacts.length,
+      };
+    } else {
+      const p = this.satsLayer.lastProp[this.liveTracked.i];
+      const s = this.satsLayer.contacts[this.liveTracked.i];
+      if (!p || !s) return this.releaseLiveTrack();
+      [lon, lat] = p.lonLat;
+      info = {
+        active: true,
+        kind: 'satellite',
+        name: s.name,
+        altKm: p.altitudeKm,
+        gsKt: null,
+        track: null,
+        basis: 'COMPUTED · SGP4 (celestrak elements)',
+        age: `TLE ${p.tleAgeHours.toFixed(1)}H OLD`,
+      };
+    }
+    this.cameraCtl.followLatLon(lat, lon, force ? 1 : 0.06);
+    this.events.emit('liveTrack', info);
+
+    // fading trail: one vertex per second, capped
+    if (nowMs - this.trailLastPush > 1000) {
+      this.trailLastPush = nowMs;
+      const r = this.liveTracked.kind === 'satellite'
+        ? 1 + (this.satsLayer.lastProp[this.liveTracked.i]?.altitudeKm ?? 400) / 6371
+        : 1.0035;
+      this.trailPts.push(latLonToVec3(lat, lon, r));
+      if (this.trailPts.length > 240) this.trailPts.shift();
+      if (this.trail) {
+        this.engine.scene.remove(this.trail);
+        this.trail.geometry.dispose();
+        (this.trail.material as THREE.Material).dispose();
+      }
+      this.trail = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(this.trailPts),
+        new THREE.LineBasicMaterial({ color: 0xe8f1fb, transparent: true, opacity: 0.55, depthWrite: false })
+      );
+      this.trail.renderOrder = 7;
+      this.engine.scene.add(this.trail);
+    }
   }
 
   /** Active commodity focus — survives a B-brush release. */

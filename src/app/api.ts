@@ -56,7 +56,16 @@ export type LayerId =
   | 'intel.dependencies'
   | 'intel.risk'
   | 'live.satellites'
+  | 'live.aircraft'
   | 'live.seismic';
+
+/** One live contact projected to screen space (detection overlay). */
+export interface LiveScreenContact {
+  kind: 'aircraft' | 'satellite';
+  name: string;
+  x: number;
+  y: number;
+}
 
 export interface CountryInfo {
   code: string;
@@ -93,6 +102,20 @@ export interface AppEvents extends Record<string, unknown> {
   brush: { active: boolean };
   /** Commodity focus applied from the commodities workspace. */
   commodityFocus: { commodityId: EntityId | null; name: string | null; routes: number; flows: number };
+  /** Live contact tracking (click-to-track) engaged/updated/released. */
+  liveTrack: {
+    active: boolean;
+    kind?: 'aircraft' | 'satellite';
+    name?: string;
+    altKm?: number | null;
+    gsKt?: number | null;
+    track?: number | null;
+    basis?: string;
+    age?: string;
+    contactsNearby?: number;
+  };
+  /** Sensor style changed (0 normal · 1 nvg · 2 flir · 3 crt · 4 noir). */
+  sensor: { mode: 0 | 1 | 2 | 3 | 4; label: string };
   toast: { title: string; body?: string; tone?: 'info' | 'warn' | 'alert' };
   status: {
     fps: number;
@@ -147,6 +170,16 @@ export interface AppApi {
   /** Commodity focus: dim routes carrying nothing of this commodity.
    *  Emphasis only — nothing hidden, nothing mutated. null clears. */
   setCommodityFocus(commodityId: EntityId | null): void;
+  /** Release the tracked live contact (camera chase + trail + readout). */
+  releaseLiveTrack(): void;
+  /** Step to the nearest other live aircraft contact. */
+  nextLiveContact(): void;
+  /** Sensor style over the rendered feed (0 normal · 1 nvg · 2 flir · 3 crt · 4 noir).
+   *  A styled feed is still the same data — HUD instruments are untouched. */
+  setSensorMode(mode: 0 | 1 | 2 | 3 | 4): void;
+  getSensorMode(): 0 | 1 | 2 | 3 | 4;
+  /** Screen positions of currently visible live contacts (detection overlay). */
+  liveScreenContacts(): LiveScreenContact[];
   setFlowMode(enabled: boolean): void;
   getFlowMode(): boolean;
 

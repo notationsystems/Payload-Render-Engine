@@ -177,6 +177,21 @@ export class CameraController {
     }
   }
 
+  /**
+   * Follow mode: chase a moving lat/lon each frame with critically-
+   * damped easing — no flight, no cancel dance. Used by live tracking.
+   */
+  followLatLon(lat: number, lon: number, ease = 0.08): void {
+    this.cancel();
+    const toTheta = lon * DEG;
+    const toPhi = clampPhi(Math.PI / 2 - lat * DEG);
+    let d = toTheta - this.theta;
+    d = ((d + Math.PI) % (Math.PI * 2)) - Math.PI;
+    if (d < -Math.PI) d += Math.PI * 2;
+    this.theta += d * ease;
+    this.phi += (toPhi - this.phi) * ease;
+  }
+
   flyToLatLon(
     lat: number,
     lon: number,

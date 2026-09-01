@@ -58,7 +58,10 @@ export function createLegend(api: AppApi): { el: HTMLElement } {
     <div class="pe-lg-group">LIVE FEEDS</div>
     ${row(dot('#ffd9a0'), 'Stations (ISS…) — computed, SGP4')}
     ${row(dot('#7fb8ff'), 'GPS')} ${row(dot('#b48cff'), 'GLONASS')} ${row(dot('#38d6c8'), 'Galileo')}
+    ${row(dot('#bfe0ff'), 'Aircraft — observed, ADS-B (dart = course)')}
+    ${row(dot('#9aa7c7'), 'Aircraft below 10k ft')}
     ${row(dot('var(--warn)'), 'Quake M4+ (ring = magnitude, fade = age)')}
+    <div class="pe-lg-row" style="color:var(--text-dim)">Click a live contact to track · D boxes contacts · 1–5 sensor styles</div>
     <div class="pe-lg-group">OVERLAYS</div>
     ${row(line('#d98cff', true), 'Hypothetical frame — computed, not observed')}
     ${row(line('#e8f1fb', true), 'Operational lane — dashed when untracked')}`;

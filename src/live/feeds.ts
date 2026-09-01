@@ -142,3 +142,77 @@ export function propagateSat(sat: LiveSat, at: Date): PropagatedSat | null {
     tleAgeHours: (at.getTime() - Date.parse(sat.epoch)) / 3600_000,
   };
 }
+
+export interface LiveAircraft {
+  hex: string;
+  flight: string | null;
+  lonLat: LonLat;
+  altFt: number | null;
+  gsKt: number | null;
+  /** true course over ground, degrees — drives the world-stable dart */
+  track: number | null;
+  /** seconds since the position was OBSERVED (ADS-B) */
+  seenPosSec: number | null;
+  fetchedAtMs: number;
+}
+
+export interface LiveAircraftSet {
+  aircraft: LiveAircraft[];
+  fetchedAt: Timestamp;
+  center: { lat: number; lon: number };
+  radiusNm: number;
+  upstream: string;
+}
+
+export async function fetchLiveAircraft(
+  apiBase: string,
+  lonLat: LonLat
+): Promise<LiveResult<LiveAircraftSet>> {
+  const r = await getEnvelope(apiBase, `/api/live/aircraft?lat=${lonLat[1].toFixed(2)}&lon=${lonLat[0].toFixed(2)}`);
+  if (r.kind !== 'ok') return r;
+  const { data, meta } = r.data as {
+    data: { aircraft: { hex: string; flight: string | null; lat: number; lon: number; altFt: number | null; gsKt: number | null; track: number | null; seenPosSec: number | null }[]; fetchedAt: string; center: { lat: number; lon: number }; radiusNm: number };
+    meta?: { upstream?: string };
+  };
+  const fetchedAtMs = Date.parse(data.fetchedAt);
+  return {
+    kind: 'ok',
+    data: {
+      aircraft: data.aircraft.map((a) => ({
+        hex: a.hex,
+        flight: a.flight,
+        lonLat: [a.lon, a.lat] as LonLat,
+        altFt: a.altFt,
+        gsKt: a.gsKt,
+        track: a.track,
+        seenPosSec: a.seenPosSec,
+        fetchedAtMs,
+      })),
+      fetchedAt: data.fetchedAt,
+      center: data.center,
+      radiusNm: data.radiusNm,
+      upstream: meta?.upstream ?? 'api.adsb.lol',
+    },
+  };
+}
+
+/**
+ * Dead-reckoned position at wall-clock now: advance along the observed
+ * track at observed ground speed for the seconds since observation.
+ * The BASIS stays honest — the readout states observed fix + reckoning
+ * age; reckoning stops being drawn past a staleness limit.
+ */
+export function deadReckon(a: LiveAircraft, nowMs: number): LonLat | null {
+  const ageSec = (nowMs - a.fetchedAtMs) / 1000 + (a.seenPosSec ?? 0);
+  if (ageSec > 180) return null; // too stale to reckon honestly
+  if (a.track === null || a.gsKt === null || ageSec <= 0) return a.lonLat;
+  const distKm = (a.gsKt * 1.852 * ageSec) / 3600;
+  const R = 6371;
+  const brg = (a.track * Math.PI) / 180;
+  const lat1 = (a.lonLat[1] * Math.PI) / 180;
+  const lon1 = (a.lonLat[0] * Math.PI) / 180;
+  const d = distKm / R;
+  const lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brg));
+  const lon2 = lon1 + Math.atan2(Math.sin(brg) * Math.sin(d) * Math.cos(lat1), Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+  return [((lon2 * 180) / Math.PI + 540) % 360 - 180, (lat2 * 180) / Math.PI];
+}

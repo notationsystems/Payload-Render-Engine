@@ -57,6 +57,9 @@ const LAYER_ALIASES: Record<string, LayerId> = {
   risk: 'intel.risk',
   satellites: 'live.satellites',
   sats: 'live.satellites',
+  aircraft: 'live.aircraft',
+  planes: 'live.aircraft',
+  adsb: 'live.aircraft',
   seismic: 'live.seismic',
   earthquakes: 'live.seismic',
   quakes: 'live.seismic',
@@ -90,6 +93,7 @@ const LAYER_LABELS: Record<LayerId, string> = {
   'intel.dependencies': 'DEPENDENCIES',
   'intel.risk': 'RISK',
   'live.satellites': 'LIVE SATELLITES',
+  'live.aircraft': 'LIVE AIRCRAFT',
   'live.seismic': 'LIVE SEISMIC',
 };
 
@@ -124,7 +128,8 @@ const HINT = 'TRY: find <place> · show <layer> · follow the load';
 
 const HELP_MESSAGE =
   'FIND <NAME> · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
-  'COMPARE <A> VS <B> · HOLD B = ROUTE BRUSH · WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · FOLLOW THE LOAD · EXIT';
+  'COMPARE <A> VS <B> · HOLD B = ROUTE BRUSH · CLICK LIVE CONTACT = TRACK (ESC RELEASES) · D = DETECTIONS · KEYS 1–5 = SENSOR STYLE · ' +
+  'WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · FOLLOW THE LOAD · EXIT';
 
 const STARTERS: Suggestion[] = [
   { text: 'Find Toronto', label: 'Find Toronto', hint: 'SEARCH' },

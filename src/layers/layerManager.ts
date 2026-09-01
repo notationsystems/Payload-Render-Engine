@@ -33,6 +33,7 @@ const DEFS: [LayerId, string, LayerDef['group'], boolean][] = [
   ['intel.risk', 'Risk', 'INTELLIGENCE', false],
   // gods-eye-view substrate: live public feeds through the spatial API
   ['live.satellites', 'Satellites (live)', 'LIVE', false],
+  ['live.aircraft', 'Aircraft (live)', 'LIVE', false],
   ['live.seismic', 'Seismic (live)', 'LIVE', false],
 ];
 

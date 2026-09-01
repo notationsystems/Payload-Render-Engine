@@ -23,6 +23,9 @@ import { createLegend } from './ui/legend';
 import { createCommoditiesPanel } from './ui/commoditiesPanel';
 import { createArchOverlay } from './ui/archOverlay';
 import { createScenarioBanner } from './ui/scenarioBanner';
+import { createTrackCard } from './ui/trackCard';
+import { createSensorStyles } from './ui/sensorStyles';
+import { createDetectionOverlay } from './ui/detectionOverlay';
 
 async function start(): Promise<void> {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -56,6 +59,9 @@ async function start(): Promise<void> {
   hud.appendChild(createCommoditiesPanel(app).el);
   hud.appendChild(createArchOverlay(app).el);
   hud.appendChild(createScenarioBanner(app).el);
+  hud.appendChild(createTrackCard(app).el);
+  hud.appendChild(createDetectionOverlay(app).el);
+  hud.appendChild(createSensorStyles(app).el);
 
   // escape: exit demo, else clear selection — but never while typing
   // (the search box owns Escape for its own dropdown/blur)
@@ -66,6 +72,7 @@ async function start(): Promise<void> {
     // the architecture overlay owns Escape while it is open
     if (document.querySelector('.os-arch:not([hidden])')) return;
     if (app.isDemoActive()) app.stopFollowTheLoad();
+    else if (app.isLiveTracking()) app.releaseLiveTrack();
     else if (app.getPreset() === 'agents' || app.getPreset() === 'scenarios') {
       app.setPreset(app.getLastLayerPreset());
     } else {

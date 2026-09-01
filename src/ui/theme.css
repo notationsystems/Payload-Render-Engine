@@ -848,6 +848,140 @@ input {
 }
 
 
+/* ------------------------------------------------------------------ */
+/* live tracking — tracked-contact readout (click a live contact)      */
+/* ------------------------------------------------------------------ */
+.pe-track {
+  position: fixed;
+  left: 50%;
+  bottom: 92px;
+  transform: translateX(-50%);
+  z-index: 22; /* rides just above the timeline band */
+  min-width: 300px;
+  max-width: 480px;
+  background: var(--glass);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 9px 12px 8px;
+  pointer-events: auto;
+}
+.pe-track-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pe-track-kind {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  padding: 1px 6px;
+  border: 1px solid rgba(191, 224, 255, 0.5);
+  border-radius: 2px;
+  color: #bfe0ff;
+}
+.pe-track-kind[data-kind='satellite'] {
+  border-color: rgba(255, 217, 160, 0.5);
+  color: #ffd9a0;
+}
+.pe-track-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--text-hi);
+}
+.pe-track-tele {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-mid);
+}
+.pe-track-tele b { font-weight: 500; color: var(--text-hi); }
+.pe-track-basis {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+.pe-track-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 7px;
+}
+.pe-track-btn {
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.pe-track-btn:hover { color: var(--text-hi); border-color: var(--text-dim); }
+.pe-track-release:hover { color: var(--warn); border-color: var(--warn); }
+
+/* ------------------------------------------------------------------ */
+/* sensor styles — feed treatment chips (keys 1–5)                     */
+/* ------------------------------------------------------------------ */
+.pe-sensor {
+  position: fixed;
+  left: 14px;
+  bottom: 48px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  background: var(--glass-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+.pe-sensor-head {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+  padding: 0 4px 0 2px;
+}
+.pe-sensor-btn {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.pe-sensor-btn:hover { color: var(--text-mid); }
+.pe-sensor-btn.on {
+  color: var(--text-hi);
+  border-color: var(--line-strong);
+  background: rgba(210, 226, 240, 0.06);
+}
+
+/* ------------------------------------------------------------------ */
+/* detection overlay — boxed live contacts (key D)                     */
+/* ------------------------------------------------------------------ */
+.pe-detect {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10; /* over the scene, under every instrument panel */
+  pointer-events: none;
+}
+
 /* responsive shed: the status bar yields detail before it collides */
 @media (max-width: 1780px) {
   .pe-sb-opt { display: none; }
