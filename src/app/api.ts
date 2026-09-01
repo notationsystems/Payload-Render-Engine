@@ -117,6 +117,10 @@ export interface AppEvents extends Record<string, unknown> {
   };
   /** Sensor style changed (0 normal · 1 nvg · 2 flir · 3 crt · 4 noir). */
   sensor: { mode: 0 | 1 | 2 | 3 | 4; label: string };
+  /** Live seismic feed loaded/refreshed (count of reported events). */
+  liveQuakes: { count: number };
+  /** Cursor over a live contact (identification before the click). */
+  liveHover: { active: boolean; kind?: 'aircraft' | 'satellite'; name?: string; basis?: string };
   toast: { title: string; body?: string; tone?: 'info' | 'warn' | 'alert' };
   status: {
     fps: number;
@@ -181,6 +185,8 @@ export interface AppApi {
   getSensorMode(): 0 | 1 | 2 | 3 | 4;
   /** Screen positions of currently visible live contacts (detection overlay). */
   liveScreenContacts(): LiveScreenContact[];
+  /** Reported quakes if the live seismic feed has loaded; null = not loaded (absence, not zero). */
+  getLiveQuakes(): import('../live/feeds').LiveQuake[] | null;
   setFlowMode(enabled: boolean): void;
   getFlowMode(): boolean;
 

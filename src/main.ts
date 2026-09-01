@@ -25,6 +25,7 @@ import { createArchOverlay } from './ui/archOverlay';
 import { createScenarioBanner } from './ui/scenarioBanner';
 import { createTrackCard } from './ui/trackCard';
 import { createMarketsPanel } from './ui/marketsPanel';
+import { createAlertsRail } from './ui/alertsRail';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -62,6 +63,7 @@ async function start(): Promise<void> {
   hud.appendChild(createScenarioBanner(app).el);
   hud.appendChild(createTrackCard(app).el);
   hud.appendChild(createMarketsPanel(app).el);
+  hud.appendChild(createAlertsRail(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 

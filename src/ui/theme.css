@@ -849,6 +849,108 @@ input {
 
 
 /* ------------------------------------------------------------------ */
+/* alerts rail — live hazards × corpus assets + corpus disruptions     */
+/* ------------------------------------------------------------------ */
+.pe-alerts {
+  position: fixed;
+  /* inboard of the legend's column — the two right-edge instruments
+     never stack over each other at any viewport height */
+  right: 240px;
+  top: 108px;
+  z-index: 15;
+  width: 276px;
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: opacity 0.2s ease;
+  pointer-events: auto;
+}
+.pe-alerts.pe-alerts-tucked { opacity: 0; pointer-events: none; }
+.pe-alerts.pe-alerts-hot { border-color: rgba(255, 93, 110, 0.35); }
+.pe-alerts-head {
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.pe-alerts-head:hover { color: var(--text-mid); }
+.pe-alerts-head b { color: var(--alert); font-weight: 600; }
+.pe-alerts-zero { color: var(--text-dim); }
+.pe-alerts-body { padding: 0 8px 8px; }
+.pe-alerts-sect {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin: 6px 2px 4px;
+}
+.pe-alert-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--glass-soft);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--warn);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+}
+.pe-alert-row:hover { border-color: var(--line-strong); border-left-color: var(--warn); }
+.pe-alert-row.alert { border-left-color: var(--alert); }
+.pe-alert-row.alert:hover { border-left-color: var(--alert); }
+.pe-alert-title {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-hi);
+}
+.pe-alert-sub {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+  color: var(--text-mid);
+}
+.pe-alert-basis {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.pe-alerts-none, .pe-alerts-off {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  padding: 2px 2px 4px;
+}
+.pe-alerts-enable {
+  display: block;
+  margin-top: 5px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.pe-alerts-enable:hover { color: var(--text-hi); border-color: var(--text-dim); }
+
+/* ------------------------------------------------------------------ */
 /* live tracking — tracked-contact readout (click a live contact)      */
 /* ------------------------------------------------------------------ */
 .pe-track {

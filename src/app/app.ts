@@ -92,6 +92,8 @@ export class App implements AppApi {
   private aircraftBucket = '';
   private liveTracked: { kind: 'aircraft' | 'satellite'; i: number } | null = null;
   private sensorMode: 0 | 1 | 2 | 3 | 4 = 0;
+  /** Reported quakes once the seismic feed loads — null = not loaded. */
+  private liveQuakesList: import('../live/feeds').LiveQuake[] | null = null;
   private trail: THREE.Line | null = null;
   private trailPts: THREE.Vector3[] = [];
   private trailLastPush = 0;
@@ -577,6 +579,45 @@ export class App implements AppApi {
     );
     input.onHover = (pick) => this.applyHover(pick);
     this.wireBrush(canvas);
+    // live-contact hover: identify a dart/dot before the click. Corpus
+    // hover wins — a live chip only shows over empty sky/sea.
+    let liveHoverAt = 0;
+    let liveHoverKey = '';
+    canvas.addEventListener('pointermove', (e) => {
+      const now = performance.now();
+      if (now - liveHoverAt < 120) return;
+      liveHoverAt = now;
+      const live = this.hoverId || this.demo.active ? null : this.pickLive(e.clientX, e.clientY);
+      if (!live) {
+        if (liveHoverKey) {
+          liveHoverKey = '';
+          this.events.emit('liveHover', { active: false });
+          document.body.style.cursor = this.hoverId ? 'pointer' : 'default';
+        }
+        return;
+      }
+      const key = `${live.kind}:${live.i}`;
+      if (key === liveHoverKey) return;
+      liveHoverKey = key;
+      if (live.kind === 'aircraft') {
+        const a = this.aircraftLayer.contacts[live.i];
+        this.events.emit('liveHover', {
+          active: true,
+          kind: 'aircraft',
+          name: a.flight ?? a.hex.toUpperCase(),
+          basis: 'OBSERVED · ADS-B',
+        });
+      } else {
+        const s = this.satsLayer.contacts[live.i];
+        this.events.emit('liveHover', {
+          active: true,
+          kind: 'satellite',
+          name: s.name,
+          basis: 'COMPUTED · SGP4',
+        });
+      }
+      document.body.style.cursor = 'pointer';
+    });
     input.onClick = (pick, x, y) => {
       if (this.demo.active) return;
       // live contacts outrank empty space AND the country pick — an
@@ -784,7 +825,9 @@ export class App implements AppApi {
       return;
     }
     this.liveLoaded.quakes = true;
+    this.liveQuakesList = r.data.quakes;
     this.quakesLayer.setQuakes(r.data.quakes);
+    this.events.emit('liveQuakes', { count: r.data.quakes.length });
     this.events.emit('toast', {
       title: 'LIVE SEISMIC',
       body: `${r.data.quakes.length} reported events (M2.5+, 24h) · ${r.data.upstream}`,
@@ -882,6 +925,10 @@ export class App implements AppApi {
 
   isLiveTracking(): boolean {
     return this.liveTracked !== null;
+  }
+
+  getLiveQuakes(): import('../live/feeds').LiveQuake[] | null {
+    return this.liveQuakesList;
   }
 
   releaseLiveTrack(): void {

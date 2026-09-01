@@ -1,11 +1,19 @@
 /**
  * Status bar — bottom-left mono readout of renderer vitals plus the
  * synthetic-data disclaimer chip. Throttled to ~4Hz.
+ *
+ * Market pulse: two quiet segments (EUR/USD fix, BTC last) for the
+ * trading desk's ambient awareness. Their basis rides in the title —
+ * an ECB daily fix is named as one — and when the feed is unreachable
+ * the segments are ABSENT, never zero.
  */
 
 import type { AppApi, AppEvents } from '../app/api';
+import { resolveApiBase } from '../data/sources';
+import { fetchCrypto, fetchFx } from '../live/markets';
 
 const THROTTLE_MS = 250;
+const MARKET_PULSE_MS = 120_000;
 
 function fmt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
@@ -30,6 +38,38 @@ export function createStatusBar(api: AppApi): { el: HTMLElement } {
   // detail segments yield on narrow viewports before colliding with the timeline
   altSeg.classList.add('pe-sb-opt');
   particlesSeg.classList.add('pe-sb-opt');
+
+  // ---- market pulse (absent until a feed answers)
+  const fxSeg = seg();
+  const btcSeg = seg();
+  fxSeg.hidden = true;
+  btcSeg.hidden = true;
+  const pollMarkets = async (): Promise<void> => {
+    const base = resolveApiBase();
+    const [fx, cr] = await Promise.all([fetchFx(base), fetchCrypto(base)]);
+    if (fx.kind === 'ok') {
+      const raw = fx.data.rates[fx.data.latestDate]?.EUR;
+      if (Number.isFinite(raw)) {
+        fxSeg.innerHTML = `EUR/USD <b>${(1 / raw).toFixed(4)}</b>`;
+        fxSeg.title = `ECB daily reference fix of ${fx.data.latestDate} — informational, not a tradeable quote (via frankfurter.dev)`;
+        fxSeg.hidden = false;
+      }
+    } else {
+      fxSeg.hidden = true;
+    }
+    if (cr.kind === 'ok') {
+      const btc = cr.data.products.find((p) => p.id === 'BTC-USD');
+      if (btc) {
+        btcSeg.innerHTML = `BTC <b>${Math.round(btc.last).toLocaleString('en-US')}</b>`;
+        btcSeg.title = 'Coinbase Exchange last trade — single-venue print, not an index';
+        btcSeg.hidden = false;
+      }
+    } else {
+      btcSeg.hidden = true;
+    }
+  };
+  void pollMarkets();
+  window.setInterval(() => void pollMarkets(), MARKET_PULSE_MS);
 
   const brushChip = document.createElement('span');
   brushChip.className = 'pe-sb-chip pe-sb-brush';

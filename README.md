@@ -72,8 +72,16 @@ npm run check    # seam + provenance + types
 - **D** — detection overlay: corner-bracket boxes + ids on every live contact in view
 - **1–5** — sensor style over the rendered feed: NORMAL / NVG / FLIR / CRT / NOIR
   (a GLSL post-pass on the WebGL canvas only — instruments stay untouched)
+- **Hover a live contact** — a tooltip identifies it before the click (name + basis)
 - **`/`** — focus the command bar / search
 - **Space** — play / pause simulation time
+- **ALERTS rail** (top right) — live hazards correlated with corpus assets
+  ("M5.6 · 240 km from Port of Callao"), labeled COMPUTED PROXIMITY with the
+  correlation radii printed on the rail, plus the corpus's own active
+  disruptions; click a row to focus the asset. With the seismic feed off the
+  rail says so and offers the toggle — it never correlates against nothing.
+- **Market pulse** (status bar) — EUR/USD (ECB daily fix) and BTC (Coinbase
+  last trade), basis in the tooltip; absent, never zero, when the feed is down
 - Command examples: `find toronto` · `show maritime` · `show aircraft` · `follow the load`
 
 ## Layer reference

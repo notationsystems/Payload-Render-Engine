@@ -75,6 +75,23 @@ export function createTooltip(api: AppApi): { el: HTMLElement } {
     render(id);
   });
 
+  // live contacts identify too — kind-colored chip, basis instead of
+  // state (an ADS-B fix has no corpus reading to show)
+  api.events.on('liveHover', (h) => {
+    if (currentId) return; // corpus hover wins
+    if (!h.active) {
+      el.hidden = true;
+      return;
+    }
+    const color = h.kind === 'satellite' ? '#ffd9a0' : '#bfe0ff';
+    el.innerHTML = `
+      <span class="pe-tt-kind" style="border-color:${color};color:${color}">${h.kind === 'satellite' ? 'SATELLITE' : 'AIRCRAFT'}</span>
+      <span class="pe-tt-name">${esc(h.name ?? '—')}</span>
+      <span class="pe-tt-state"><span class="pe-tt-dim">${esc(h.basis ?? '')} · CLICK TO TRACK</span></span>`;
+    el.hidden = false;
+    place();
+  });
+
   // live refresh while hovering (state advances with the clock)
   api.events.on('time', () => {
     if (currentId && !el.hidden) render(currentId);
