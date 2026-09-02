@@ -38,6 +38,22 @@ export function createInjectionCard(api: AppApi): { el: HTMLElement } {
           `<div class="pe-inject-depth"><span class="pe-inject-hop">HOP ${d}</span>${names.map(esc).join(' · ')}</div>`
       )
       .join('');
+    // state the baselines: how many of the frame's entities have an
+    // OBSERVED state at sim time. On this corpus the answer is usually
+    // zero — and that absence is worn, not implied: the propagation is
+    // structural, never a delta against a guess.
+    const frameIds = [impact.entityId, ...impact.affected.map((a) => a.entityId)].filter((id) =>
+      api.store.node(id)
+    );
+    const observedCount = frameIds.filter(
+      (id) => api.store.stateAt(id, api.clock.simTime).observed !== false
+    ).length;
+    const stateBasis =
+      frameIds.length === 0
+        ? 'STATE BASIS — none of the frame’s entities are in the loaded corpus'
+        : `STATE BASIS — ${observedCount} of ${frameIds.length} entity states OBSERVED at sim time${
+            observedCount === 0 ? ' (all UNOBSERVED)' : ''
+          }; the propagation runs over DECLARED structure (graph + stated capacity), never a delta against a guess`;
     const alts = impact.alternatives.length
       ? impact.alternatives
           .map(
@@ -53,6 +69,7 @@ export function createInjectionCard(api: AppApi): { el: HTMLElement } {
         <span class="pe-query-count">${impact.disruptedKtPerYear !== null ? `~${impact.disruptedKtPerYear} KT/Y DISRUPTED` : 'VOLUME UNMODELED'}</span>
       </div>
       <div class="pe-query-basis">${esc(disclaimer)}</div>
+      <div class="pe-query-basis pe-inject-statebasis">${esc(stateBasis)}</div>
       <div class="pe-inject-body">
         <div class="pe-inject-sec">AFFECTED DOWNSTREAM · ${impact.affected.length} (violet on the globe)</div>
         ${depthRows || '<div class="pe-inject-depth">none — the perturbation does not propagate in the modeled graph</div>'}

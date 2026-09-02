@@ -1856,3 +1856,4 @@ input {
     animation-duration: 0.01ms !important;
   }
 }
+.pe-inject-statebasis { color: #6b7688; } /* unobserved grey — absence is not zero */
