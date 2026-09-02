@@ -2,11 +2,15 @@
 
 **An interactive digital twin of the physical economy.**
 
-![Payload Earth — global network view](docs/media/global.png)
+![PayLoad OS — global network view](docs/media/global.png)
 
 | Night-side economy | Route inspector |
 | --- | --- |
 | ![Asia at night](docs/media/asia-night.png) | ![Route inspector](docs/media/route-inspector.png) |
+
+| Operations control tower | Derivatives desk | Live tracking |
+| --- | --- | --- |
+| ![Operations desk](docs/media/ops-desk.png) | ![Markets — derivatives](docs/media/markets-derivatives.png) | ![Live aircraft tracking](docs/media/live-track.png) |
 
 Payload Earth renders the machinery of trade — ports, rail terminals, refineries,
 warehouses, chokepoints — on a dark, cinematic WebGL globe. Four transport modes
@@ -184,6 +188,11 @@ The engineering record — the data/render seam, provenance discipline, the
 Assertion/Observation/Deviation model, the provider interface, the rendering
 pipeline, and the temporal model — lives in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+The **design language** — the semantic vocabulary (solid=observed,
+hollow=declared, dashed=hypothetical, absence stated), palette, z-bands,
+interaction grammar, and the honesty rule of every surface — lives in
+[`docs/DESIGN.md`](docs/DESIGN.md).
 
 ## License
 
