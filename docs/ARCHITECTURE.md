@@ -455,6 +455,26 @@ Payload's real propagation engine + VROOM re-optimization will produce
 `ScenarioImpact` frames through the identical contract, and nothing above
 the data layer changes when they do.
 
+### The upstream injection path (terminal corpus)
+
+The terminal corpus has no in-process engine — and now does not need
+one for what-if work: `GET /api/scenarios/inject` forwards a single
+hypothetical event to the Terminal's own counterfactual engine
+(`POST /api/economy/scenario`), which runs its state twice and
+answers with the counterfactual frame, the affected set by hop depth,
+disrupted volume, spare-capacity alternatives, and its verbatim
+reasoning trace. Honesty contract: the answer is computed upstream,
+so it carries NO corpusBuild; the frame kind `counterfactual` rides
+through untouched; and because this corpus's states are unobserved,
+the twin renders structural propagation only — the violet role
+treatment and the injection card — and never fabricates a baseline
+utilization delta to dress the result up as state. The SCENARIOS
+panel's WHAT-IF INJECTION controls drive it; Esc releases it first in
+the ladder. Alongside it, `GET /api/refusals` mirrors the upstream
+refused:* digest — every group one mechanism with one shared remedy,
+ranked by how often it blocked an answer — surfaced by the `refusals`
+command as a work queue.
+
 ## 14. The backend: the Spatial API (begun)
 
 The twin now has a server — `server/` — begun the way the user asked:

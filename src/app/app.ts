@@ -48,6 +48,7 @@ import { QuakesLayer } from '../layers/quakesLayer';
 import { BeaconsLayer } from '../layers/beaconsLayer';
 import { correlateQuakes, greatCircleKm } from '../intel/proximity';
 import { runMiner, type MinedPattern, type MiningRun } from '../intel/miner';
+import { fetchInjection, type InjectionOutcome, type InjectionParams } from '../data/injection';
 import { deadReckon, fetchLiveAircraft, fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
 import { resolveApiBase } from '../data/sources';
 import { LabelsLayer } from '../layers/labelsLayer';
@@ -1668,6 +1669,7 @@ export class App implements AppApi {
     const spec = this.scenarioCatalog.find((sp) => sp.id === id);
     if (!spec) return null;
     if (this.activeScenario) this.clearScenario();
+    this.clearInjection(); // one hypothetical frame at a time
 
     const impact = computeScenarioImpact(
       this.store.snapshot,
@@ -1711,6 +1713,61 @@ export class App implements AppApi {
 
   getActiveScenario(): ScenarioImpact | null {
     return this.activeScenario;
+  }
+
+  // ------------------------------------------------ what-if injection
+  // The UPSTREAM counterfactual engine's answer, worn honestly: the
+  // perturbed entity and its affected set take the violet scenario
+  // roles (dashed hypothetical vocabulary), the card carries the
+  // engine's own reasoning trace, and NO state delta is fabricated —
+  // this corpus's states are unobserved and stay that way.
+
+  private injectionActive = false;
+
+  async runInjection(p: InjectionParams): Promise<InjectionOutcome> {
+    const outcome = await fetchInjection(resolveApiBase(), p);
+    if (outcome.kind !== 'ok') return outcome;
+    // one lit structure at a time — injection displaces the others
+    this.clearInjection();
+    this.clearMinedPattern();
+    this.clearQuery();
+    if (this.activeScenario) this.clearScenario();
+    const impact = outcome.result.scenarioImpacts[0];
+    if (impact) {
+      if (this.store.node(impact.entityId)) this.nodesLayer.setScenarioRole(impact.entityId, 1);
+      for (const a of impact.affected) {
+        if (this.store.node(a.entityId)) this.nodesLayer.setScenarioRole(a.entityId, 2);
+      }
+      const n = this.store.node(impact.entityId);
+      if (n) {
+        void this.cameraCtl.flyToLatLon(n.geometry.coordinates[1], n.geometry.coordinates[0], {
+          distance: 2.4,
+          durationMs: 1300,
+        });
+      }
+    }
+    this.injectionActive = true;
+    this.events.emit('injection', { active: true, result: outcome.result, disclaimer: outcome.disclaimer });
+    this.events.emit('toast', {
+      title: 'WHAT-IF INJECTED — HYPOTHETICAL',
+      body: `${outcome.result.counterfactualFrame.scenarioLabel} — computed upstream; a simulated outcome is not an outcome.`,
+      tone: 'warn',
+    });
+    return outcome;
+  }
+
+  clearInjection(): void {
+    if (!this.injectionActive) return;
+    this.injectionActive = false;
+    // roles are shared with in-process scenarios; only safe to wipe
+    // because entering either path clears the other first
+    this.nodesLayer.clearScenarioRoles();
+    this.routesLayer.clearScenarioRoles();
+    this.events.emit('injection', { active: false });
+  }
+
+  isInjectionActive(): boolean {
+    return this.injectionActive;
   }
 
   getDataSourceId(): string {

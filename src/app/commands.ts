@@ -173,6 +173,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'patterns', label: 'patterns — mined candidates', hint: 'MINER' },
   { text: 'corpus', label: 'corpus — definition of the loaded corpus', hint: 'CORPUS' },
   { text: 'compiler', label: 'compiler — build + conservation report', hint: 'BUILD' },
+  { text: 'refusals', label: 'refusals — the refused:* work queue', hint: 'QUEUE' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -323,6 +324,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'compiler' || lower === 'build' || lower === 'builds') {
     window.dispatchEvent(new CustomEvent('pe:compiler-toggle'));
     return ok('COMPILER CONSOLE — build identity · record census · conservation report');
+  }
+
+  // -- refusals work queue: what the upstream declined, with remedies
+  if (lower === 'refusals' || lower === 'refused' || lower === 'queue') {
+    window.dispatchEvent(new CustomEvent('pe:refusals-toggle'));
+    return ok('REFUSALS WORK QUEUE — one mechanism per group, one shared remedy, ranked');
   }
   if (lower === 'clear pattern' || lower === 'exit pattern') {
     api.clearMinedPattern();

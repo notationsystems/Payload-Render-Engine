@@ -140,6 +140,122 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
   impactBox.className = 'sc-impact sc-hidden-guard';
   impactBox.hidden = true;
 
+  // ---- what-if injection: the UPSTREAM counterfactual engine --------------
+  // Capability probed by use: the route refuses on corpora without an
+  // upstream engine, and the refusal renders here with its remedy.
+
+  const injTitle = document.createElement('div');
+  injTitle.className = 'os-card-title sc-title';
+  injTitle.textContent = 'WHAT-IF INJECTION — UPSTREAM ENGINE, COMPUTED NOT OBSERVED';
+
+  const injectBox = document.createElement('div');
+  injectBox.className = 'sc-inject';
+
+  let injType = 'strike';
+  let injSeverity = 'high';
+  let injCommodity = 'copper';
+  let injEntity = ''; // survives control rebuilds on chip clicks
+
+  const injStatus = document.createElement('div');
+  injStatus.className = 'sc-inject-status';
+  injStatus.textContent =
+    'Inject a hypothetical event at a corpus entity and watch the upstream engine propagate it. Violet = hypothetical, never state.';
+
+  const buildInjectControls = (): void => {
+    injectBox.replaceChildren();
+    const entityRow = document.createElement('div');
+    entityRow.className = 'sc-inject-row';
+    const input = document.createElement('input');
+    input.className = 'sc-inject-input';
+    input.type = 'text';
+    input.placeholder = 'entity — name or id (e.g. Escondida)';
+    input.value = injEntity;
+    input.addEventListener('input', () => (injEntity = input.value));
+    const useSel = document.createElement('button');
+    useSel.type = 'button';
+    useSel.className = 'sc-inject-chip';
+    useSel.textContent = 'USE SELECTED';
+    useSel.title = 'Fill from the current globe selection';
+    useSel.addEventListener('click', () => {
+      const id = api.getSelection();
+      const n = id ? api.store.node(id) : null;
+      if (n) {
+        input.value = n.name;
+        injEntity = n.name;
+      }
+    });
+    entityRow.append(input, useSel);
+
+    const chipRow = (
+      label: string,
+      options: readonly string[],
+      get: () => string,
+      set: (v: string) => void
+    ): HTMLElement => {
+      const row = document.createElement('div');
+      row.className = 'sc-inject-row';
+      const l = document.createElement('span');
+      l.className = 'sc-inject-label';
+      l.textContent = label;
+      row.appendChild(l);
+      for (const opt of options) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `sc-inject-chip ${get() === opt ? 'on' : ''}`;
+        b.textContent = opt.replace(/_/g, ' ').toUpperCase();
+        b.addEventListener('click', () => {
+          set(opt);
+          buildInjectControls();
+        });
+        row.appendChild(b);
+      }
+      return row;
+    };
+
+    const commoditySlugs = api.store.snapshot.commodities.map((c) => c.id.split(':').pop() ?? c.id);
+    if (commoditySlugs.length && !commoditySlugs.includes(injCommodity)) injCommodity = commoditySlugs[0];
+    const run = document.createElement('button');
+    run.type = 'button';
+    run.className = 'sc-run sc-inject-run';
+    run.textContent = 'RUN INJECTION';
+    run.addEventListener('click', () => {
+      const term = input.value.trim();
+      if (!term) {
+        injStatus.textContent = 'NAME AN ENTITY — type a name or USE SELECTED.';
+        return;
+      }
+      // resolve by name through the corpus's own search — never a guess
+      const hit = api.search(term).find((r) => api.store.node(r.id));
+      if (!hit) {
+        injStatus.textContent = `NO FACILITY MATCHING "${term.toUpperCase()}" IN THE LOADED CORPUS.`;
+        return;
+      }
+      injStatus.textContent = `INJECTING ${injSeverity.toUpperCase()} ${injType.toUpperCase()} AT ${hit.name.toUpperCase()} — asking the upstream engine…`;
+      void api
+        .runInjection({ entityId: hit.id, type: injType, severity: injSeverity, commodity: injCommodity })
+        .then((out) => {
+          if (out.kind === 'ok') {
+            const n = out.result.scenarioImpacts[0]?.affected.length ?? 0;
+            injStatus.textContent = `HYPOTHETICAL ENTERED — ${n} downstream entities affected (violet). EXIT with Esc or the card.`;
+          } else if (out.kind === 'refused') {
+            injStatus.textContent = `${out.refusal.kind.replace(/_/g, ' ')} — ${out.refusal.message} · REMEDY: ${out.refusal.remedy}`;
+          } else {
+            injStatus.textContent = out.note;
+          }
+        });
+    });
+
+    injectBox.append(
+      entityRow,
+      chipRow('TYPE', ['strike', 'closure', 'outage', 'disruption', 'sanction'], () => injType, (v) => (injType = v)),
+      chipRow('SEVERITY', ['low', 'medium', 'high'], () => injSeverity, (v) => (injSeverity = v)),
+      chipRow('COMMODITY', commoditySlugs.length ? commoditySlugs : ['copper'], () => injCommodity, (v) => (injCommodity = v)),
+      run,
+      injStatus
+    );
+  };
+  buildInjectControls();
+
   const renderCatalog = (activeId: EntityId | null): void => {
     catalog.innerHTML = '';
     if (api.scenariosUnavailableReason && api.listScenarios().length === 0) {
@@ -316,7 +432,7 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
     list.appendChild(row);
   }
 
-  el.append(header, frames, critTitle, crit, cfTitle, catalog, impactBox, listTitle, list);
+  el.append(header, frames, critTitle, crit, cfTitle, catalog, impactBox, injTitle, injectBox, listTitle, list);
 
   api.events.on('preset', ({ preset }) => {
     el.hidden = preset !== 'scenarios';

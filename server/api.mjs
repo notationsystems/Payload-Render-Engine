@@ -270,6 +270,65 @@ export async function registerRoutes(corpus) {
     return ok(miningResult);
   });
 
+  // ---- the refused:* work queue, mirrored. Everything the UPSTREAM
+  // declined to answer while building its state, grouped by refusal
+  // mechanism with the mechanism's ONE shared remedy, ranked by how
+  // often it blocked an answer — a work order, and the most honest
+  // artifact a corpus can publish about itself.
+  get('/api/refusals', async ({ query }) => {
+    if (corpus.kind !== 'terminal') {
+      return refuse(
+        'REFUSALS_QUEUE_UNSUPPORTED_FOR_CORPUS',
+        `corpus '${corpus.kind}' keeps no upstream refusal queue — an authored corpus declines nothing during a compile`,
+        'load the terminal corpus (CORPUS=terminal); its upstream keeps the refused:* digest'
+      );
+    }
+    const commodity = query.get('commodity') ?? 'copper';
+    if (!/^[a-z][a-z-]{0,31}$/.test(commodity)) {
+      return refuse('REFUSALS_REQUEST_INVALID', 'commodity must be a lowercase slug (e.g. copper, aluminium)', 'pass the commodity slug the corpus lists');
+    }
+    const upstreamBase = process.env.TERMINAL_URL ?? 'http://127.0.0.1:3000';
+    let res;
+    try {
+      res = await fetch(`${upstreamBase}/api/economy/refusals?commodity=${encodeURIComponent(commodity)}`, {
+        headers: { Accept: 'application/json' },
+      });
+    } catch (err) {
+      return refuse(
+        'REFUSALS_UPSTREAM_UNREACHABLE',
+        `the Terminal at ${upstreamBase} did not answer: ${err?.message ?? err}`,
+        'start payload-terminal-v0 (TERMINAL_URL); the refusal digest lives there'
+      );
+    }
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      return refuse('REFUSALS_UPSTREAM_UNREADABLE', `the Terminal answered HTTP ${res.status} without readable JSON`, 'check the Terminal deployment');
+    }
+    if (!res.ok || body?.error) {
+      return refuse('REFUSALS_REFUSED_UPSTREAM', body?.error ?? `the digest answered HTTP ${res.status}`, 'check commodity against the upstream vocabulary');
+    }
+    if (!Array.isArray(body?.byType)) {
+      return refuse('REFUSALS_UPSTREAM_UNREADABLE', 'the Terminal answered without a byType digest', 'check the Terminal version; this route speaks the refusals contract');
+    }
+    return {
+      ...ok(body),
+      meta: {
+        ...meta(RANGE.now, 'best_known'),
+        // computed upstream over upstream state — not this build
+        corpusBuild: undefined,
+        sourceClass: 'terminal:refusals',
+        valueKind: 'per_record',
+        admissible: null,
+        admissibleBasis: 'refusal_digest',
+        upstream: `${upstreamBase}/api/economy/refusals`,
+        disclaimer:
+          "the refused:* work queue — everything the upstream DECLINED to answer, each group one mechanism with one shared remedy; absence of an answer, stated, never silently dropped",
+      },
+    };
+  });
+
   // ---- corpus definition: the corpus as a MANUFACTURED artifact of
   // the corpus machinery — 𝒞 = F(ontology, sources, extraction,
   // resolution, validation, mining, policy, publication). The DECLARED
@@ -655,6 +714,98 @@ export async function registerRoutes(corpus) {
   registerMarketRoutes(get, { ok, refuse, meta });
 
   get('/api/scenarios', () => scenarioGuard() ?? ok(scenarios));
+
+  // ---- terminal counterfactuals: what-if injection through the
+  // UPSTREAM scenario engine (POST /api/economy/scenario). The answer
+  // is computed upstream over upstream state — it is NOT a projection
+  // of this service's corpus build, so it carries no corpusBuild
+  // (same doctrine as live/market answers). The upstream frame kind
+  // 'counterfactual' + knowledge mode ride through untouched: a
+  // hypothetical can never be read as a reconstruction.
+  const INJECT_TYPES = new Set(['outage', 'strike', 'closure', 'expansion', 'disruption', 'weather', 'policy', 'demand_surge', 'sanction', 'insolvency']);
+  const INJECT_SEVERITIES = new Set(['low', 'medium', 'high']);
+  get('/api/scenarios/inject', async ({ query }) => {
+    if (corpus.kind !== 'terminal') {
+      return refuse(
+        'INJECTION_UNSUPPORTED_FOR_CORPUS',
+        `corpus '${corpus.kind}' has no upstream counterfactual engine — its scenarios run in-process`,
+        "use the in-process catalog (/api/scenarios) on this corpus; injection is the Terminal corpus's capability"
+      );
+    }
+    const entityId = query.get('entityId');
+    if (!entityId || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(entityId)) {
+      return refuse('INJECTION_REQUEST_INVALID', 'entityId is required (a bounded upstream id, e.g. ent:mine:escondida)', 'pass the entity id exactly as the corpus carries it');
+    }
+    const type = query.get('type') ?? 'closure';
+    if (!INJECT_TYPES.has(type)) {
+      return refuse('INJECTION_REQUEST_INVALID', `event type '${type}' is not in the upstream vocabulary`, `use one of: ${[...INJECT_TYPES].join(', ')}`);
+    }
+    const severity = query.get('severity') ?? 'high';
+    if (!INJECT_SEVERITIES.has(severity)) {
+      return refuse('INJECTION_REQUEST_INVALID', `severity '${severity}' is not in the upstream vocabulary`, 'use low, medium, or high');
+    }
+    const commodity = query.get('commodity') ?? 'copper';
+    if (!/^[a-z][a-z-]{0,31}$/.test(commodity)) {
+      return refuse('INJECTION_REQUEST_INVALID', 'commodity must be a lowercase slug (e.g. copper, aluminium)', 'pass the commodity slug the corpus lists');
+    }
+    const upstreamBase = process.env.TERMINAL_URL ?? 'http://127.0.0.1:3000';
+    const title = `${severity} ${type} at ${entityId} (what-if)`;
+    let res;
+    try {
+      res = await fetch(`${upstreamBase}/api/economy/scenario`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({
+          commodity,
+          label: title,
+          events: [
+            { entityId, type, title, start: RANGE.now.slice(0, 10), severity },
+          ],
+        }),
+      });
+    } catch (err) {
+      return refuse(
+        'INJECTION_UPSTREAM_UNREACHABLE',
+        `the Terminal at ${upstreamBase} did not answer: ${err?.message ?? err}`,
+        'start payload-terminal-v0 (TERMINAL_URL); the scenario engine runs there'
+      );
+    }
+    let body;
+    try {
+      body = await res.json();
+    } catch {
+      return refuse('INJECTION_UPSTREAM_UNREADABLE', `the Terminal answered HTTP ${res.status} without readable JSON`, 'check the Terminal deployment');
+    }
+    if (!res.ok || body?.error) {
+      return refuse(
+        'INJECTION_REFUSED_UPSTREAM',
+        body?.error ?? `the scenario engine answered HTTP ${res.status}`,
+        'the upstream vocabulary decides — check entity id and commodity against the loaded corpus'
+      );
+    }
+    if (body?.counterfactualFrame?.kind !== 'counterfactual') {
+      return refuse(
+        'INJECTION_UPSTREAM_UNREADABLE',
+        'the Terminal answered without a counterfactual frame — refusing to serve an unframed hypothetical',
+        'check the Terminal version; this route speaks the scenario contract'
+      );
+    }
+    return {
+      ...ok(body),
+      meta: {
+        ...meta(RANGE.now, body.counterfactualFrame.knowledge ?? 'best_known', body.counterfactualFrame),
+        // computed upstream over upstream state — NOT this build
+        corpusBuild: undefined,
+        sourceClass: 'terminal:counterfactual',
+        valueKind: 'computed',
+        admissible: false,
+        admissibleBasis: 'hypothetical_frame',
+        upstream: `${upstreamBase}/api/economy/scenario`,
+        disclaimer:
+          'HYPOTHETICAL — computed by the Terminal scenario engine (frame kind counterfactual). A simulated outcome is not an outcome.',
+      },
+    };
+  });
 
   get('/api/scenarios/rank', ({ query }) => {
     const guard = scenarioGuard();

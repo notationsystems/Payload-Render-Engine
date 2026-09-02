@@ -296,6 +296,43 @@ check(
   'capabilities listing names the mining route'
 );
 
+// what-if injection + refusals queue: upstream capabilities, typed everywhere
+console.log('\n— injection + refusals mirrors —');
+const injSynth = await call('GET', '/api/scenarios/inject?entityId=ent:mine:escondida');
+check(
+  injSynth?.status === 'refused' && injSynth.refusal.kind === 'INJECTION_UNSUPPORTED_FOR_CORPUS',
+  'injection on a corpus without an upstream engine → typed refusal'
+);
+const refSynth = await call('GET', '/api/refusals');
+check(
+  refSynth?.status === 'refused' && refSynth.refusal.kind === 'REFUSALS_QUEUE_UNSUPPORTED_FOR_CORPUS',
+  'refusals queue on an authored corpus → typed refusal (declines nothing during a compile)'
+);
+const injNoEntity = await tcall('GET', '/api/scenarios/inject');
+check(
+  injNoEntity?.status === 'refused' && injNoEntity.refusal.kind === 'INJECTION_REQUEST_INVALID',
+  'injection without an entity refused before any upstream call'
+);
+const injBadType = await tcall('GET', '/api/scenarios/inject?entityId=ent:mine:escondida&type=meteor');
+check(
+  injBadType?.status === 'refused' && /vocabulary/.test(injBadType.refusal.message),
+  'event type outside the upstream vocabulary refused, vocabulary named'
+);
+const savedTermUrl = process.env.TERMINAL_URL;
+process.env.TERMINAL_URL = 'http://127.0.0.1:1'; // nothing listens here
+const injDown = await tcall('GET', '/api/scenarios/inject?entityId=ent:mine:escondida&type=strike');
+check(
+  injDown?.status === 'refused' && injDown.refusal.kind === 'INJECTION_UPSTREAM_UNREACHABLE',
+  'unreachable engine → typed refusal, never a fabricated hypothetical'
+);
+const refDown = await tcall('GET', '/api/refusals?commodity=copper');
+check(
+  refDown?.status === 'refused' && refDown.refusal.kind === 'REFUSALS_UPSTREAM_UNREACHABLE',
+  'unreachable digest → typed refusal, never an empty queue'
+);
+if (savedTermUrl === undefined) delete process.env.TERMINAL_URL;
+else process.env.TERMINAL_URL = savedTermUrl;
+
 // corpus definition: the corpus as a manufactured, self-describing artifact
 console.log('\n— corpus definition —');
 const defEnv = await call('GET', '/api/corpus/definition');

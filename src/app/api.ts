@@ -148,6 +148,12 @@ export interface AppEvents extends Record<string, unknown> {
   };
   /** A mined pattern candidate lit/cleared on the globe. */
   pattern: { active: boolean; pattern?: import('../intel/miner').MinedPattern };
+  /** An upstream what-if injection entered/exited (hypothetical violet). */
+  injection: {
+    active: boolean;
+    result?: import('../data/injection').InjectionResult;
+    disclaimer?: string;
+  };
   /** Shift-click pin toggle for A/B comparison (selection untouched). */
   pin: { id: EntityId };
   /** Live seismic feed loaded/refreshed (count of reported events). */
@@ -284,4 +290,14 @@ export interface AppApi {
   runScenario(id: EntityId): ScenarioImpact | null;
   clearScenario(): void;
   getActiveScenario(): ScenarioImpact | null;
+
+  /** What-if injection through the UPSTREAM counterfactual engine
+   *  (terminal corpus). Structural propagation only — affected set,
+   *  disrupted volume, alternatives, reasoning trace — rendered in
+   *  hypothetical violet; no state delta is ever fabricated. */
+  runInjection(
+    p: import('../data/injection').InjectionParams
+  ): Promise<import('../data/injection').InjectionOutcome>;
+  clearInjection(): void;
+  isInjectionActive(): boolean;
 }

@@ -33,6 +33,8 @@ import { createQueryCard } from './ui/queryCard';
 import { createPatternsPanel } from './ui/patternsPanel';
 import { createCorpusPanel } from './ui/corpusPanel';
 import { createCompilerPanel } from './ui/compilerPanel';
+import { createInjectionCard } from './ui/injectionCard';
+import { createRefusalsPanel } from './ui/refusalsPanel';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -78,6 +80,8 @@ async function start(): Promise<void> {
   hud.appendChild(createPatternsPanel(app).el);
   hud.appendChild(createCorpusPanel(app).el);
   hud.appendChild(createCompilerPanel(app).el);
+  hud.appendChild(createInjectionCard(app).el);
+  hud.appendChild(createRefusalsPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 
@@ -95,6 +99,7 @@ async function start(): Promise<void> {
     if (document.querySelector('.pe-corpus:not([hidden])')) return;
     if (app.isDemoActive()) app.stopFollowTheLoad();
     else if (app.isLiveTracking()) app.releaseLiveTrack();
+    else if (app.isInjectionActive()) app.clearInjection();
     else if (app.isPatternActive()) app.clearMinedPattern();
     else if (app.isQueryActive()) app.clearQuery();
     else if (

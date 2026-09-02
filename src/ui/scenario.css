@@ -426,3 +426,61 @@
   font-size: 10px;
   color: var(--text-dim);
 }
+
+/* ---- what-if injection controls (upstream counterfactual engine) ---- */
+.sc-inject {
+  padding: 8px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sc-inject-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.sc-inject-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  width: 72px;
+}
+.sc-inject-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 4px 8px;
+  background: rgba(120, 160, 200, 0.06);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-hi);
+  outline: none;
+}
+.sc-inject-input:focus { border-color: #d98cff; }
+.sc-inject-chip {
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--text-mid);
+  cursor: pointer;
+}
+.sc-inject-chip:hover { color: var(--text-hi); border-color: var(--text-dim); }
+.sc-inject-chip.on {
+  color: #d98cff;
+  border-color: #d98cff;
+  background: rgba(217, 140, 255, 0.08);
+}
+.sc-inject-run { align-self: flex-start; }
+.sc-inject-status {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
