@@ -1496,6 +1496,15 @@ input {
   line-height: 1.55;
   color: var(--text-mid);
 }
+/* the compiler console shares the corpus overlay idiom; the identity
+   shift is the maritime-teal machinery accent */
+.pe-compiler { border-top-color: var(--mode-maritime); }
+.pe-compiler .pe-corpus-kicker { color: var(--mode-maritime); border-color: var(--mode-maritime); }
+.pe-compiler .pe-corpus-banner {
+  color: var(--mode-maritime);
+  border-color: rgba(56, 214, 200, 0.4);
+}
+.pe-compiler-note { color: var(--text-dim); font-size: 9.5px; font-style: italic; }
 
 /* ------------------------------------------------------------------ */
 /* pin-to-compare — shift-click A/B cards + delta strip                */

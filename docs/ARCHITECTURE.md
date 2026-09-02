@@ -782,7 +782,12 @@ serves the assembled artifact:
 The renderer wears it: the `corpus` command opens the definition
 overlay (declared rules · derived censuses · stated absences); on the
 in-browser corpus the surface refuses with a remedy instead of
-reconstructing a definition client-side.
+reconstructing a definition client-side. Its sibling, the `compiler`
+command, opens the **Compiler console** — build identity, record
+census, and the loader's conservation report (exclusions grouped WITH
+their reasons, unresolved cross-references, upstream reconciliation,
+RELATE derivations) — the build/maintain instrument for the corpus
+machinery itself.
 
 ### What this reserves
 

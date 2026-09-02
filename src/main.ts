@@ -32,6 +32,7 @@ import { createPinsPanel } from './ui/pinsPanel';
 import { createQueryCard } from './ui/queryCard';
 import { createPatternsPanel } from './ui/patternsPanel';
 import { createCorpusPanel } from './ui/corpusPanel';
+import { createCompilerPanel } from './ui/compilerPanel';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -76,6 +77,7 @@ async function start(): Promise<void> {
   hud.appendChild(createQueryCard(app).el);
   hud.appendChild(createPatternsPanel(app).el);
   hud.appendChild(createCorpusPanel(app).el);
+  hud.appendChild(createCompilerPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 
