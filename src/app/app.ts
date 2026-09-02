@@ -46,7 +46,7 @@ import { SatsLayer } from '../layers/satsLayer';
 import { AircraftLayer } from '../layers/aircraftLayer';
 import { QuakesLayer } from '../layers/quakesLayer';
 import { BeaconsLayer } from '../layers/beaconsLayer';
-import { correlateQuakes } from '../intel/proximity';
+import { correlateQuakes, greatCircleKm } from '../intel/proximity';
 import { deadReckon, fetchLiveAircraft, fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
 import { resolveApiBase } from '../data/sources';
 import { LabelsLayer } from '../layers/labelsLayer';
@@ -93,7 +93,10 @@ export class App implements AppApi {
   private aircraftLayer!: AircraftLayer;
   private aircraftTimer: number | undefined;
   private aircraftBucket = '';
+  private quakesTimer: number | undefined;
   private liveTracked: { kind: 'aircraft' | 'satellite'; i: number } | null = null;
+  /** identity anchor for a tracked aircraft — polls replace the array */
+  private liveTrackedHex: string | null = null;
   private sensorMode: 0 | 1 | 2 | 3 | 4 = 0;
   /** Reported quakes once the seismic feed loads — null = not loaded. */
   private liveQuakesList: import('../live/feeds').LiveQuake[] | null = null;
@@ -223,6 +226,9 @@ export class App implements AppApi {
           tone: 'info',
         });
       }
+      // a drag while tracking hands the camera back — the chase must
+      // never rubber-band against the operator's own hand
+      if (this.liveTracked) this.releaseLiveTrack();
     };
 
     // temporal spine
@@ -249,7 +255,7 @@ export class App implements AppApi {
       this.opsArc.update(dt);
       this.satsLayer.update();
       this.aircraftLayer.update();
-      this.updateLiveTrack();
+      this.updateLiveTrack(false, dt);
       this.quakesLayer.update(dt);
       this.beacons.update(elapsed);
       this.labelsLayer.update(this.engine.camera, this.nodesLayer, alt);
@@ -444,6 +450,14 @@ export class App implements AppApi {
     m.register('live.seismic', (v) => {
       this.quakesLayer.setVisible(v);
       if (v && !this.liveLoaded.quakes) void this.loadLiveQuakes();
+      // report ages drift and new events happen: refresh the 24h feed
+      // every 5 minutes while the layer is on (server caches 5 min too)
+      if (v && this.quakesTimer === undefined) {
+        this.quakesTimer = window.setInterval(() => void this.loadLiveQuakes(), 5 * 60_000);
+      } else if (!v && this.quakesTimer !== undefined) {
+        window.clearInterval(this.quakesTimer);
+        this.quakesTimer = undefined;
+      }
     });
     for (const bucket of [
       'infra.ports',
@@ -858,14 +872,18 @@ export class App implements AppApi {
 
   // ---------------------------------------------------- live tracking
 
-  /** Poll observed air traffic around the camera subpoint (30s cadence,
-   *  immediate refetch when the subpoint moves to a new degree bucket). */
+  /** Poll observed air traffic around the camera subpoint: every 30s,
+   *  or within 5s of the subpoint moving to a new degree bucket. */
+  private aircraftLastPollMs = 0;
+  private aircraftToastBucket = '';
+
   private startAircraftPolling(): void {
     if (this.aircraftTimer !== undefined) return;
     const poll = async (): Promise<void> => {
       const sub = vec3ToLatLon(this.engine.camera.position.clone().normalize());
       const bucket = `${Math.round(sub.lat)}:${Math.round(sub.lon)}`;
       this.aircraftBucket = bucket;
+      this.aircraftLastPollMs = Date.now();
       const r = await fetchLiveAircraft(resolveApiBase(), [sub.lon, sub.lat]);
       if (r.kind !== 'ok') {
         this.events.emit('toast', {
@@ -876,19 +894,32 @@ export class App implements AppApi {
         return;
       }
       this.aircraftLayer.setAircraft(r.data.aircraft);
-      this.events.emit('toast', {
-        title: 'LIVE AIRCRAFT',
-        body: `${r.data.aircraft.length} ADS-B contacts within 250 NM of ${r.data.center.lat}°, ${r.data.center.lon}° · OBSERVED, dead-reckoned between fixes`,
-        tone: 'info',
-      });
+      // a poll replaces the contacts array — a tracked aircraft is
+      // re-anchored BY IDENTITY (hex), never left to whatever contact
+      // now occupies its old index; a contact gone from the snapshot
+      // releases the track rather than silently swapping planes
+      if (this.liveTracked?.kind === 'aircraft') {
+        const j = r.data.aircraft.findIndex((a) => a.hex === this.liveTrackedHex);
+        if (j >= 0) this.liveTracked.i = j;
+        else this.releaseLiveTrack();
+      }
+      // the toast announces a REGION, not every refresh of the same one
+      if (bucket !== this.aircraftToastBucket) {
+        this.aircraftToastBucket = bucket;
+        this.events.emit('toast', {
+          title: 'LIVE AIRCRAFT',
+          body: `${r.data.aircraft.length} ADS-B contacts within 250 NM of ${r.data.center.lat}°, ${r.data.center.lon}° · OBSERVED, dead-reckoned between fixes`,
+          tone: 'info',
+        });
+      }
     };
     void poll();
     this.aircraftTimer = window.setInterval(() => {
       const sub = vec3ToLatLon(this.engine.camera.position.clone().normalize());
       const bucket = `${Math.round(sub.lat)}:${Math.round(sub.lon)}`;
-      if (bucket !== this.aircraftBucket) void poll();
-      else void poll();
-    }, 30_000);
+      const due = Date.now() - this.aircraftLastPollMs >= 30_000;
+      if (bucket !== this.aircraftBucket || due) void poll();
+    }, 5_000);
   }
 
   private stopAircraftPolling(): void {
@@ -934,6 +965,7 @@ export class App implements AppApi {
 
   private startLiveTrack(t: { kind: 'aircraft' | 'satellite'; i: number }): void {
     this.liveTracked = t;
+    this.liveTrackedHex = t.kind === 'aircraft' ? (this.aircraftLayer.contacts[t.i]?.hex ?? null) : null;
     this.trailPts = [];
     if (this.trail) {
       this.engine.scene.remove(this.trail);
@@ -983,6 +1015,7 @@ export class App implements AppApi {
 
   releaseLiveTrack(): void {
     this.liveTracked = null;
+    this.liveTrackedHex = null;
     if (this.trail) {
       this.engine.scene.remove(this.trail);
       this.trail.geometry.dispose();
@@ -999,14 +1032,15 @@ export class App implements AppApi {
     const cur = contacts[this.liveTracked.i];
     const nowMs = Date.now();
     const here = deadReckon(cur, nowMs) ?? cur.lonLat;
-    // nearest other alive contact by great-circle angle
+    // nearest other alive contact by TRUE great-circle distance —
+    // flat degree math lies near the poles and across the antimeridian
     let bestI = -1;
     let bestD = Infinity;
     for (let i = 0; i < contacts.length; i++) {
       if (i === this.liveTracked.i) continue;
       const ll = deadReckon(contacts[i], nowMs);
       if (!ll) continue;
-      const d = Math.hypot(ll[0] - here[0], ll[1] - here[1]);
+      const d = greatCircleKm(here[0], here[1], ll[0], ll[1]);
       if (d < bestD) {
         bestD = d;
         bestI = i;
@@ -1082,7 +1116,7 @@ export class App implements AppApi {
 
   /** Per-frame: chase the tracked contact, extend its trail, refresh
    *  the readout. Basis honesty rides in every readout emit. */
-  private updateLiveTrack(force = false): void {
+  private updateLiveTrack(force = false, dt = 1 / 60): void {
     if (!this.liveTracked) return;
     const nowMs = Date.now();
     let lat: number;
@@ -1140,7 +1174,9 @@ export class App implements AppApi {
     }
     info.lat = lat;
     info.lon = lon;
-    this.cameraCtl.followLatLon(lat, lon, force ? 1 : 0.06);
+    // frame-rate-independent chase: the same stiffness at 60Hz and 144Hz
+    const ease = force ? 1 : 1 - Math.pow(1 - 0.06, dt * 60);
+    this.cameraCtl.followLatLon(lat, lon, ease);
     this.events.emit('liveTrack', info);
 
     // fading trail: one vertex per second, capped

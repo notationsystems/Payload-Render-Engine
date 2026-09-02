@@ -29,9 +29,17 @@ import { fileURLToPath } from 'node:url';
 if (process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy) {
   try {
     const { EnvHttpProxyAgent, setGlobalDispatcher } = await import('undici');
-    setGlobalDispatcher(new EnvHttpProxyAgent());
-  } catch {
-    console.warn('[live] proxy env set but undici unavailable — using direct egress');
+    // EnvHttpProxyAgent honors ONLY an explicit NO_PROXY — it has no
+    // implicit loopback exemption. The Terminal mirror and the IBKR
+    // gateway are localhost fetches from this same process; without a
+    // bypass they would tunnel to the remote proxy's OWN loopback and
+    // refuse. Operator NO_PROXY wins when set; loopback is the floor.
+    const noProxy = process.env.NO_PROXY ?? process.env.no_proxy ?? 'localhost,127.0.0.1,::1';
+    setGlobalDispatcher(new EnvHttpProxyAgent({ noProxy }));
+  } catch (err) {
+    console.warn(
+      `[live] proxy env set but no proxy dispatcher could be built (${err?.message ?? err}) — using direct egress`
+    );
   }
 }
 

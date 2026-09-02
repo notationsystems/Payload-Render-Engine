@@ -31,6 +31,7 @@ export class SatsLayer {
   private positions!: Float32Array;
   private colors!: Float32Array;
   private sizes!: Float32Array;
+  private baseSizes!: Float32Array;
   private lastPropagate = 0;
   /** last propagated geodetic fix per sat (null = failed/decayed) */
   lastProp: ({ lonLat: [number, number]; altitudeKm: number; tleAgeHours: number } | null)[] = [];
@@ -80,6 +81,7 @@ export class SatsLayer {
       this.colors[i * 3 + 2] = c.b;
       this.sizes[i] = sats[i].name.startsWith('ISS') ? 0.1 : 0.045;
     }
+    this.baseSizes = this.sizes.slice();
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     this.geo.setAttribute('aColor', new THREE.BufferAttribute(this.colors, 3));
     this.geo.setAttribute('aSize', new THREE.BufferAttribute(this.sizes, 1));
@@ -114,6 +116,9 @@ export class SatsLayer {
         this.sizes[i] = 0;
         continue;
       }
+      // a later successful propagation restores the size a transient
+      // failure zeroed — recovery never leaves an invisible trackable dot
+      this.sizes[i] = this.baseSizes[i];
       const r = 1 + p.altitudeKm / EARTH_KM;
       const v = latLonToVec3(p.lonLat[1], p.lonLat[0], r);
       this.positions[i * 3] = v.x;

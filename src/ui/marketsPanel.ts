@@ -332,12 +332,17 @@ export function createMarketsPanel(api: AppApi): { el: HTMLElement } {
       const peakOi = Math.max(...dated.map((f) => f.openInterest), 1);
       for (const f of dated) {
         const basis = annualizedBasis(f, nowMs);
+        // a null basis has two distinct causes — say which one
+        const nearExpiry =
+          f.expiryIso !== null &&
+          Number.isFinite(Date.parse(f.expiryIso)) &&
+          Date.parse(f.expiryIso) - nowMs < 86_400_000;
         const row = document.createElement('div');
         row.className = 'mk-term-row';
         row.innerHTML = `
           <span class="mk-term-exp">${esc(fmtExpiry(f.expiryIso))}</span>
           <span class="mk-term-mark">${esc(fmtN(f.markPrice, 1))}</span>
-          <span class="mk-term-basis ${basis !== null ? pctClass(basis) : ''}">${basis !== null ? esc(signedPct(basis, 2)) : '<1D'}</span>
+          <span class="mk-term-basis ${basis !== null ? pctClass(basis) : ''}" ${basis === null && !nearExpiry ? 'title="no venue index served for this future"' : ''}>${basis !== null ? esc(signedPct(basis, 2)) : nearExpiry ? '<1D' : 'NO IDX'}</span>
           <span class="mk-oi-bar"><i style="width:${Math.max(2, (f.openInterest / peakOi) * 100)}%"></i></span>
           <span class="mk-term-oi">${esc(fmtUsdCompact(f.openInterest))}</span>`;
         t.appendChild(row);
@@ -473,7 +478,13 @@ export function createMarketsPanel(api: AppApi): { el: HTMLElement } {
     }
   };
 
+  // per-desk request sequencing: only the NEWEST in-flight request may
+  // store and render — a stalled older response must never overwrite
+  // fresher data already on screen
+  const loadSeq: Record<Desk, number> = { fx: 0, crypto: 0, derivatives: 0, broker: 0 };
+
   const load = async (d: Desk): Promise<void> => {
+    const seq = ++loadSeq[d];
     const base = resolveApiBase();
     const r =
       d === 'fx'
@@ -483,6 +494,7 @@ export function createMarketsPanel(api: AppApi): { el: HTMLElement } {
           : d === 'derivatives'
             ? await fetchDerivatives(base)
             : await fetchBroker(base);
+    if (seq !== loadSeq[d]) return; // superseded while in flight
     (results as Record<Desk, unknown>)[d] = r;
     if (open && desk === d) renderDesk();
   };
@@ -490,14 +502,18 @@ export function createMarketsPanel(api: AppApi): { el: HTMLElement } {
   api.events.on('preset', ({ preset }) => {
     open = preset === 'markets';
     el.hidden = !open;
+    // the preset event has no same-value dedupe: re-clicking the open
+    // tab re-emits, so the old interval must be cleared BEFORE a new
+    // one is stored — an overwritten id is a permanent 60s fetch leak
+    if (timer !== undefined) {
+      window.clearInterval(timer);
+      timer = undefined;
+    }
     if (open) {
       renderChips();
       renderDesk();
       void load(desk);
       timer = window.setInterval(() => void load(desk), 60_000);
-    } else if (timer !== undefined) {
-      window.clearInterval(timer);
-      timer = undefined;
     }
   });
 

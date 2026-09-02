@@ -107,13 +107,7 @@ export class AircraftLayer {
   update(): void {
     if (!this.points.visible || !this.aircraft.length) return;
     const nowMs = Date.now();
-    const camPos = this.camera.position;
-    const up = new THREE.Vector3();
-    const east = new THREE.Vector3();
-    const north = new THREE.Vector3();
-    const toCam = new THREE.Vector3();
-    const screenE = new THREE.Vector2();
-    const screenN = new THREE.Vector2();
+    const m = this.camera.matrixWorldInverse;
 
     for (let i = 0; i < this.aircraft.length; i++) {
       const a = this.aircraft[i];
@@ -124,37 +118,38 @@ export class AircraftLayer {
       }
       this.alive[i] = 1;
       const r = 1 + Math.max(0, ((a.altFt ?? 0) * 0.0003048) / EARTH_KM) + 0.0015;
-      const v = latLonToVec3(ll[1], ll[0], r);
-      this.positions[i * 3] = v.x;
-      this.positions[i * 3 + 1] = v.y;
-      this.positions[i * 3 + 2] = v.z;
+      latLonToVec3(ll[1], ll[0], r, _v);
+      this.positions[i * 3] = _v.x;
+      this.positions[i * 3 + 1] = _v.y;
+      this.positions[i * 3 + 2] = _v.z;
 
       // world-stable heading: project local east/north into screen space
-      // and rotate the dart by the SCREEN angle of the true course
+      // and rotate the dart by the SCREEN angle of the true course —
+      // scratch vectors only, this runs per contact per frame
       if (a.track !== null) {
-        up.copy(v).normalize();
-        east.set(-up.z, 0, up.x).normalize();
-        north.crossVectors(up, east);
-        toCam.copy(camPos).sub(v);
+        _up.copy(_v).normalize();
+        _east.set(-_up.z, 0, _up.x).normalize();
+        _north.crossVectors(_up, _east);
         const brg = (a.track * Math.PI) / 180;
-        const dir = north
-          .clone()
-          .multiplyScalar(Math.cos(brg))
-          .addScaledVector(east, Math.sin(brg));
-        // project dir into camera space (approx: use camera matrix basis)
-        const m = this.camera.matrixWorldInverse;
-        const pWorld = v.clone();
-        const pTip = v.clone().addScaledVector(dir, 0.01);
-        const s0 = pWorld.applyMatrix4(m);
-        const s1 = pTip.applyMatrix4(m);
-        screenE.set(s1.x / -s1.z - s0.x / -s0.z, s1.y / -s1.z - s0.y / -s0.z);
-        this.angles[i] = Math.atan2(screenE.y, screenE.x);
+        _dir.copy(_north).multiplyScalar(Math.cos(brg)).addScaledVector(_east, Math.sin(brg));
+        _pw.copy(_v).applyMatrix4(m);
+        _pt.copy(_v).addScaledVector(_dir, 0.01).applyMatrix4(m);
+        const dx = _pt.x / -_pt.z - _pw.x / -_pw.z;
+        const dy = _pt.y / -_pt.z - _pw.y / -_pw.z;
+        this.angles[i] = Math.atan2(dy, dx);
       }
-      void screenN;
-      void toCam;
     }
     this.geo.attributes.position.needsUpdate = true;
     this.geo.attributes.aAngle.needsUpdate = true;
     this.geo.attributes.aAlive.needsUpdate = true;
   }
 }
+
+// scratch vectors — never allocated in the per-frame loop
+const _v = new THREE.Vector3();
+const _up = new THREE.Vector3();
+const _east = new THREE.Vector3();
+const _north = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _pw = new THREE.Vector3();
+const _pt = new THREE.Vector3();

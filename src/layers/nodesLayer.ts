@@ -257,8 +257,7 @@ export class NodesLayer {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
-    // fwidth() in the glyph shader — core in WebGL2, extension on WebGL1
-    (mat as unknown as { extensions: { derivatives: boolean } }).extensions = { derivatives: true };
+    // fwidth() in the glyph shader is core in the WebGL2-only renderer
     this.points = new THREE.Points(geo, mat);
     this.points.renderOrder = 6;
     // browser zoom / monitor moves change devicePixelRatio at runtime

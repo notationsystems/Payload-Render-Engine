@@ -94,7 +94,7 @@ export async function fetchLiveQuakes(apiBase: string): Promise<LiveResult<LiveQ
   const r = await getEnvelope(apiBase, '/api/live/quakes');
   if (r.kind !== 'ok') return r;
   const { data, meta } = r.data as {
-    data: { quakes: { id: string; mag: number | null; place: string; time: string; coordinates: [number, number, number] }[]; fetchedAt: string };
+    data: { quakes: { id: string; mag: number | null; place: string | null; time: string; coordinates: [number, number, number] }[]; fetchedAt: string };
     meta?: { upstream?: string };
   };
   return {
@@ -105,7 +105,8 @@ export async function fetchLiveQuakes(apiBase: string): Promise<LiveResult<LiveQ
         .map((q) => ({
           id: q.id,
           mag: q.mag as number,
-          place: q.place,
+          // USGS occasionally reports a null place — stated, not crashed on
+          place: q.place ?? 'location unstated by USGS',
           time: q.time,
           lonLat: [q.coordinates[0], q.coordinates[1]] as LonLat,
           depthKm: q.coordinates[2] ?? 0,
@@ -171,10 +172,13 @@ export async function fetchLiveAircraft(
   const r = await getEnvelope(apiBase, `/api/live/aircraft?lat=${lonLat[1].toFixed(2)}&lon=${lonLat[0].toFixed(2)}`);
   if (r.kind !== 'ok') return r;
   const { data, meta } = r.data as {
-    data: { aircraft: { hex: string; flight: string | null; lat: number; lon: number; altFt: number | null; gsKt: number | null; track: number | null; seenPosSec: number | null }[]; fetchedAt: string; center: { lat: number; lon: number }; radiusNm: number };
+    data: { aircraft: { hex: string; flight: string | null; lat: number; lon: number; altFt: number | null; gsKt: number | null; track: number | null; seenPosSec: number | null }[]; fetchedAt: string; cacheAgeMs?: number; center: { lat: number; lon: number }; radiusNm: number };
     meta?: { upstream?: string };
   };
-  const fetchedAtMs = Date.parse(data.fetchedAt);
+  // anchor the fix clock to CLIENT receipt time minus the server-stated
+  // cache age — dead-reckoning ages must never depend on how far the
+  // user's wall clock disagrees with the server's
+  const fetchedAtMs = Date.now() - (data.cacheAgeMs ?? 0);
   return {
     kind: 'ok',
     data: {

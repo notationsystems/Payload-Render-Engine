@@ -95,7 +95,8 @@ export class LabelsLayer {
       if (collides) continue;
       placed.push({ x, y, hw });
       const el = this.pool[i++];
-      el.textContent = e.node.name;
+      // avoid replacing an identical text node 60x/s — layout churn
+      if (el.textContent !== e.node.name) el.textContent = e.node.name;
       el.style.left = `${x.toFixed(1)}px`;
       el.style.top = `${y.toFixed(1)}px`;
       const edgeFade = Math.min(1, Math.max(0, (facing - horizon) * 9));

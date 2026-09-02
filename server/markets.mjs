@@ -42,6 +42,7 @@ const FETCH_HEADERS = {
 // memory + disk, stale-served-with-stated-age (same posture as live.mjs)
 
 const memCache = new Map(); // name → {fetchedAt, payload}
+const inflight = new Map(); // name → Promise — concurrent misses share ONE upstream run
 
 async function cachedJson(name, ttlMs, fetcher) {
   await mkdir(CACHE_DIR, { recursive: true });
@@ -50,24 +51,45 @@ async function cachedJson(name, ttlMs, fetcher) {
   if (!cached) {
     try {
       cached = JSON.parse(await readFile(path, 'utf8'));
+      memCache.set(name, cached); // disk survivors are memoized too
     } catch {
       /* no cache yet */
     }
   }
   const age = cached ? Date.now() - Date.parse(cached.fetchedAt) : Infinity;
   if (cached && age < ttlMs) return { ...cached, cacheState: age === 0 ? 'live' : 'fresh', ageMs: age };
-  try {
-    const payload = await fetcher();
-    const fresh = { fetchedAt: new Date().toISOString(), payload };
-    memCache.set(name, fresh);
-    await writeFile(path, JSON.stringify(fresh));
-    return { ...fresh, cacheState: 'live', ageMs: 0 };
-  } catch (err) {
-    if (cached) {
-      return { ...cached, cacheState: 'stale', ageMs: age, upstreamError: String(err?.message ?? err) };
+
+  // single-flight: a second request during a fetch awaits the first —
+  // never a duplicated paced upstream sequence, never a spurious
+  // refusal while a sibling is filling the cache
+  if (inflight.has(name)) return inflight.get(name);
+  const run = (async () => {
+    try {
+      const payload = await fetcher();
+      const fresh = { fetchedAt: new Date().toISOString(), payload };
+      memCache.set(name, fresh);
+      // a LOCAL disk failure after a successful fetch must not be
+      // reported as an upstream one — the fresh payload is served
+      try {
+        await writeFile(path, JSON.stringify(fresh));
+      } catch (err) {
+        console.warn(`[markets] cache write failed for ${name}: ${err?.message ?? err}`);
+      }
+      return { ...fresh, cacheState: 'live', ageMs: 0 };
+    } catch (err) {
+      if (cached) {
+        // age re-measured at serve time — a slow failed fetch must not
+        // understate how old the served snapshot really is
+        const servedAge = Date.now() - Date.parse(cached.fetchedAt);
+        return { ...cached, cacheState: 'stale', ageMs: servedAge, upstreamError: String(err?.message ?? err) };
+      }
+      throw err;
+    } finally {
+      inflight.delete(name);
     }
-    throw err;
-  }
+  })();
+  inflight.set(name, run);
+  return run;
 }
 
 async function getJson(url, timeoutMs = 15_000) {
@@ -110,20 +132,23 @@ async function fetchCrypto() {
       const candles = await getJson(
         `https://api.exchange.coinbase.com/products/${id}/candles?granularity=86400`
       );
+      // an HTTP-200 stats body with a missing/garbled field is a
+      // FAILURE for this product, never a NaN→null smuggled to the
+      // client as a number
+      const last = Number(stats.last);
+      const open24h = Number(stats.open);
+      const high24h = Number(stats.high);
+      const low24h = Number(stats.low);
+      const volume24h = Number(stats.volume);
+      if (![last, open24h, high24h, low24h, volume24h].every(Number.isFinite)) {
+        throw new Error('stats body missing or non-numeric fields');
+      }
       // candles: [[time, low, high, open, close, volume], ...] newest first
-      const daily = candles
+      const daily = (Array.isArray(candles) ? candles : [])
         .slice(0, 30)
         .reverse()
         .map((c) => ({ t: c[0], close: c[4] }));
-      products.push({
-        id,
-        last: Number(stats.last),
-        open24h: Number(stats.open),
-        high24h: Number(stats.high),
-        low24h: Number(stats.low),
-        volume24h: Number(stats.volume),
-        daily,
-      });
+      products.push({ id, last, open24h, high24h, low24h, volume24h, daily });
     } catch (err) {
       // partial delivery: the desk states what did not answer
       failures.push({ product: id, error: String(err?.message ?? err) });
@@ -179,19 +204,26 @@ async function fetchDerivatives() {
       const opt = await getJson(
         `https://www.deribit.com/api/v2/public/get_book_summary_by_currency?currency=${ccy}&kind=option`
       );
-      const futures = (fut.result ?? [])
+      // an HTTP-200 JSON-RPC error envelope is a FAILURE, never an
+      // empty term structure cached as an answer
+      if (!Array.isArray(fut.result) || !Array.isArray(opt.result)) {
+        throw new Error(
+          `deribit envelope missing result${fut.error?.message ? `: ${fut.error.message}` : ''}${opt.error?.message ? `: ${opt.error.message}` : ''}`
+        );
+      }
+      const futures = fut.result
         .map((r) => ({
           instrument: r.instrument_name,
           ...parseInstrument(r.instrument_name),
           markPrice: r.mark_price,
-          indexPrice: r.estimated_delivery_price,
+          indexPrice: r.estimated_delivery_price ?? null,
           openInterest: r.open_interest,
           volume24hUsd: r.volume_usd ?? null,
           funding8h: r.funding_8h ?? null,
           currentFunding: r.current_funding ?? null,
         }))
-        .sort((a, b) => (a.expiryIso ?? '') < (b.expiryIso ?? '') ? -1 : 1);
-      const options = (opt.result ?? [])
+        .sort((a, b) => (a.expiryIso ?? '').localeCompare(b.expiryIso ?? ''));
+      const options = opt.result
         .filter((r) => (r.open_interest ?? 0) > 0)
         .sort((a, b) => (b.open_interest ?? 0) - (a.open_interest ?? 0))
         .slice(0, OPTIONS_CAP)
@@ -308,7 +340,7 @@ export function registerMarketRoutes(get, { ok, refuse, meta }) {
       return refuse(
         'BROKER_NOT_CONFIGURED',
         'no Interactive Brokers Client Portal Gateway is configured; the broker desk is fail-closed without one',
-        'run the IB Client Portal Gateway (interactivebrokers.github.io → Client Portal API), authenticate in its login page, then set IBKR_GATEWAY_URL (e.g. https://localhost:5000/v1/api) in the spatial API environment — credentials stay in the gateway, never in this service or the browser'
+        'run the IB Client Portal Gateway (interactivebrokers.github.io → Client Portal API), authenticate in its login page, set IBKR_GATEWAY_URL (e.g. https://localhost:5000/v1/api), and trust its self-signed certificate by pointing NODE_EXTRA_CA_CERTS at the gateway cert when starting this service — credentials stay in the gateway, never in this service or the browser'
       );
     }
     try {
@@ -321,11 +353,17 @@ export function registerMarketRoutes(get, { ok, refuse, meta }) {
       const status = await auth.json();
       let accounts = null;
       if (status.authenticated) {
-        const acc = await fetch(`${base.replace(/\/+$/, '')}/portfolio/accounts`, {
-          signal: AbortSignal.timeout(10_000),
-          headers: FETCH_HEADERS,
-        });
-        if (acc.ok) accounts = await acc.json();
+        // a bad accounts response degrades to accounts:null — it must
+        // not discard the auth status already in hand as UNREACHABLE
+        try {
+          const acc = await fetch(`${base.replace(/\/+$/, '')}/portfolio/accounts`, {
+            signal: AbortSignal.timeout(10_000),
+            headers: FETCH_HEADERS,
+          });
+          if (acc.ok) accounts = await acc.json();
+        } catch {
+          accounts = null;
+        }
       }
       const fetchedAt = new Date().toISOString();
       return {

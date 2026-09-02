@@ -114,6 +114,9 @@ export class Engine {
   private sensor: ShaderPass;
   private callbacks: FrameCallback[] = [];
   private clock = new THREE.Clock();
+  /** own accumulator — Clock.start() zeroes elapsedTime on tab return,
+   *  which would snap every uTime-phased animation back to zero */
+  private elapsedAcc = 0;
   private running = false;
   private frames = 0;
   private fpsAccum = 0;
@@ -184,7 +187,8 @@ export class Engine {
       requestAnimationFrame(loop);
       if (document.hidden) return;
       const dt = Math.min(this.clock.getDelta(), 0.1);
-      const elapsed = this.clock.elapsedTime;
+      this.elapsedAcc += dt;
+      const elapsed = this.elapsedAcc;
       for (const cb of this.callbacks) cb(dt, elapsed);
       if (this.sensor.enabled) this.sensor.uniforms.uTime.value = elapsed;
       this.composer.render();

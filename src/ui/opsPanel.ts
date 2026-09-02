@@ -127,10 +127,15 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
     return `<span class="ops-state ${tone}" title="${esc(label)}">${esc(label)} ${esc(v.replace(/_/g, ' ').toUpperCase())}</span>`;
   };
 
+  // severity strings ride into class names: whitelist, never interpolate
+  // raw wire values into markup (esc() alone doesn't protect attributes)
+  const SEVERITIES = new Set(['critical', 'high', 'medium', 'low', 'none']);
+  const sev = (s: string): string => (SEVERITIES.has(s) ? s : 'none');
+
   const issueBlock = (issue: OpsLoad['issues'][number]): string => `
     <div class="ops-issue">
       <div class="ops-issue-head">
-        <span class="ops-sev ops-sev-${issue.severity}">${issue.severity.toUpperCase()}</span>
+        <span class="ops-sev ops-sev-${sev(issue.severity)}">${sev(issue.severity).toUpperCase()}</span>
         <span class="ops-issue-code">${esc(humanizeOpsCode(issue.code))}</span>
         ${issue.deadlineAt ? `<span class="ops-deadline">DEADLINE ${esc(fmtInstant(issue.deadlineAt))}</span>` : ''}
         <span class="ops-evidence">${issue.evidenceIds.length} EVIDENCE REF${issue.evidenceIds.length === 1 ? '' : 'S'}</span>
@@ -175,7 +180,7 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
     const next = load.nextAction;
     row.innerHTML = `
       <div class="ops-row-head">
-        <span class="ops-sev ops-sev-${load.attentionLevel}">${load.attentionLevel.toUpperCase()}</span>
+        <span class="ops-sev ops-sev-${sev(load.attentionLevel)}">${sev(load.attentionLevel).toUpperCase()}</span>
         <span class="ops-lane">${esc(load.route.origin ?? '?')} <span class="ops-arrow">→</span> ${esc(load.route.destination ?? '?')}</span>
         <span class="ops-ids">${esc(load.loadId ?? load.operationId)}${load.carrierId ? ` · ${esc(load.carrierId)}` : ''}</span>
         <span class="ops-phase">${esc(humanizeOpsCode(load.state.operationPhase))}</span>
@@ -272,7 +277,7 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
       row.className = 'ops-g-row';
       const label = document.createElement('span');
       label.className = 'ops-g-label';
-      label.innerHTML = `<i class="ops-g-sev ops-sev-${l.attentionLevel}"></i>${esc(l.loadId ?? l.operationId)}`;
+      label.innerHTML = `<i class="ops-g-sev ops-sev-${sev(l.attentionLevel)}"></i>${esc(l.loadId ?? l.operationId)}`;
       const track = document.createElement('span');
       track.className = 'ops-g-track';
 

@@ -47,6 +47,9 @@ export function createSitrep(api: AppApi): { el: HTMLElement } {
   el.appendChild(sheet);
 
   let lastText = '';
+  /** compose generation — a stale in-flight compose must never
+   *  overwrite a newer one's rendered body or exported text */
+  let composeGen = 0;
 
   // ------------------------------------------------------------ collectors
 
@@ -257,6 +260,7 @@ export function createSitrep(api: AppApi): { el: HTMLElement } {
   // -------------------------------------------------------------- compose
 
   const compose = async (): Promise<void> => {
+    const gen = ++composeGen;
     const composedAt = new Date().toISOString();
     const meta = api.store.snapshot.meta;
     sheet.innerHTML = `
@@ -289,6 +293,7 @@ export function createSitrep(api: AppApi): { el: HTMLElement } {
     const blocks: Block[] = [];
     blocks.push(disruptionsBlock(), hazardsBlock(), commoditiesBlock(), networkBlock());
     const [ops, mkts] = await Promise.all([opsBlock(), marketsBlock()]);
+    if (gen !== composeGen) return; // a newer compose owns the sheet now
     const ordered = [ops, blocks[0], blocks[1], mkts, blocks[2], blocks[3]];
 
     const body = sheet.querySelector('.pe-sitrep-body')!;

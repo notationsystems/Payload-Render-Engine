@@ -159,7 +159,7 @@ export function createCommoditiesPanel(api: AppApi): { el: HTMLElement } {
     const group = (label: string, list: Observation[], focusable: boolean): void => {
       if (!list.length) return;
       const ranked = [...list].sort((a, b) => b.value - a.value).slice(0, 5);
-      const peak = ranked[0]?.value ?? 1;
+      const peak = ranked[0]?.value || 1; // || not ??: an all-zero period must not divide by 0
       const g = document.createElement('div');
       g.className = 'cm-prod-group';
       g.textContent = label;
@@ -318,7 +318,9 @@ export function createCommoditiesPanel(api: AppApi): { el: HTMLElement } {
   api.events.on('preset', ({ preset }) => {
     const open = preset === 'commodities';
     el.hidden = !open;
-    if (open && fxState === 'idle') {
+    // a failed fetch is retried on the next open — a refusal is a
+    // state of the feed, never a latch on the lens
+    if (open && (fxState === 'idle' || fxState === 'unavailable')) {
       fxState = 'pending';
       void fetchFx(resolveApiBase()).then((r) => {
         if (r.kind === 'ok') {

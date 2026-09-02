@@ -185,8 +185,9 @@ export async function fetchBroker(apiBase: string): Promise<MarketResult<BrokerS
  * or the future expires within a day (the annualization degenerates).
  */
 export function annualizedBasis(f: DerivFuture, nowMs: number): number | null {
-  if (f.kind !== 'future' || !f.expiryIso || f.indexPrice === null || f.indexPrice <= 0) return null;
+  if (f.kind !== 'future' || !f.expiryIso) return null;
+  if (typeof f.indexPrice !== 'number' || !Number.isFinite(f.indexPrice) || f.indexPrice <= 0) return null;
   const years = (Date.parse(f.expiryIso) - nowMs) / (365.25 * 86_400_000);
-  if (years < 1 / 365) return null;
+  if (!Number.isFinite(years) || years < 1 / 365) return null; // near expiry OR unparseable — never NaN out
   return (f.markPrice / f.indexPrice - 1) / years;
 }
