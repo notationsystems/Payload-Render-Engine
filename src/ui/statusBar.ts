@@ -35,9 +35,13 @@ export function createStatusBar(api: AppApi): { el: HTMLElement } {
   const nodesSeg = seg();
   const routesSeg = seg();
   const particlesSeg = seg();
-  // detail segments yield on narrow viewports before colliding with the timeline
+  // tiered shed on narrow viewports, before colliding with the timeline:
+  // renderer detail yields first, renderer counts second — the market
+  // pulse and the disclaimer chip are the last things this bar gives up
   altSeg.classList.add('pe-sb-opt');
   particlesSeg.classList.add('pe-sb-opt');
+  nodesSeg.classList.add('pe-sb-opt2');
+  routesSeg.classList.add('pe-sb-opt2');
 
   // ---- market pulse (absent until a feed answers)
   const fxSeg = seg();

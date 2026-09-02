@@ -1254,9 +1254,22 @@ input {
   pointer-events: none;
 }
 
-/* responsive shed: the status bar yields detail before it collides */
+/* responsive shed: the status bar yields detail before it collides —
+   renderer detail first, renderer counts second; the market pulse and
+   the disclaimer chip survive to the narrowest tier */
 @media (max-width: 1780px) {
   .pe-sb-opt { display: none; }
+}
+@media (max-width: 1700px) {
+  .pe-sb-opt2 { display: none; }
+  /* the disclaimer chip ellipsizes rather than clipping mid-word —
+     its full text stays in the title tooltip */
+  .pe-sb-chip {
+    max-width: 128px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 /* motion discipline: the instrument respects reduced-motion */

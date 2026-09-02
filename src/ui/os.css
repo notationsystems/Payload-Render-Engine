@@ -50,7 +50,7 @@
 .os-dock {
   position: fixed;
   left: 240px; /* clear of the layer rail */
-  bottom: 84px; /* clear of the timeline */
+  bottom: 96px; /* clear of the timeline (14px inset + ~72px tall) */
   display: flex;
   flex-direction: column;
   gap: 8px;
