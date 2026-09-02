@@ -137,6 +137,8 @@ export interface AppEvents extends Record<string, unknown> {
     flowsOn?: boolean;
     evidenceCount?: number;
   };
+  /** A mined pattern candidate lit/cleared on the globe. */
+  pattern: { active: boolean; pattern?: import('../intel/miner').MinedPattern };
   /** Shift-click pin toggle for A/B comparison (selection untouched). */
   pin: { id: EntityId };
   /** Live seismic feed loaded/refreshed (count of reported events). */
@@ -208,6 +210,15 @@ export interface AppApi {
   addQueryFlows(): void;
   clearQuery(): void;
   isQueryActive(): boolean;
+  /** Payload Miner v0: deterministic pattern candidates over the served
+   *  snapshot, memoized per corpus. Pattern ≠ observed fact — every
+   *  result is a CANDIDATE with algorithm + run + build lineage. */
+  getMinedPatterns(): { run: import('../intel/miner').MiningRun; patterns: import('../intel/miner').MinedPattern[] };
+  /** Light one mined pattern's subgraph (emphasis mechanics; the banner
+   *  carries the MINED labeling). */
+  showMinedPattern(id: string): void;
+  clearMinedPattern(): void;
+  isPatternActive(): boolean;
   /** Release the tracked live contact (camera chase + trail + readout). */
   releaseLiveTrack(): void;
   /** Step to the nearest other live aircraft contact. */

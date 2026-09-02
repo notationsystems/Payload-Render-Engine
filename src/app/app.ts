@@ -47,6 +47,7 @@ import { AircraftLayer } from '../layers/aircraftLayer';
 import { QuakesLayer } from '../layers/quakesLayer';
 import { BeaconsLayer } from '../layers/beaconsLayer';
 import { correlateQuakes, greatCircleKm } from '../intel/proximity';
+import { runMiner, type MinedPattern, type MiningRun } from '../intel/miner';
 import { deadReckon, fetchLiveAircraft, fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
 import { resolveApiBase } from '../data/sources';
 import { LabelsLayer } from '../layers/labelsLayer';
@@ -1242,6 +1243,7 @@ export class App implements AppApi {
   }
 
   runMaterialQuery(role: 'producers' | 'consumers', commodityId: EntityId): number {
+    this.clearMinedPattern(); // one lit structure at a time
     const field = role === 'producers' ? 'outputs' : 'inputs';
     const ids = new Set<EntityId>();
     const pts: THREE.Vector3[] = [];
@@ -1316,6 +1318,60 @@ export class App implements AppApi {
 
   isQueryActive(): boolean {
     return this.queryState !== null;
+  }
+
+  // ------------------------------------------------------ payload miner
+  // Deterministic pattern candidates over the served snapshot. The
+  // ladder is enforced at the type level (validationStatus 'candidate')
+  // and at the surface level (the banner names algorithm/run/build and
+  // says CANDIDATE — never observed-fact styling).
+
+  private minerResult: { run: MiningRun; patterns: MinedPattern[] } | null = null;
+  private activePatternId: string | null = null;
+
+  getMinedPatterns(): { run: MiningRun; patterns: MinedPattern[] } {
+    if (!this.minerResult) this.minerResult = runMiner(this.store.snapshot);
+    return this.minerResult;
+  }
+
+  showMinedPattern(id: string): void {
+    const p = this.getMinedPatterns().patterns.find((x) => x.id === id);
+    if (!p) return;
+    this.clearQuery(); // one lit structure at a time
+    this.activePatternId = id;
+    const nodeIds = new Set(p.entities.filter((e) => this.store.node(e)));
+    this.nodesLayer.applyQuerySet(nodeIds.size ? nodeIds : null);
+    const routeIds = new Set(p.routes.filter((r) => this.store.route(r)));
+    this.routesLayer.applyBrush(routeIds.size ? routeIds : null);
+    // frame the pattern's constituent facilities
+    const pts = [...nodeIds].map((e) => {
+      const n = this.store.node(e)!;
+      return latLonToVec3(n.geometry.coordinates[1], n.geometry.coordinates[0], 1);
+    });
+    if (pts.length) {
+      const c = pts.reduce((s, q) => s.add(q), new THREE.Vector3()).divideScalar(pts.length);
+      if (c.lengthSq() > 0.01) {
+        const { lat, lon } = vec3ToLatLon(c.clone().normalize());
+        const spread = pts.length > 1 ? Math.max(...pts.map((q) => q.angleTo(c))) : 0;
+        this.cameraCtl.flyToLatLon(lat, lon, {
+          distance: Math.min(3.2, Math.max(1.5, 1.2 + spread * 2.2)),
+          durationMs: 1300,
+        });
+      }
+    }
+    this.events.emit('pattern', { active: true, pattern: p });
+  }
+
+  clearMinedPattern(): void {
+    if (!this.activePatternId) return;
+    this.activePatternId = null;
+    this.nodesLayer.applyQuerySet(null);
+    this.routesLayer.applyBrush(this.commodityFocusSet);
+    this.events.emit('pattern', { active: false });
+  }
+
+  isPatternActive(): boolean {
+    return this.activePatternId !== null;
   }
 
   /** Active commodity focus — survives a B-brush release. */

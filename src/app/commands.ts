@@ -128,7 +128,7 @@ const PRESETS: ViewPreset[] = [
 const HINT = 'TRY: find <place> · show <layer> · follow the load';
 
 const HELP_MESSAGE =
-  'FIND <NAME> · PRODUCERS/CONSUMERS OF <MATERIAL> · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
+  'FIND <NAME> · PRODUCERS/CONSUMERS OF <MATERIAL> · PATTERNS = MINED CANDIDATES · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
   'COMPARE <A> VS <B> · SHIFT-CLICK = PIN A/B COMPARE · HOLD B = ROUTE BRUSH · CLICK LIVE CONTACT = TRACK (ESC RELEASES) · D = DETECTIONS · KEYS 1–5 = SENSOR STYLE · ' +
   'WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/MARKETS/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · BRIEF = SITREP · FOLLOW THE LOAD · EXIT';
 
@@ -170,6 +170,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'brief', label: 'brief', hint: 'SITREP' },
   { text: 'producers of ', label: 'producers of <material>', hint: 'QUERY' },
   { text: 'consumers of ', label: 'consumers of <material>', hint: 'QUERY' },
+  { text: 'patterns', label: 'patterns — mined candidates', hint: 'MINER' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -302,6 +303,16 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'brief' || lower === 'sitrep') {
     window.dispatchEvent(new CustomEvent('pe:sitrep-toggle'));
     return ok('SITUATION REPORT — composed from loaded surfaces, basis labeled');
+  }
+
+  // -- payload miner: the pattern registry (candidates, never facts)
+  if (lower === 'patterns' || lower === 'mine' || lower === 'miner') {
+    window.dispatchEvent(new CustomEvent('pe:patterns-toggle'));
+    return ok('PATTERN REGISTRY — mined candidates with algorithm · run · build lineage');
+  }
+  if (lower === 'clear pattern' || lower === 'exit pattern') {
+    api.clearMinedPattern();
+    return ok('PATTERN CLEARED');
   }
 
   // -- corpus query: Earth as the visual query surface. Field-based:

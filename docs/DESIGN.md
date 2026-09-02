@@ -35,6 +35,7 @@ for decoration.
 | **GREY** `#6b7688` | STATE UNOBSERVED — absence is not zero | Node/route state, `UNOBSERVED` chips |
 | **ABSENT** + stated reason | REFUSED / UNAVAILABLE — the surface says why | Market pulse hides when the feed is down; refusal cards |
 | **BEAM** (red/amber pillar + pad) | ALERT-FLAGGED asset — a marker of an alert that exists elsewhere with its basis | Attention beams |
+| **MINED gold** `#d9c26a` | MINED CANDIDATE — a structure a named algorithm computed over declared fields; not an observed fact, never promoted without validation | Pattern registry frame, active-pattern card, MINED kicker |
 
 Companion rules:
 
@@ -50,6 +51,12 @@ Companion rules:
   on the detection overlay, top-OI cap on the options list) — an empty
   result reads "nothing within stated criteria", never "nothing
   happened".
+- **The epistemic ladder is worn, not implied.** `Observation ≠
+  DerivedMetric ≠ MinedPattern ≠ Hypothesis` — each rung has its own
+  treatment (solid · COMPUTED label · mined gold · dashed violet), and
+  a surface never borrows a higher rung's styling for a lower rung's
+  content. Every mined candidate names its algorithm@version, mining
+  run, corpus build, and supporting-record count in text.
 - **Basis lines.** Every desk/panel leads with its source and
   disclaimer (an ECB fix is "informational, not a tradeable quote"; a
   venue mark is "the venue's model"; ops is "journal projection").

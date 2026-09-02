@@ -667,3 +667,58 @@ boundary daily.
    displays a derived figure must be able to display its policy
    lineage — the UI contract is reserved now so the field is worn,
    not hidden, when it arrives.
+
+## 19. Payload Miner v0 — corpus builder + data miner
+
+The platform already runs most of a mining loop — ingestion normalizes,
+RELATE derives connection fields, the proximity engine correlates, the
+counterfactual engine ranks. The miner closes the loop deliberately:
+**the Corpus Builder makes knowledge canonical; the Data Miner reads
+that canon and emits pattern candidates back into review** — the
+SCG-style cycle `K_{t+1} = K_t + V(M(K_t))`, where `V` (validation)
+is the gate nothing skips.
+
+### The schema-enforced ladder
+
+> `Observation ≠ DerivedMetric ≠ MinedPattern ≠ Hypothesis`
+
+A mined pattern is a **candidate**, a distinct epistemic type
+(`src/intel/miner.ts`): `validationStatus` is literally the type
+`'candidate'` — there is no code path that promotes one. Each carries
+`algorithm`, `algorithmVersion`, `score`, `scoreBasis`, its
+`supportingRecords`, the `miningRunId`, and the `corpusBuildId` it was
+mined from. Provenance chain: **Pattern → MiningRun → CorpusBuild →
+records** — a pattern mined from a stale build is detectable by id
+alone.
+
+### v0 miners (deterministic, pure, field-based)
+
+| Algorithm | Pattern type | What it computes |
+|---|---|---|
+| `origin-share@0.1` | `SUPPLY_CONCENTRATION` | declared flows of a commodity dominated by one origin (≥4 flows, ≥50% share) |
+| `articulation-points (Tarjan)@0.1` | `STRUCTURAL_ARTICULATION` | route-graph cut vertices; an UNDECLARED cut scores 1.0 (the discovery), a declared chokepoint 0.5 (confirmation) |
+| `corridor-share@0.1` | `SHARED_CORRIDOR` | single routes ≥5 declared flows traverse |
+
+All three read only declared corpus fields (flow segments, route
+endpoints, commodity ids) — never names, never proximity guesses.
+Determinism is a contract: ties break lexicographically, so the same
+corpus build always yields the same run.
+
+### The surface
+
+The **Pattern Registry** (`patterns` in the command bar) lists
+candidates grouped by type under a MINED-gold banner that states the
+ladder in words. Clicking a candidate lights its subgraph on the globe
+with the same emphasis mechanics as a corpus query (dim ≠ hide) and
+raises the active-pattern card: statement, score with its named basis,
+`algorithm@version`, run id, build id, supporting-record count. Zero
+candidates renders the thresholds that were not cleared — absence with
+a stated reason, per the design law.
+
+### What v1 adds (when the corpus platform lands)
+
+Temporal miners (lead-time drift, seasonality) once observation
+history deepens; mining runs recorded server-side under
+`/v1/mining/runs`; a validation workflow that moves a candidate to
+`validated`/`rejected` **by a person or a stricter process, never by
+the miner itself**.
