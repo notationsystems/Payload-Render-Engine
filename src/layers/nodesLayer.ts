@@ -282,6 +282,15 @@ export class NodesLayer {
     this.applyVisibility();
   }
 
+  /** Corpus-query result set: matches lit, everything else quieted.
+   *  Emphasis, never a filter — context dims to 0.15, nothing is hidden. */
+  private querySet: Set<EntityId> | null = null;
+
+  applyQuerySet(ids: Set<EntityId> | null): void {
+    this.querySet = ids && ids.size ? ids : null;
+    this.applyVisibility();
+  }
+
   private applyVisibility(): void {
     // progressive disclosure: minor nodes appear as the camera descends.
     // (At corpus scale this becomes clustering — geodesic-median cluster
@@ -291,10 +300,14 @@ export class NodesLayer {
     let n = 0;
     for (const e of this.entries) {
       const layerOn = this.bucketVisible.get(e.bucket) ?? true;
-      const lodOn = e.node.importance >= minImportance;
-      const v = layerOn && lodOn ? 1 : 0;
+      const inQuery = this.querySet?.has(e.node.id) ?? false;
+      // a query MATCH always shows, whatever the zoom LOD says — a
+      // result set that hides its own members would be a lie
+      const lodOn = e.node.importance >= minImportance || inQuery;
+      let v = layerOn && lodOn ? 1 : 0;
+      if (v && this.querySet && !inQuery) v = 0.15;
       this.alphaAttr.setX(e.index, v);
-      if (v) n++;
+      if (v > 0.5) n++;
     }
     this.visibleCount = n;
     this.alphaAttr.needsUpdate = true;

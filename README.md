@@ -1,6 +1,14 @@
 # PayLoad OS
 
-**An interactive digital twin of the physical economy.**
+**The visual query surface of the physical-economy corpus.**
+
+PayLoad OS is an *information* operating system: it builds high-integrity
+computational corpora of the physical economy and serves intelligence
+derived from them. Payload Earth — this renderer — is the spatial
+interface to that corpus: ask it a question (`producers of copper`) and
+the globe lights the result set with its basis and evidence; refine with
+routes, flows, dependencies; everything not matched is quieted, never
+hidden. It is not an operational dispatch map, and it never owns state.
 
 ![PayLoad OS — global network view](docs/media/global.png)
 

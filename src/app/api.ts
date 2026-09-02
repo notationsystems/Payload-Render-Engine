@@ -125,6 +125,18 @@ export interface AppEvents extends Record<string, unknown> {
   };
   /** Sensor style changed (0 normal · 1 nvg · 2 flir · 3 crt · 4 noir). */
   sensor: { mode: 0 | 1 | 2 | 3 | 4; label: string };
+  /** Corpus query result set lit/refined/cleared on the globe. */
+  query: {
+    active: boolean;
+    label?: string;
+    matched?: number;
+    basis?: string;
+    commodityId?: EntityId | null;
+    /** null/undefined = refinement not tried; 0 = tried, none declared */
+    routesLit?: number | null;
+    flowsOn?: boolean;
+    evidenceCount?: number;
+  };
   /** Shift-click pin toggle for A/B comparison (selection untouched). */
   pin: { id: EntityId };
   /** Live seismic feed loaded/refreshed (count of reported events). */
@@ -185,6 +197,17 @@ export interface AppApi {
   /** Commodity focus: dim routes carrying nothing of this commodity.
    *  Emphasis only — nothing hidden, nothing mutated. null clears. */
   setCommodityFocus(commodityId: EntityId | null): void;
+  /** Corpus query: light the facilities whose DECLARED inputs/outputs
+   *  include the commodity (field-based, never name inference); the
+   *  rest of the globe quiets. Returns the match count. */
+  runMaterialQuery(role: 'producers' | 'consumers', commodityId: EntityId): number;
+  /** Chained refinement: light the routes the matched facilities
+   *  DECLARE connections to. Returns how many routes lit. */
+  addQueryRoutes(): number;
+  /** Chained refinement: light this commodity's flows + particles. */
+  addQueryFlows(): void;
+  clearQuery(): void;
+  isQueryActive(): boolean;
   /** Release the tracked live contact (camera chase + trail + readout). */
   releaseLiveTrack(): void;
   /** Step to the nearest other live aircraft contact. */

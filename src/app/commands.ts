@@ -9,7 +9,7 @@
  */
 
 import type { AppApi, CommandResult, LayerId, Suggestion, ViewPreset } from './api';
-import type { Flow, Route } from '../data/contracts';
+import type { EntityId, Flow, Route } from '../data/contracts';
 import type { SearchResult } from '../data/store';
 
 // ------------------------------------------------------------------
@@ -128,7 +128,7 @@ const PRESETS: ViewPreset[] = [
 const HINT = 'TRY: find <place> · show <layer> · follow the load';
 
 const HELP_MESSAGE =
-  'FIND <NAME> · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
+  'FIND <NAME> · PRODUCERS/CONSUMERS OF <MATERIAL> · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
   'COMPARE <A> VS <B> · SHIFT-CLICK = PIN A/B COMPARE · HOLD B = ROUTE BRUSH · CLICK LIVE CONTACT = TRACK (ESC RELEASES) · D = DETECTIONS · KEYS 1–5 = SENSOR STYLE · ' +
   'WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/MARKETS/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · BRIEF = SITREP · FOLLOW THE LOAD · EXIT';
 
@@ -168,6 +168,8 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'commodities', label: 'commodities', hint: 'PRESET' },
   { text: 'markets', label: 'markets', hint: 'VIEW' },
   { text: 'brief', label: 'brief', hint: 'SITREP' },
+  { text: 'producers of ', label: 'producers of <material>', hint: 'QUERY' },
+  { text: 'consumers of ', label: 'consumers of <material>', hint: 'QUERY' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -300,6 +302,40 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'brief' || lower === 'sitrep') {
     window.dispatchEvent(new CustomEvent('pe:sitrep-toggle'));
     return ok('SITUATION REPORT — composed from loaded surfaces, basis labeled');
+  }
+
+  // -- corpus query: Earth as the visual query surface. Field-based:
+  // a producer is a facility whose record DECLARES the commodity in
+  // outputs — never a name that looked right.
+  const matQuery =
+    /^(?:producers?\s+of|who\s+makes|who\s+produces)\s+(.+)$/.exec(lower) ??
+    /^(?:consumers?\s+of|who\s+uses|who\s+consumes)\s+(.+)$/.exec(lower);
+  if (matQuery) {
+    const role: 'producers' | 'consumers' = /^(producers?|who\s+makes|who\s+produces)/.test(lower)
+      ? 'producers'
+      : 'consumers';
+    const term = matQuery[1];
+    let best: { id: EntityId; name: string } | null = null;
+    let bestScore = -Infinity;
+    for (const c of api.store.snapshot.commodities) {
+      const s = fuzzyScore(term, c.name);
+      if (s !== null && s > bestScore) {
+        bestScore = s;
+        best = { id: c.id, name: c.name };
+      }
+    }
+    if (!best) return err(`NO COMMODITY MATCHING "${term.toUpperCase()}" IN THE LOADED CORPUS`);
+    const n = api.runMaterialQuery(role, best.id);
+    if (!n) {
+      return ok(
+        `0 FACILITIES DECLARE ${best.name.toUpperCase()} AS AN ${role === 'producers' ? 'OUTPUT' : 'INPUT'} — absence of declaration, not proof of absence`
+      );
+    }
+    return ok(`${n} ${role.toUpperCase()} OF ${best.name.toUpperCase()} LIT — the rest of the globe is quieted, not hidden`);
+  }
+  if (lower === 'clear query' || lower === 'exit query') {
+    api.clearQuery();
+    return ok('QUERY CLEARED');
   }
 
   // -- 6. time controls
@@ -548,12 +584,18 @@ export function suggestCommands(api: AppApi, input: string): Suggestion[] {
     );
   }
 
-  // commodity flows shortcut
+  // commodity shortcuts: flows + the corpus query verbs
   for (const c of api.store.snapshot.commodities) {
+    const s = fuzzyScore(lower, c.name);
     consider(
       { text: `show ${c.name.toLowerCase()} flows`, label: `show ${c.name} flows`, hint: 'FLOWS' },
-      fuzzyScore(lower, c.name),
+      s,
       5
+    );
+    consider(
+      { text: `producers of ${c.name.toLowerCase()}`, label: `producers of ${c.name}`, hint: 'QUERY' },
+      s ?? fuzzyScore(lower, `producers of ${c.name}`),
+      6
     );
   }
 

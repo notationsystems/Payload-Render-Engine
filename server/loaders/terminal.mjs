@@ -508,6 +508,52 @@ export async function loadTerminalCorpus({
     },
   };
 
+  // RELATE: derive the facility↔material fields the query surface
+  // answers from — from what the upstream itself declares. A facility
+  // OUTPUTS a commodity when a production observation names it as the
+  // subject; it INPUTS one when a declared flow of that commodity
+  // terminates at it. Loader curation over upstream declarations —
+  // never name inference — counted in the mapping report.
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  let outputsDerived = 0;
+  let inputsDerived = 0;
+  for (const o of observations) {
+    if (o.metric !== 'production') continue;
+    const n = nodeById.get(o.entityId);
+    if (!n) continue;
+    const tag = o.provenance.evidence?.find((e) => e.startsWith('commodity:'));
+    if (!tag) continue;
+    const cid = `commodity:${tag.slice('commodity:'.length)}`;
+    n.outputs = n.outputs ?? [];
+    if (!n.outputs.includes(cid)) {
+      n.outputs.push(cid);
+      outputsDerived++;
+    }
+  }
+  for (const f of flows) {
+    if (!f.commodityId) continue;
+    const n = nodeById.get(f.destinationId);
+    if (!n) continue;
+    n.inputs = n.inputs ?? [];
+    if (!n.inputs.includes(f.commodityId)) {
+      n.inputs.push(f.commodityId);
+      inputsDerived++;
+    }
+  }
+  // a node is CONNECTED to the routes that declare it as an endpoint
+  let routeLinksDerived = 0;
+  for (const r of routes) {
+    for (const endId of [r.originId, r.destinationId]) {
+      const n = nodeById.get(endId);
+      if (!n) continue;
+      n.connectedRouteIds = n.connectedRouteIds ?? [];
+      if (!n.connectedRouteIds.includes(r.id)) {
+        n.connectedRouteIds.push(r.id);
+        routeLinksDerived++;
+      }
+    }
+  }
+
   // entities with at least one observation answer 'unobserved' (evidence
   // exists, but the state channel at t was never measured); everything
   // else answers 'no_history'. NOTHING here synthesizes a state.
@@ -554,6 +600,12 @@ export async function loadTerminalCorpus({
       excluded,
       unresolvedRefs,
       upstreamReconciliation,
+      // facility↔material relations derived from upstream declarations
+      derivedFields: {
+        outputsFromProductionObservations: outputsDerived,
+        inputsFromFlowDestinations: inputsDerived,
+        routeLinksFromDeclaredEndpoints: routeLinksDerived,
+      },
     },
   };
 }

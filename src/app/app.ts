@@ -1201,6 +1201,123 @@ export class App implements AppApi {
     }
   }
 
+  // ------------------------------------------------------- corpus query
+  // Earth as the visual query surface: a query lights a RESULT SET and
+  // quiets the rest. Matching is FIELD-BASED — a facility is a producer
+  // of X because its corpus record DECLARES X in `outputs`, never
+  // because a name looked right. Emphasis only; nothing is hidden.
+
+  private queryIds: Set<EntityId> | null = null;
+  private queryState: {
+    role: 'producers' | 'consumers';
+    commodityId: EntityId;
+    label: string;
+    /** null = refinement not tried; 0 = tried, zero DECLARED connections */
+    routesLit: number | null;
+    flowsOn: boolean;
+  } | null = null;
+
+  private queryEvidenceCount(commodityId: EntityId): number {
+    const key = commodityId.split(':').pop();
+    return this.store.snapshot.observations.filter((o) =>
+      o.provenance.evidence?.includes(`commodity:${key}`)
+    ).length;
+  }
+
+  private emitQuery(): void {
+    if (!this.queryState || !this.queryIds) {
+      this.events.emit('query', { active: false });
+      return;
+    }
+    this.events.emit('query', {
+      active: true,
+      label: this.queryState.label,
+      matched: this.queryIds.size,
+      basis: `matched on the corpus ${this.queryState.role === 'producers' ? 'outputs' : 'inputs'} field — declared, not inferred`,
+      commodityId: this.queryState.commodityId,
+      routesLit: this.queryState.routesLit,
+      flowsOn: this.queryState.flowsOn,
+      evidenceCount: this.queryEvidenceCount(this.queryState.commodityId),
+    });
+  }
+
+  runMaterialQuery(role: 'producers' | 'consumers', commodityId: EntityId): number {
+    const field = role === 'producers' ? 'outputs' : 'inputs';
+    const ids = new Set<EntityId>();
+    const pts: THREE.Vector3[] = [];
+    for (const n of this.store.snapshot.nodes) {
+      if ((n[field] ?? []).includes(commodityId)) {
+        ids.add(n.id);
+        pts.push(latLonToVec3(n.geometry.coordinates[1], n.geometry.coordinates[0], 1));
+      }
+    }
+    if (!ids.size) {
+      this.clearQuery();
+      return 0;
+    }
+    const name = this.store.snapshot.commodities.find((c) => c.id === commodityId)?.name ?? commodityId;
+    this.queryIds = ids;
+    this.queryState = {
+      role,
+      commodityId,
+      label: `${role.toUpperCase()} OF ${name.toUpperCase()}`,
+      routesLit: null,
+      flowsOn: false,
+    };
+    this.nodesLayer.applyQuerySet(ids);
+    // frame the result set: fly to its centroid, distance by spread
+    const c = pts.reduce((s, p) => s.add(p), new THREE.Vector3()).divideScalar(pts.length);
+    if (c.lengthSq() > 0.01) {
+      const { lat, lon } = vec3ToLatLon(c.clone().normalize());
+      const spread = Math.max(...pts.map((p) => p.angleTo(c)));
+      this.cameraCtl.flyToLatLon(lat, lon, {
+        distance: Math.min(3.4, Math.max(1.6, 1.2 + spread * 2.2)),
+        durationMs: 1400,
+      });
+    }
+    this.emitQuery();
+    return ids.size;
+  }
+
+  addQueryRoutes(): number {
+    if (!this.queryIds || !this.queryState) return 0;
+    const lit = new Set<EntityId>();
+    for (const id of this.queryIds) {
+      const n = this.store.node(id);
+      for (const rid of n?.connectedRouteIds ?? []) {
+        if (this.store.route(rid)) lit.add(rid);
+      }
+    }
+    this.routesLayer.applyBrush(lit.size ? lit : null);
+    this.queryState.routesLit = lit.size;
+    this.emitQuery();
+    return lit.size;
+  }
+
+  addQueryFlows(): void {
+    if (!this.queryState) return;
+    this.setCommodityFocus(this.queryState.commodityId);
+    this.setFlowMode(true);
+    this.queryState.flowsOn = true;
+    this.emitQuery();
+  }
+
+  clearQuery(): void {
+    const had = this.queryState !== null;
+    this.queryIds = null;
+    this.queryState = null;
+    this.nodesLayer.applyQuerySet(null);
+    if (had) {
+      // restore the standing commodity focus (or nothing) on routes
+      this.routesLayer.applyBrush(this.commodityFocusSet);
+      this.emitQuery();
+    }
+  }
+
+  isQueryActive(): boolean {
+    return this.queryState !== null;
+  }
+
   /** Active commodity focus — survives a B-brush release. */
   private commodityFocusSet: Set<EntityId> | null = null;
 

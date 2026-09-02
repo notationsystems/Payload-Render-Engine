@@ -29,6 +29,7 @@ import { createAlertsRail } from './ui/alertsRail';
 import { createSitrep } from './ui/sitrep';
 import { createReticle } from './ui/reticle';
 import { createPinsPanel } from './ui/pinsPanel';
+import { createQueryCard } from './ui/queryCard';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -70,6 +71,7 @@ async function start(): Promise<void> {
   hud.appendChild(createSitrep(app).el);
   hud.appendChild(createReticle(app).el);
   hud.appendChild(createPinsPanel(app).el);
+  hud.appendChild(createQueryCard(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 
@@ -83,6 +85,7 @@ async function start(): Promise<void> {
     if (document.querySelector('.os-arch:not([hidden])')) return;
     if (app.isDemoActive()) app.stopFollowTheLoad();
     else if (app.isLiveTracking()) app.releaseLiveTrack();
+    else if (app.isQueryActive()) app.clearQuery();
     else if (
       app.getPreset() === 'agents' ||
       app.getPreset() === 'scenarios' ||

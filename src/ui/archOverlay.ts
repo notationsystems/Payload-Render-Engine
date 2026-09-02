@@ -6,15 +6,23 @@
 
 import type { AppApi } from '../app/api';
 
+// The Information-OS stack: PayLoad OS builds the physical-economy
+// corpus; interfaces sit above it. Acquire → Extract → Normalize →
+// Resolve → Structure → Relate → Index → Compress → Retrieve →
+// Compute → Prove.
 const STACK: { title: string; items: string[]; here?: boolean }[] = [
-  { title: 'EXTERNAL WORLD', items: ['Documents', 'Sensors', 'Feeds', 'Systems'] },
-  { title: 'DAF', items: ['Collect', 'Normalize', 'Provenance'] },
-  { title: 'CANONICAL STATE', items: ['Entities', 'Events', 'Observations', 'Relations'] },
-  { title: 'SPATIAL CORPUS', items: ['PostGIS', 'Spatial graph', 'Network state'] },
-  { title: 'COMPUTE ENGINES', items: ['Routing (pgRouting)', 'Optimization (VROOM)', 'Isochrones'] },
-  { title: 'ANALYTICAL LAYER', items: ['Tradewind Macro', 'Flow analysis', 'Constraints', 'Scenarios'] },
-  { title: 'AI & AGENTS', items: ['Reasoning', 'OCR / NLP', 'Agents', 'Workflows'] },
-  { title: 'DIGITAL TWIN', items: ['This renderer', 'Projection only', 'Never authoritative'], here: true },
+  { title: 'EXTERNAL WORLD', items: ['Documents', 'Filings', 'Feeds', 'Datasets'] },
+  { title: 'ACQUIRE / EXTRACT', items: ['DAF', 'Document perception', 'Provenance at entry'] },
+  { title: 'CORPUS', items: ['Evidence', 'Identity (resolution)', 'Ontology'] },
+  { title: 'CANONICAL STATE', items: ['Relational', 'Graph', 'Spatial'] },
+  { title: 'INDEX', items: ['Temporal', 'Vector / semantic'] },
+  { title: 'RETRIEVAL', items: ['Hybrid retrieval', 'GraphRAG'] },
+  { title: 'CONTEXT COMPILER', items: ['Compressed evidence', 'Packages for reasoning'] },
+  {
+    title: 'INTERFACES',
+    items: ['APIs · Agents · Tradewind', 'PAYLOAD EARTH — this renderer', 'the visual query surface'],
+    here: true,
+  },
 ];
 
 export function createArchOverlay(api: AppApi): { el: HTMLElement } {
@@ -58,7 +66,7 @@ export function createArchOverlay(api: AppApi): { el: HTMLElement } {
   const stance = document.createElement('div');
   stance.className = 'os-arch-stance';
   stance.textContent =
-    'The twin renders state; it never stores or mutates it. The seam is mechanical: the build fails if the data layer touches the renderer.';
+    'Earth is the VISUAL QUERY SURFACE of the physical-economy corpus: a query lights a result set with its basis and evidence; the renderer never stores or mutates state, and the seam is mechanical — the build fails if the data layer touches it.';
 
   sheet.append(head, flow, tagline, stance);
   el.appendChild(sheet);
