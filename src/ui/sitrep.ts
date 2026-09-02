@@ -22,6 +22,7 @@ import { resolveApiBase } from '../data/sources';
 import { fetchOperations, humanizeOpsCode } from '../data/operations';
 import { fetchCrypto, fetchDerivatives, fetchFx } from '../live/markets';
 import { correlateQuakes, PROXIMITY_THRESHOLDS } from '../intel/proximity';
+import { recordFeed } from '../core/health';
 import type { Observation } from '../data/contracts';
 
 const esc = (s: string): string =>
@@ -55,6 +56,7 @@ export function createSitrep(api: AppApi): { el: HTMLElement } {
 
   const opsBlock = async (): Promise<Block> => {
     const r = await fetchOperations(resolveApiBase());
+    recordFeed('operations', r.kind === 'ok' ? 'ok' : r.kind);
     if (r.kind === 'refused') {
       return {
         title: 'OPERATIONS',

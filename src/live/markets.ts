@@ -16,6 +16,7 @@
  */
 
 import type { Timestamp } from '../data/contracts';
+import { recordFeed } from '../core/health';
 
 export interface FxSet {
   base: string; // 'USD'
@@ -126,6 +127,7 @@ async function getEnvelope(apiBase: string, path: string): Promise<MarketResult<
 
 export async function fetchFx(apiBase: string): Promise<MarketResult<FxSet>> {
   const r = await getEnvelope(apiBase, '/api/markets/fx');
+  recordFeed('markets.fx', r.kind === 'ok' ? 'ok' : r.kind);
   if (r.kind !== 'ok') return r;
   const d = r.data.data as Omit<FxSet, 'upstream' | 'disclaimer'>;
   return {
@@ -140,6 +142,7 @@ export async function fetchFx(apiBase: string): Promise<MarketResult<FxSet>> {
 
 export async function fetchCrypto(apiBase: string): Promise<MarketResult<CryptoSet>> {
   const r = await getEnvelope(apiBase, '/api/markets/crypto');
+  recordFeed('markets.crypto', r.kind === 'ok' ? 'ok' : r.kind);
   if (r.kind !== 'ok') return r;
   const d = r.data.data as Omit<CryptoSet, 'upstream' | 'disclaimer'>;
   return {
@@ -154,6 +157,7 @@ export async function fetchCrypto(apiBase: string): Promise<MarketResult<CryptoS
 
 export async function fetchDerivatives(apiBase: string): Promise<MarketResult<DerivSet>> {
   const r = await getEnvelope(apiBase, '/api/markets/derivatives');
+  recordFeed('markets.derivatives', r.kind === 'ok' ? 'ok' : r.kind);
   if (r.kind !== 'ok') return r;
   const d = r.data.data as Omit<DerivSet, 'upstream' | 'disclaimer'>;
   return {
@@ -168,6 +172,7 @@ export async function fetchDerivatives(apiBase: string): Promise<MarketResult<De
 
 export async function fetchBroker(apiBase: string): Promise<MarketResult<BrokerStatus>> {
   const r = await getEnvelope(apiBase, '/api/markets/broker');
+  recordFeed('markets.broker', r.kind === 'ok' ? 'ok' : r.kind);
   if (r.kind !== 'ok') return r;
   const d = r.data.data as Omit<BrokerStatus, 'disclaimer'>;
   return {

@@ -12,6 +12,7 @@
 
 import * as satellite from 'satellite.js';
 import type { LonLat, Timestamp } from '../data/contracts';
+import { recordFeed } from '../core/health';
 
 export interface LiveSat {
   name: string;
@@ -63,6 +64,7 @@ async function getEnvelope(apiBase: string, path: string): Promise<LiveResult<un
 
 export async function fetchLiveSatellites(apiBase: string): Promise<LiveResult<LiveSatSet>> {
   const r = await getEnvelope(apiBase, '/api/live/satellites');
+  recordFeed('live.satellites', r.kind === 'ok' ? 'ok' : r.kind);
   if (r.kind !== 'ok') return r;
   const { data, meta } = r.data as {
     data: { groups: { group: string; tles: { name: string; l1: string; l2: string }[] }[]; fetchedAt: string; cacheState: string };
@@ -92,6 +94,7 @@ export async function fetchLiveSatellites(apiBase: string): Promise<LiveResult<L
 
 export async function fetchLiveQuakes(apiBase: string): Promise<LiveResult<LiveQuakeSet>> {
   const r = await getEnvelope(apiBase, '/api/live/quakes');
+  recordFeed('live.seismic', r.kind === 'ok' ? 'ok' : r.kind);
   if (r.kind !== 'ok') return r;
   const { data, meta } = r.data as {
     data: { quakes: { id: string; mag: number | null; place: string | null; time: string; coordinates: [number, number, number] }[]; fetchedAt: string };
@@ -170,6 +173,7 @@ export async function fetchLiveAircraft(
   lonLat: LonLat
 ): Promise<LiveResult<LiveAircraftSet>> {
   const r = await getEnvelope(apiBase, `/api/live/aircraft?lat=${lonLat[1].toFixed(2)}&lon=${lonLat[0].toFixed(2)}`);
+  recordFeed('live.aircraft', r.kind === 'ok' ? 'ok' : r.kind);
   if (r.kind !== 'ok') return r;
   const { data, meta } = r.data as {
     data: { aircraft: { hex: string; flight: string | null; lat: number; lon: number; altFt: number | null; gsKt: number | null; track: number | null; seenPosSec: number | null }[]; fetchedAt: string; cacheAgeMs?: number; center: { lat: number; lon: number }; radiusNm: number };

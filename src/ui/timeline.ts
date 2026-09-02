@@ -110,14 +110,44 @@ export function createTimeline(api: AppApi): { el: HTMLElement } {
   const playhead = document.createElement('div');
   playhead.className = 'pi-tl-playhead';
 
-  track.append(density, future, played, nowTick, markers, playhead);
+  // density hover readout: which slice of time, how much evidence
+  const denseTip = document.createElement('div');
+  denseTip.className = 'pi-tl-densetip';
+  denseTip.hidden = true;
+
+  track.append(density, future, played, nowTick, markers, playhead, denseTip);
   scrub.append(track);
+
+  track.addEventListener('pointermove', (e) => {
+    if (!densObs.length || densRange.endMs <= densRange.startMs) return;
+    const rect = track.getBoundingClientRect();
+    const f = Math.min(0.999, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const i = Math.floor(f * densObs.length);
+    const span = densRange.endMs - densRange.startMs;
+    const a = new Date(densRange.startMs + (i / densObs.length) * span).toISOString().slice(0, 10);
+    const b = new Date(densRange.startMs + ((i + 1) / densObs.length) * span).toISOString().slice(0, 10);
+    const obs = densObs[i];
+    const evt = densEvt[i];
+    denseTip.textContent =
+      obs + evt === 0
+        ? `${a} → ${b} · NO EVIDENCE KNOWN IN THIS WINDOW`
+        : `${a} → ${b} · ${obs} OBSERVATION${obs === 1 ? '' : 'S'} KNOWN${evt ? ` · ${evt} EVENT START${evt === 1 ? '' : 'S'}` : ''}`;
+    denseTip.style.left = `${Math.min(96, Math.max(4, f * 100)).toFixed(1)}%`;
+    denseTip.hidden = false;
+  });
+  track.addEventListener('pointerleave', () => {
+    denseTip.hidden = true;
+  });
 
   el.append(row1, scrub);
 
   // ---------------------------------------------------------------- markers
 
   let markersRangeKey = '';
+  // per-bucket evidence retained for the density hover readout
+  let densObs: number[] = [];
+  let densEvt: number[] = [];
+  let densRange = { startMs: 0, endMs: 0 };
 
   const frac = (ms: number, startMs: number, endMs: number): number =>
     endMs === startMs ? 0 : Math.min(1, Math.max(0, (ms - startMs) / (endMs - startMs)));
@@ -133,21 +163,25 @@ export function createTimeline(api: AppApi): { el: HTMLElement } {
     nowTick.style.left = `${nowFrac * 100}%`;
     future.style.left = `${nowFrac * 100}%`;
 
-    // density strip
+    // density strip — obs and events counted separately so the hover
+    // readout can name what the bar is made of
     try {
       const snap = api.store.snapshot;
       const BUCKETS = 72;
-      const counts = new Array(BUCKETS).fill(0);
+      densObs = new Array(BUCKETS).fill(0);
+      densEvt = new Array(BUCKETS).fill(0);
+      densRange = { startMs, endMs };
       for (const o of snap.observations) {
         const ms = Date.parse(o.provenance.knownAt);
         if (Number.isFinite(ms) && ms >= startMs && ms <= endMs)
-          counts[Math.min(BUCKETS - 1, Math.floor(frac(ms, startMs, endMs) * BUCKETS))]++;
+          densObs[Math.min(BUCKETS - 1, Math.floor(frac(ms, startMs, endMs) * BUCKETS))]++;
       }
       for (const e of snap.events) {
         const ms = Date.parse(e.start);
         if (Number.isFinite(ms) && ms >= startMs && ms <= endMs)
-          counts[Math.min(BUCKETS - 1, Math.floor(frac(ms, startMs, endMs) * BUCKETS))]++;
+          densEvt[Math.min(BUCKETS - 1, Math.floor(frac(ms, startMs, endMs) * BUCKETS))]++;
       }
+      const counts = densObs.map((v, i) => v + densEvt[i]);
       const peak = Math.max(...counts, 1);
       const dpr = Math.max(1, window.devicePixelRatio || 1);
       const w = density.clientWidth || 600;

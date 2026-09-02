@@ -86,6 +86,17 @@ npm run check    # seam + provenance + types
   rail says so and offers the toggle — it never correlates against nothing.
 - **Market pulse** (status bar) — EUR/USD (ECB daily fix) and BTC (Coinbase
   last trade), basis in the tooltip; absent, never zero, when the feed is down
+- **Feed health** (status bar chip) — a session ledger of the last 20 attempt
+  outcomes per feed ("markets.fx · 2/2 OK", "operations · refused 3 of last
+  20"); click to expand. A feed never attempted is absent, not OK.
+- **Search** is one fuzzy, ranked palette — verbs, layer toggles, presets, and
+  corpus entities compete in a single scored list (diacritic-folded: `glog`
+  finds Głogów)
+- **Audio cue** (alerts rail, `CUE OFF/ON`) — opt-in, off by default: a short
+  chime when a NEW alert-severity item appears; never for standing alerts.
+  Preference remembered per browser.
+- **Timeline density strip** — hover for the window's evidence readout
+  ("2 observations known · 1 event start"), including the honest empty case
 - Command examples: `find toronto` · `show maritime` · `show aircraft` · `follow the load`
 
 ## Layer reference

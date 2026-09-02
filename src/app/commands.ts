@@ -450,67 +450,126 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
 // suggestCommands
 // ------------------------------------------------------------------
 
+/**
+ * Fuzzy match score — one ranking for verbs, layers, presets, and
+ * entities alike. Exact > prefix > word-boundary > substring >
+ * subsequence (with word-start and consecutive-run bonuses). null =
+ * no match. Deterministic, dependency-free.
+ */
+/** Diacritic fold so 'glog' finds Głogów: NFD strip + the few letters
+ *  (ł, ø, đ, æ) that don't decompose into base + combining mark. */
+function fold(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/ł/g, 'l')
+    .replace(/ø/g, 'o')
+    .replace(/đ/g, 'd')
+    .replace(/æ/g, 'ae');
+}
+
+function fuzzyScore(query: string, text: string): number | null {
+  const q = fold(query);
+  const t = fold(text);
+  if (!q) return 0;
+  if (t === q) return 1000;
+  if (t.startsWith(q)) return 900 - t.length * 0.2;
+  const word = t.indexOf(' ' + q);
+  if (word >= 0) return 800 - word - t.length * 0.1;
+  const sub = t.indexOf(q);
+  if (sub >= 0) return 700 - sub - t.length * 0.1;
+  let ti = 0;
+  let score = 0;
+  let run = 0;
+  for (let qi = 0; qi < q.length; qi++) {
+    const ch = q[qi];
+    let found = -1;
+    while (ti < t.length) {
+      if (t[ti] === ch) {
+        found = ti;
+        break;
+      }
+      ti++;
+    }
+    if (found < 0) return null;
+    const wordStart = found === 0 || t[found - 1] === ' ' || t[found - 1] === '-';
+    run = qi > 0 && found > 0 && t[found - 1] === q[qi - 1] ? run + 1 : 0;
+    score += 10 + (wordStart ? 15 : 0) + run * 8 - Math.min(found, 30) * 0.3;
+    ti = found + 1;
+  }
+  return score - t.length * 0.2;
+}
+
+/**
+ * One fuzzy, ranked palette: verbs, layer toggles, presets, commodity
+ * flows, and corpus entities compete in a single scored list instead
+ * of three concatenated grammars. Entities are matched over the whole
+ * snapshot (a few hundred names — a linear scan is nothing).
+ */
 export function suggestCommands(api: AppApi, input: string): Suggestion[] {
   const text = normalize(input);
   if (!text) return STARTERS.slice();
   const lower = text.toLowerCase();
 
-  const out: Suggestion[] = [];
+  interface Ranked {
+    s: Suggestion;
+    score: number;
+  }
+  const ranked: Ranked[] = [];
   const seen = new Set<string>();
-  const push = (s: Suggestion) => {
+  const consider = (s: Suggestion, score: number | null, weight = 0): void => {
+    if (score === null) return;
     const key = s.text.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    out.push(s);
+    ranked.push({ s, score: score + weight });
   };
 
-  // verb completions matching the prefix
+  // command verbs & templates — a small weight so a typed verb beats a
+  // weak entity subsequence, but a strong entity prefix still wins
   for (const v of VERB_SUGGESTIONS) {
-    if (v.text.toLowerCase().startsWith(lower) || v.label.toLowerCase().startsWith(lower)) {
-      push(v);
-    }
+    consider(v, fuzzyScore(lower, v.label) ?? fuzzyScore(lower, v.text), 30);
   }
 
-  // layer completions for 'show <partial>' / 'hide <partial>'
+  // layer toggles — matched on the alias itself AND on 'show <alias>'
   const showHide = /^(show|hide)\s+(.*)$/.exec(lower);
-  if (showHide) {
-    const verb = showHide[1];
-    const partial = showHide[2];
-    for (const alias of Object.keys(LAYER_ALIASES)) {
-      if (!partial || alias.startsWith(partial)) {
-        push({
-          text: `${verb} ${alias}`,
-          label: `${verb} ${alias}`,
-          hint: LAYER_LABELS[LAYER_ALIASES[alias]],
-        });
-      }
-      if (out.length >= 12) break;
-    }
+  for (const alias of Object.keys(LAYER_ALIASES)) {
+    const verb = showHide?.[1] ?? 'show';
+    const needle = showHide ? showHide[2] : lower;
+    consider(
+      {
+        text: `${verb} ${alias}`,
+        label: `${verb} ${alias}`,
+        hint: LAYER_LABELS[LAYER_ALIASES[alias]],
+      },
+      fuzzyScore(needle, alias),
+      showHide ? 60 : -10
+    );
   }
 
-  // commodity special-case: 'copper' → show copper flows
+  // commodity flows shortcut
   for (const c of api.store.snapshot.commodities) {
-    const cname = c.name.toLowerCase();
-    if (cname.includes(lower) || lower.includes(cname)) {
-      push({
-        text: `show ${cname} flows`,
-        label: `show ${c.name} flows`,
-        hint: 'FLOWS',
-      });
-      push({ text: 'show flows', label: 'show flows', hint: 'LAYER' });
-      break;
-    }
+    consider(
+      { text: `show ${c.name.toLowerCase()} flows`, label: `show ${c.name} flows`, hint: 'FLOWS' },
+      fuzzyScore(lower, c.name),
+      5
+    );
   }
 
-  // entity results as find-suggestions
-  const results: SearchResult[] = api.search(lower).slice(0, 5);
-  for (const r of results) {
-    push({
-      text: `find ${r.name}`,
-      label: r.name,
-      hint: r.kind.toUpperCase(),
-    });
+  // corpus entities — fuzzy over the whole snapshot, one scan
+  const snap = api.store.snapshot;
+  const entity = (name: string, hint: string): void =>
+    consider({ text: `find ${name}`, label: name, hint }, fuzzyScore(lower, name), 0);
+  for (const n of snap.nodes) entity(n.name, n.kind.replace(/_/g, ' ').toUpperCase());
+  for (const r of snap.routes) entity(r.name, r.mode.toUpperCase());
+  for (const f of snap.flows) entity(f.name, 'FLOW');
+
+  // the store's own search may catch alias/id matches the name scan missed
+  for (const r of api.search(lower).slice(0, 5) as SearchResult[]) {
+    consider({ text: `find ${r.name}`, label: r.name, hint: r.kind.toUpperCase() }, 400);
   }
 
-  return out.slice(0, 12);
+  ranked.sort((a, b) => b.score - a.score);
+  return ranked.slice(0, 12).map((r) => r.s);
 }

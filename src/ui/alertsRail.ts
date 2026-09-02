@@ -29,19 +29,82 @@ export function createAlertsRail(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');
   el.className = 'pe-alerts';
 
+  const headWrap = document.createElement('div');
+  headWrap.className = 'pe-alerts-headwrap';
   const head = document.createElement('button');
   head.type = 'button';
   head.className = 'pe-alerts-head';
+  const cueBtn = document.createElement('button');
+  cueBtn.type = 'button';
+  cueBtn.className = 'pe-alerts-cuebtn';
+  headWrap.append(head, cueBtn);
 
   const body = document.createElement('div');
   body.className = 'pe-alerts-body';
-  el.append(head, body);
+  el.append(headWrap, body);
 
   let open = true;
   head.addEventListener('click', () => {
     open = !open;
     body.hidden = !open;
   });
+
+  // ---- audio cue: OPT-IN, off by default, preference remembered.
+  // A short two-tone chime when a NEW alert-severity item appears —
+  // never on refreshes of standing alerts, never on the first render.
+  // The enabling click is the browser's required audio gesture.
+  let cueOn = false;
+  try {
+    cueOn = localStorage.getItem('pe.alertCue') === '1';
+  } catch {
+    /* storage unavailable — stays off */
+  }
+  let audioCtx: AudioContext | null = null;
+  let prevAlertIds: Set<string> | null = null;
+
+  const chime = (): void => {
+    try {
+      audioCtx = audioCtx ?? new AudioContext();
+      if (audioCtx.state === 'suspended') void audioCtx.resume();
+      const t0 = audioCtx.currentTime;
+      for (const [freq, at] of [
+        [880, 0],
+        [660, 0.12],
+      ] as const) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, t0 + at);
+        gain.gain.linearRampToValueAtTime(0.12, t0 + at + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + at + 0.14);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(t0 + at);
+        osc.stop(t0 + at + 0.16);
+      }
+    } catch {
+      /* audio unavailable — the rail stays visual-only */
+    }
+  };
+
+  const syncCueBtn = (): void => {
+    cueBtn.textContent = cueOn ? 'CUE ON' : 'CUE OFF';
+    cueBtn.classList.toggle('on', cueOn);
+    cueBtn.title = cueOn
+      ? 'Audio cue plays when a NEW alert-severity item appears — click to disable'
+      : 'Enable a short audio cue for NEW alert-severity items (opt-in; off by default)';
+  };
+  cueBtn.addEventListener('click', () => {
+    cueOn = !cueOn;
+    try {
+      localStorage.setItem('pe.alertCue', cueOn ? '1' : '0');
+    } catch {
+      /* preference simply won't persist */
+    }
+    syncCueBtn();
+    if (cueOn) chime(); // audible confirmation, and the unlock gesture
+  });
+  syncCueBtn();
 
   const thresholdLine = PROXIMITY_THRESHOLDS.map(
     (t) => `M${t.minMag}+ ≤ ${t.radiusKm} km`
@@ -62,6 +125,7 @@ export function createAlertsRail(api: AppApi): { el: HTMLElement } {
   const render = (): void => {
     body.replaceChildren();
     const nowMs = Date.now();
+    const alertIds = new Set<string>();
 
     // ---- live hazards × corpus assets
     const sect1 = document.createElement('div');
@@ -85,6 +149,7 @@ export function createAlertsRail(api: AppApi): { el: HTMLElement } {
     } else {
       const alerts = correlateQuakes(quakes, api.store.snapshot.nodes, nowMs);
       hazardCount = alerts.length;
+      for (const a of alerts) if (a.severity === 'alert') alertIds.add(a.id);
       if (!alerts.length) {
         const none = document.createElement('div');
         none.className = 'pe-alerts-none';
@@ -128,9 +193,22 @@ export function createAlertsRail(api: AppApi): { el: HTMLElement } {
       }
     }
 
+    for (const e of active) if (e.severity >= 0.7) alertIds.add(e.id);
+
     const total = hazardCount + active.length;
     head.innerHTML = `ALERTS ${total ? `<b>${total}</b>` : '<span class="pe-alerts-zero">0</span>'}`;
     el.classList.toggle('pe-alerts-hot', hazardCount > 0 || active.some((e) => e.severity >= 0.7));
+
+    // chime only for a NEW alert-severity id — standing alerts stay silent
+    if (cueOn && prevAlertIds !== null) {
+      for (const id of alertIds) {
+        if (!prevAlertIds.has(id)) {
+          chime();
+          break;
+        }
+      }
+    }
+    prevAlertIds = alertIds;
   };
 
   // recompute when the feed lands, when sim time jumps regimes, and on

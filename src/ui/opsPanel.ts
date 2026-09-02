@@ -29,6 +29,7 @@ import {
   type OpsSnapshot,
 } from '../data/operations';
 import { resolveApiBase } from '../data/sources';
+import { recordFeed } from '../core/health';
 import './ops.css';
 
 const esc = (s: string): string =>
@@ -397,6 +398,7 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
 
   const refresh = async (): Promise<void> => {
     last = await fetchOperations(resolveApiBase());
+    recordFeed('operations', last.kind === 'ok' ? 'ok' : last.kind);
     lastFetchedAt = Date.now();
     renderBody();
   };

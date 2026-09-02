@@ -11,6 +11,7 @@
 import type { AppApi, AppEvents } from '../app/api';
 import { resolveApiBase } from '../data/sources';
 import { fetchCrypto, fetchFx } from '../live/markets';
+import { feedHealth, onFeedHealth, type FeedLedger } from '../core/health';
 
 const THROTTLE_MS = 250;
 const MARKET_PULSE_MS = 120_000;
@@ -74,6 +75,58 @@ export function createStatusBar(api: AppApi): { el: HTMLElement } {
   };
   void pollMarkets();
   window.setInterval(() => void pollMarkets(), MARKET_PULSE_MS);
+
+  // ---- feed health: the OS observing its own feeds over the session.
+  // The chip aggregates; the card itemizes "refused 3 of last 20".
+  const healthChip = document.createElement('button');
+  healthChip.type = 'button';
+  healthChip.className = 'pe-sb-chip pe-sb-health';
+  healthChip.textContent = 'FEEDS UNTRIED';
+  healthChip.title = 'Session feed-health ledger — click to expand';
+  el.appendChild(healthChip);
+
+  const healthCard = document.createElement('div');
+  healthCard.className = 'pe-health-card';
+  healthCard.hidden = true;
+  el.appendChild(healthCard);
+
+  const ledgerLine = (l: FeedLedger): string => {
+    const okN = l.samples.filter((s) => s.outcome === 'ok').length;
+    const n = l.samples.length;
+    const last = l.samples[n - 1];
+    const ageS = Math.max(0, Math.round((Date.now() - last.t) / 1000));
+    const ageTxt = ageS < 90 ? `${ageS}s` : `${Math.round(ageS / 60)}m`;
+    const tone = last.outcome === 'ok' ? (okN === n ? 'ok' : 'warn') : 'alert';
+    const detail =
+      okN === n
+        ? `${okN}/${n} OK`
+        : `${n - okN} ${l.samples.filter((s) => s.outcome === 'refused').length >= n - okN ? 'REFUSED' : 'FAILED'} OF LAST ${n}`;
+    return `<div class="pe-health-row ${tone}"><span class="pe-health-feed">${l.feed.toUpperCase()}</span><span class="pe-health-detail">${detail}</span><span class="pe-health-last">LAST ${last.outcome.toUpperCase()} · ${ageTxt} AGO</span></div>`;
+  };
+
+  const renderHealth = (): void => {
+    const ledgers = feedHealth();
+    if (!ledgers.length) {
+      healthChip.textContent = 'FEEDS UNTRIED';
+      healthChip.classList.remove('warn', 'alert');
+      healthCard.innerHTML = `<div class="pe-health-head">FEED HEALTH — SESSION LEDGER</div>
+        <div class="pe-health-none">No feed attempted yet this session — untried, not OK.</div>`;
+      return;
+    }
+    const degraded = ledgers.filter((l) => l.samples[l.samples.length - 1].outcome !== 'ok');
+    healthChip.textContent = degraded.length ? `FEEDS ${degraded.length} DEGRADED` : `FEEDS ${ledgers.length} OK`;
+    healthChip.classList.toggle('alert', degraded.length > 0);
+    healthCard.innerHTML =
+      `<div class="pe-health-head">FEED HEALTH — SESSION LEDGER · LAST ${20} ATTEMPTS PER FEED</div>` +
+      ledgers.map(ledgerLine).join('') +
+      `<div class="pe-health-note">Outcomes are the typed results (ok / refused / unreachable); a feed never attempted is absent from this list, not OK.</div>`;
+  };
+  renderHealth();
+  onFeedHealth(renderHealth);
+  healthChip.addEventListener('click', () => {
+    healthCard.hidden = !healthCard.hidden;
+    if (!healthCard.hidden) renderHealth();
+  });
 
   const brushChip = document.createElement('span');
   brushChip.className = 'pe-sb-chip pe-sb-brush';
