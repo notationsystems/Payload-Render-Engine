@@ -633,8 +633,13 @@ export class App implements AppApi {
       }
       document.body.style.cursor = 'pointer';
     });
-    input.onClick = (pick, x, y) => {
+    input.onClick = (pick, x, y, shiftKey) => {
       if (this.demo.active) return;
+      // shift-click pins for comparison — selection is untouched
+      if (shiftKey && pick && pick.type !== 'country') {
+        this.events.emit('pin', { id: pick.id });
+        return;
+      }
       // live contacts outrank empty space AND the country pick — an
       // aircraft dart hugs the globe, so the sphere hit would otherwise
       // always swallow the click. Corpus nodes/routes still win.

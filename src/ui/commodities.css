@@ -175,3 +175,24 @@
 }
 .cm-click { cursor: pointer; border-radius: 2px; }
 .cm-click:hover .cm-prod-name { color: var(--accent); }
+
+/* MARKET CONTEXT — FX lens (computed restatements of the observed price) */
+.cm-fx-base {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  color: var(--text-mid);
+  margin: 2px 0 6px;
+}
+.cm-fx-base b { color: var(--text-hi); font-weight: 500; }
+.cm-fx-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-mid);
+}
+.cm-fx-cell b { color: var(--text-hi); font-weight: 500; }

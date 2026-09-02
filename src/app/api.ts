@@ -125,6 +125,8 @@ export interface AppEvents extends Record<string, unknown> {
   };
   /** Sensor style changed (0 normal · 1 nvg · 2 flir · 3 crt · 4 noir). */
   sensor: { mode: 0 | 1 | 2 | 3 | 4; label: string };
+  /** Shift-click pin toggle for A/B comparison (selection untouched). */
+  pin: { id: EntityId };
   /** Live seismic feed loaded/refreshed (count of reported events). */
   liveQuakes: { count: number };
   /** Cursor over a live contact (identification before the click). */

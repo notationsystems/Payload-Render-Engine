@@ -16,6 +16,8 @@
 import type { AppApi } from '../app/api';
 import type { EntityId, Observation } from '../data/contracts';
 import { drawSparkline } from './sparkline';
+import { fetchFx, type FxSet } from '../live/markets';
+import { resolveApiBase } from '../data/sources';
 import './commodities.css';
 
 const esc = (s: string): string =>
@@ -67,6 +69,8 @@ export function createCommoditiesPanel(api: AppApi): { el: HTMLElement } {
   el.append(header, chips, focusNote, body, peek);
 
   let selected: EntityId | null = null;
+  let fx: FxSet | null = null;
+  let fxState: 'idle' | 'pending' | 'unavailable' = 'idle';
 
   // ------------------------------------------------------------- helpers
 
@@ -183,6 +187,50 @@ export function createCommoditiesPanel(api: AppApi): { el: HTMLElement } {
     return tile;
   };
 
+  /**
+   * MARKET CONTEXT — the FX lens: the latest OBSERVED corpus price
+   * restated through the ECB daily fix. Every restatement is COMPUTED
+   * (obs USD price × fix), both instants are stated, and the tile says
+   * plainly why there is no live metals quote: exchange metals data is
+   * licensed — this desk never invents one.
+   */
+  const marketContextTile = (prices: Observation[]): HTMLElement => {
+    const tile = document.createElement('div');
+    tile.className = 'cm-tile cm-tile-wide';
+    tile.innerHTML = `<div class="cm-tile-title">MARKET CONTEXT — FX LENS</div>`;
+    if (!prices.length) {
+      tile.innerHTML += `<div class="cm-none">NO PRICE OBSERVATIONS TO RESTATE</div>`;
+      return tile;
+    }
+    const last = prices[prices.length - 1];
+    const unit = last.unit ?? '';
+    if (!unit.toUpperCase().startsWith('USD')) {
+      tile.innerHTML += `<div class="cm-none">LATEST PRICE IS IN ${esc(unit || 'AN UNSTATED UNIT')} — the FX lens restates USD-quoted observations only</div>`;
+      return tile;
+    }
+    if (fxState === 'unavailable' || (!fx && fxState !== 'pending')) {
+      tile.innerHTML += `<div class="cm-none">FX DESK UNAVAILABLE — the lens needs the spatial API's markets proxy (ECB fix via frankfurter)</div>`;
+      return tile;
+    }
+    if (!fx) {
+      tile.innerHTML += `<div class="cm-none">FETCHING THE ECB FIX…</div>`;
+      return tile;
+    }
+    const denom = unit.slice(3); // '/lb', '/t', …
+    const rates = fx.rates[fx.latestDate] ?? {};
+    const row = (sym: string): string => {
+      const r = rates[sym];
+      if (!Number.isFinite(r)) return '';
+      return `<span class="cm-fx-cell"><b>${esc((last.value * r).toLocaleString('en-US', { maximumFractionDigits: 2 }))}</b> ${esc(sym + denom)}</span>`;
+    };
+    tile.innerHTML += `
+      <div class="cm-fx-base">OBSERVED <b>${esc(last.value.toLocaleString('en-US'))} ${esc(unit)}</b> AS OF ${esc(last.t.slice(0, 10))}</div>
+      <div class="cm-fx-row">${['EUR', 'CNY', 'JPY', 'BRL', 'INR'].map(row).join('')}</div>
+      <div class="cm-tile-evidence">COMPUTED — obs USD price × ECB fix of ${esc(fx.latestDate)} (informational, not a tradeable quote)</div>
+      <div class="cm-tile-evidence">NO LIVE METALS QUOTE — exchange metals data is licensed; this desk restates the corpus observation, it never invents a price</div>`;
+    return tile;
+  };
+
   const flowsSection = (commodityId: EntityId): HTMLElement => {
     const wrap = document.createElement('div');
     wrap.className = 'cm-flows';
@@ -262,6 +310,7 @@ export function createCommoditiesPanel(api: AppApi): { el: HTMLElement } {
       sparkTile('NET POSITIONING', series(obs, 'net_positioning'), '#b48cff')
     );
     body.appendChild(grid);
+    body.appendChild(marketContextTile(series(obs, 'price')));
     body.appendChild(producersTile(series(obs, 'production')));
     body.appendChild(flowsSection(selected));
   };
@@ -269,6 +318,18 @@ export function createCommoditiesPanel(api: AppApi): { el: HTMLElement } {
   api.events.on('preset', ({ preset }) => {
     const open = preset === 'commodities';
     el.hidden = !open;
+    if (open && fxState === 'idle') {
+      fxState = 'pending';
+      void fetchFx(resolveApiBase()).then((r) => {
+        if (r.kind === 'ok') {
+          fx = r.data;
+          fxState = 'idle';
+        } else {
+          fxState = 'unavailable';
+        }
+        if (!el.hidden) render();
+      });
+    }
     if (open) render();
     else {
       api.setCommodityFocus(null);

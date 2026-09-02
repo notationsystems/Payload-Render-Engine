@@ -28,6 +28,7 @@ import { createMarketsPanel } from './ui/marketsPanel';
 import { createAlertsRail } from './ui/alertsRail';
 import { createSitrep } from './ui/sitrep';
 import { createReticle } from './ui/reticle';
+import { createPinsPanel } from './ui/pinsPanel';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -68,6 +69,7 @@ async function start(): Promise<void> {
   hud.appendChild(createAlertsRail(app).el);
   hud.appendChild(createSitrep(app).el);
   hud.appendChild(createReticle(app).el);
+  hud.appendChild(createPinsPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 

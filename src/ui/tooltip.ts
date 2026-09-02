@@ -97,5 +97,11 @@ export function createTooltip(api: AppApi): { el: HTMLElement } {
     if (currentId && !el.hidden) render(currentId);
   });
 
+  // a panel opening under the cursor orphans the hover — clear it
+  api.events.on('preset', () => {
+    currentId = null;
+    el.hidden = true;
+  });
+
   return { el };
 }

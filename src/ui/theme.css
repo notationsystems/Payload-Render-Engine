@@ -1029,6 +1029,113 @@ input {
 .pe-track-release:hover { color: var(--warn); border-color: var(--warn); }
 
 /* ------------------------------------------------------------------ */
+/* pin-to-compare — shift-click A/B cards + delta strip                */
+/* ------------------------------------------------------------------ */
+.pe-pins {
+  position: fixed;
+  left: 240px;
+  top: 108px;
+  z-index: 15;
+  width: 256px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+.pe-pins-head {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+}
+.pe-pin-card {
+  background: var(--glass);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 7px 9px;
+}
+.pe-pin-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.pe-pin-slot {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  padding: 1px 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  color: var(--text-mid);
+  flex: none;
+}
+.pe-pin-name {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-hi);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pe-pin-name:hover { color: var(--accent); }
+.pe-pin-x {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  flex: none;
+}
+.pe-pin-x:hover { color: var(--warn); }
+.pe-pin-meta {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.pe-pin-state {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-mid);
+}
+.pe-pin-state b { color: var(--text-hi); font-weight: 500; }
+.pe-pin-unobs { color: var(--text-dim); letter-spacing: 0.06em; }
+.pe-pin-delta {
+  background: var(--glass-soft);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 6px 9px;
+}
+.pe-pin-drow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-mid);
+  padding: 1px 0;
+  font-variant-numeric: tabular-nums;
+}
+.pe-pin-drow b { color: var(--text-hi); font-weight: 500; }
+.pe-pin-basis {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+/* ------------------------------------------------------------------ */
 /* tracking reticle — HUD ring on the tracked live contact             */
 /* ------------------------------------------------------------------ */
 .pe-reticle {
