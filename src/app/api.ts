@@ -140,6 +140,8 @@ export interface AppEvents extends Record<string, unknown> {
     label?: string;
     matched?: number;
     basis?: string;
+    /** which declared field matched — outputs (producers) or inputs */
+    role?: 'producers' | 'consumers';
     commodityId?: EntityId | null;
     /** null/undefined = refinement not tried; 0 = tried, none declared */
     routesLit?: number | null;

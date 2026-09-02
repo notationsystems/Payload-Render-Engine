@@ -1237,6 +1237,7 @@ export class App implements AppApi {
       label: this.queryState.label,
       matched: this.queryIds.size,
       basis: `matched on the corpus ${this.queryState.role === 'producers' ? 'outputs' : 'inputs'} field — declared, not inferred`,
+      role: this.queryState.role,
       commodityId: this.queryState.commodityId,
       routesLit: this.queryState.routesLit,
       flowsOn: this.queryState.flowsOn,

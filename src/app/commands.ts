@@ -174,6 +174,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'corpus', label: 'corpus — definition of the loaded corpus', hint: 'CORPUS' },
   { text: 'compiler', label: 'compiler — build + conservation report', hint: 'BUILD' },
   { text: 'refusals', label: 'refusals — the refused:* work queue', hint: 'QUEUE' },
+  { text: 'warrant', label: 'warrant — why do we believe this?', hint: 'WARRANT' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -324,6 +325,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'compiler' || lower === 'build' || lower === 'builds') {
     window.dispatchEvent(new CustomEvent('pe:compiler-toggle'));
     return ok('COMPILER CONSOLE — build identity · record census · conservation report');
+  }
+
+  // -- warrant graph: why do we believe this? A walkable chain.
+  if (lower === 'warrant' || lower === 'why') {
+    window.dispatchEvent(new CustomEvent('pe:warrant-toggle'));
+    return ok('WARRANT GRAPH — claim → computation → records → sources → build; no score, a chain');
   }
 
   // -- refusals work queue: what the upstream declined, with remedies

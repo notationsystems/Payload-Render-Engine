@@ -148,6 +148,16 @@ export class WorldStore {
 
   // ----------------------------------------------------- promises vs evidence
 
+  /** Evidence records for an entity — its observations, unfiltered. */
+  observationsFor(entityId: EntityId): Observation[] {
+    return this.observationsByEntity.get(entityId) ?? [];
+  }
+
+  /** Promise records for an entity — its assertions, unfiltered. */
+  assertionsFor(entityId: EntityId): Assertion[] {
+    return this.assertionsByEntity.get(entityId) ?? [];
+  }
+
   /**
    * Join assertions (promises) against observations (evidence) for an
    * entity — the deviation history that shows where estimates run
