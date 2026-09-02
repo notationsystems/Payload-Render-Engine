@@ -149,7 +149,11 @@ export function createStatusBar(api: AppApi): { el: HTMLElement } {
     try {
       const meta = api.store.snapshot.meta;
       chip.textContent = meta.disclaimer.split('—')[0].trim();
-      chip.title = meta.disclaimer;
+      // the corpus-build identity rides in the tooltip: every screen can
+      // answer "which build of the corpus produced this?"
+      chip.title = meta.corpusBuild
+        ? `${meta.disclaimer}\n${meta.corpusBuild.id} · canonical state ${meta.corpusBuild.canonicalStateFingerprint} · schema ${meta.corpusBuild.schemaVersion}`
+        : meta.disclaimer;
     } catch {
       /* snapshot not loaded yet */
     }

@@ -254,6 +254,8 @@ export function registerMarketRoutes(get, { ok, refuse, meta }) {
     valueKind: 'reported',
     admissible: true,
     knownAt: fetchedAt,
+    // a venue/central-bank answer is NOT corpus-derived — no build id
+    corpusBuild: undefined,
     ...over,
   });
 

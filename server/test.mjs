@@ -209,6 +209,35 @@ else process.env.PAYLOAD_OPERATIONS_TOKEN = savedToken;
 if (savedUrl === undefined) delete process.env.TERMINAL_URL;
 else process.env.TERMINAL_URL = savedUrl;
 
+// corpus-build identity: every corpus-derived answer names its build
+console.log('\n— corpus build identity —');
+const snapEnv = await call('GET', '/api/snapshot');
+const cb = snapEnv?.meta?.corpusBuild;
+check(
+  !!cb && /^[0-9a-f]{16}$/.test(cb.canonicalStateFingerprint),
+  'corpus answers carry corpusBuild with a 16-hex canonical-state fingerprint'
+);
+check(
+  !!cb && cb.id.includes(cb.canonicalStateFingerprint.slice(0, 8)),
+  'build id embeds the fingerprint prefix'
+);
+check(
+  snapEnv?.data?.meta?.corpusBuild?.canonicalStateFingerprint === cb?.canonicalStateFingerprint,
+  'the snapshot itself carries the same build (renderers can display it)'
+);
+// determinism: the SAME canonical state fingerprints identically —
+// registering routes twice over one corpus object must agree
+const { loadSyntheticCorpus: loadSynth } = await import('./loaders/synthetic.mjs');
+const sameCorpus = await loadSynth();
+const callA = makeCall(await registerRoutes(sameCorpus));
+const callB = makeCall(await registerRoutes(sameCorpus));
+const fpA = (await callA('GET', '/api/snapshot'))?.meta?.corpusBuild?.canonicalStateFingerprint;
+const fpB = (await callB('GET', '/api/snapshot'))?.meta?.corpusBuild?.canonicalStateFingerprint;
+check(!!fpA && fpA === fpB, 'same canonical state ⇒ same fingerprint (two registrations)');
+// and DIFFERENT canonical state must not collide
+const tFp = (await tcall('GET', '/api/snapshot'))?.meta?.corpusBuild?.canonicalStateFingerprint;
+check(!!tFp && tFp !== fpA, 'different corpora ⇒ different fingerprints (terminal vs synthetic)');
+
 // broker seam: fail-closed without a gateway, credential posture stated
 console.log('\n— markets broker seam —');
 const savedGw = process.env.IBKR_GATEWAY_URL;

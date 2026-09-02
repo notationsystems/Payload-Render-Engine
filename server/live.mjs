@@ -136,7 +136,9 @@ function parseTle(text) {
 }
 
 export function registerLiveRoutes(get, { ok, refuse, meta }) {
-  const liveMeta = (base, over) => ({ ...base, ...over });
+  // a live public feed is NOT corpus-derived: the corpus-build identity
+  // must never ride on it (undefined keys drop in JSON serialization)
+  const liveMeta = (base, over) => ({ ...base, corpusBuild: undefined, ...over });
 
   // observed air traffic around a point — gods-eye-view's adsb.lol
   // fallback pattern: regional observed context, never claimed as

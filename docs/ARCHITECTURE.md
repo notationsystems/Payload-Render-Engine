@@ -594,3 +594,76 @@ through its backend:
 - Both layers load lazily on first toggle; an unreachable feed is a
   toast with the refusal's remedy and an empty layer — never
   fabricated points.
+
+## 18. Decision record — the locked platform architecture
+
+**Decided 2026-09-02, operator sign-off. Not to be revisited unless
+benchmarks force it.**
+
+PayLoad OS is an **information** operating system. The core mission:
+
+> Acquire → Extract → Normalize → Resolve → Structure → Relate →
+> Index → Compress → Retrieve → Compute → Prove
+
+The locked invariant:
+
+> **Canonical Core → Rebuildable Representations → Controlled
+> Retrieval → Products/APIs**
+
+Five planes — ingestion, truth, storage, representation, access —
+with **security cutting vertically through every plane** (policy
+labels + information-flow control, not one perimeter). Storage
+topology V0 is Postgres/PostGIS + object storage + a vector store;
+dedicated temporal or graph engines only when a workload proves the
+need. Temporal semantics live as fields on canonical records
+(`event_time / known_at / valid_from / valid_to / recorded_at`).
+
+### Doctrines this repo already embodies
+
+- **Representations are disposable** (`Rᵢ = Cᵢ(K)`, never the
+  inverse): this renderer and this projection service are exactly
+  such representations — both can be destroyed and regenerated from
+  canonical state, and neither can write back (INV-6 / the mechanical
+  seam).
+- **Answers carry their warrant**: the `{status, data, meta}`
+  envelope already carries basis, knownAt, admissibility,
+  attribution, and typed refusals — the early form of the
+  proof-carrying Answer object
+  (`value · basis · evidence · computation · uncertainty · policy ·
+  corpus_build`).
+- **Corpus-build identity** (implemented here): every corpus-derived
+  response carries `meta.corpusBuild` — `id`,
+  `canonicalStateFingerprint` (content hash of the canonical
+  snapshot), `schemaVersion`, `compilerVersion`, `generatedAt` — so
+  *"which version of the corpus produced this answer?"* is always
+  answerable. Live-feed and market answers explicitly do NOT carry it:
+  they are not corpus-derived, and conflating them would falsify the
+  lineage. Version fields appear only when the capability exists — no
+  ontology/embedding version is stamped until an ontology/embedding
+  exists.
+
+### How this service's routes map to the five API families
+
+| Locked family | Served here today |
+|---|---|
+| `/v1/entities/*` | `/api/snapshot`, `/api/entities`, `/api/state/{id}` |
+| `/v1/evidence/*` | per-record provenance on every entity/observation; inspector evidence rows |
+| `/v1/spatial/*` | bbox filtering, geometry on entities (nearby/within/route/exposure are corpus-engine work) |
+| `/v1/intelligence/*` | `/api/scenarios/rank`, the query verbs (`producers of`), proximity correlation |
+| `/v1/research/*` | not served here — GraphRAG/Context Compiler territory |
+
+This projection service is a **prototype of the Payload API's
+semantic boundary**, not the API itself: when the corpus-platform
+services land, Payload Earth consumes the same public contract as
+Terminal, Tradewind, agents, and customers — dogfooding the product
+boundary daily.
+
+### Contract obligations for anything drawn here
+
+1. Corpus answers name their build; non-corpus answers must not.
+2. Nothing rendered may require reading a representation back into
+   canonical state.
+3. When `DataPolicy` labels land on records, every surface that
+   displays a derived figure must be able to display its policy
+   lineage — the UI contract is reserved now so the field is worn,
+   not hidden, when it arrives.

@@ -13,15 +13,56 @@
  * scenario support all travel with the corpus object.
  */
 
+import { createHash } from 'node:crypto';
 import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { registerMarketRoutes } from './markets.mjs';
+
+/** Version of the entity/observation/relationship/event schema this
+ *  projection serves — part of every corpus build's identity. */
+const SCHEMA_VERSION = '0.1';
 
 export async function registerRoutes(corpus) {
   corpus = corpus ?? (await selectCorpus(process.env));
 
   const snapshot = corpus.snapshot;
   const scenarios = corpus.scenarios;
+
+  // ------------------------------------------------------- corpus build
+  // Locked platform doctrine: every corpus-derived answer names the
+  // build that produced it — "which version of the corpus produced
+  // this answer?" is always answerable. The fingerprint is a content
+  // hash of the canonical snapshot this projection serves; identical
+  // canonical state ⇒ identical fingerprint; any change ⇒ a new one.
+  // Fields appear as the capabilities exist — no ontology/embedding
+  // version is stamped until an ontology/embedding actually exists.
+  const canonicalStateFingerprint = createHash('sha256')
+    .update(
+      JSON.stringify({
+        nodes: snapshot.nodes,
+        routes: snapshot.routes,
+        flows: snapshot.flows,
+        events: snapshot.events,
+        assertions: snapshot.assertions,
+        observations: snapshot.observations,
+        commodities: snapshot.commodities,
+        timeRange: snapshot.timeRange,
+      })
+    )
+    .digest('hex')
+    .slice(0, 16);
+  const corpusBuild = {
+    id: `build-${corpus.kind}-${canonicalStateFingerprint.slice(0, 8)}`,
+    canonicalStateFingerprint,
+    schemaVersion: SCHEMA_VERSION,
+    compilerVersion: `${corpus.kind}-loader/0.1`,
+    generatedAt: snapshot.meta.generatedAt,
+  };
+  // the build identity rides on RESPONSES, never on the canonical
+  // object itself — the loader stays a pure projection (byte-identical
+  // snapshots for identical captures), and the /api/snapshot route
+  // augments its served copy so renderers can display the build
+  const snapshotWithBuild = { ...snapshot, meta: { ...snapshot.meta, corpusBuild } };
 
   const RANGE = snapshot.timeRange;
   const startMs = Date.parse(RANGE.start);
@@ -70,6 +111,8 @@ export async function registerRoutes(corpus) {
       corpusGeneratedAt: snapshot.meta.generatedAt,
       ...(corpus.attributionExtra ?? {}),
     },
+    // which build of the corpus produced this answer — always answerable
+    corpusBuild,
     disclaimer: snapshot.meta.disclaimer,
   });
 
@@ -205,7 +248,7 @@ export async function registerRoutes(corpus) {
     if (t.refusal) return t.refusal;
     const k = resolveKnowledge(query);
     if (k.refusal) return k.refusal;
-    return ok(snapshot, t.asOf, k.knowledge);
+    return ok(snapshotWithBuild, t.asOf, k.knowledge);
   });
 
   get('/api/state/:entityId', ({ params, query }) => {

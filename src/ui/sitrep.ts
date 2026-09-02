@@ -275,7 +275,7 @@ export function createSitrep(api: AppApi): { el: HTMLElement } {
       </div>
       <div class="pe-sitrep-meta">
         COMPOSED ${esc(fmtT(composedAt))} FROM LOADED SURFACES ONLY — absence stated, nothing imputed.<br>
-        SIM ${esc(fmtT(api.clock.simTime))} · CORPUS: ${esc(meta.label)} · ${esc(meta.disclaimer.split('—')[0].trim())}
+        SIM ${esc(fmtT(api.clock.simTime))} · CORPUS: ${esc(meta.label)} · ${esc(meta.disclaimer.split('—')[0].trim())}${meta.corpusBuild ? ` · ${esc(meta.corpusBuild.id)}` : ''}
       </div>
       <div class="pe-sitrep-body">COMPOSING — CONTACTING DESKS…</div>`;
     sheet.querySelector('.os-panel-close')!.addEventListener('click', () => setOpen(false));
@@ -313,7 +313,7 @@ export function createSitrep(api: AppApi): { el: HTMLElement } {
     lastText = [
       `PAYLOAD OS — SITUATION REPORT`,
       `composed ${fmtT(composedAt)} from loaded surfaces only — absence stated, nothing imputed`,
-      `sim ${fmtT(api.clock.simTime)} · corpus: ${meta.label}`,
+      `sim ${fmtT(api.clock.simTime)} · corpus: ${meta.label}${meta.corpusBuild ? ` · ${meta.corpusBuild.id}` : ''}`,
       '',
       ...ordered.flatMap((b) => [
         `— ${b.title} (${b.basis})`,

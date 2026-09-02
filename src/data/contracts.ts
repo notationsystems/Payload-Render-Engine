@@ -449,5 +449,15 @@ export interface WorldSnapshot {
     label: string;
     disclaimer: string; // e.g. 'SYNTHETIC / DEMO DATA — not real shipments'
     generatedAt: Timestamp;
+    /** Which build of the corpus this snapshot is — the platform
+     *  doctrine's "which version produced this answer?" identity.
+     *  Absent for corpora served without a build stamp (in-browser). */
+    corpusBuild?: {
+      id: string;
+      canonicalStateFingerprint: string;
+      schemaVersion: string;
+      compilerVersion: string;
+      generatedAt: Timestamp;
+    };
   };
 }
