@@ -715,10 +715,27 @@ raises the active-pattern card: statement, score with its named basis,
 candidates renders the thresholds that were not cleared — absence with
 a stated reason, per the design law.
 
+### The service boundary (mining as a capability)
+
+Mining is served, not renderer-private: `GET /api/mining/patterns`
+returns `{run, patterns}` in the standard envelope — the run stamped
+with the same `corpusBuild` the meta carries, memoized per build
+(asking twice must not fabricate a second discovery event). The
+implementation is **single-sourced in `shared/miner.mjs`** (typed by
+`shared/miner.d.mts`, re-exported through `src/intel/miner.ts`): the
+service and the renderer cannot fork the algorithm. When Payload
+Earth runs against the spatial API it **displays the served run**
+rather than re-deriving it — dogfooding the product boundary — and
+falls back to labeled in-browser mining only for the unstamped
+in-browser corpus or a failed fetch; the registry's lineage line
+names which path ran (`MINED AT PAYLOAD-SPATIAL-API` /
+`IN-BROWSER`). This route is the prototype of the eventual
+`/v1/mining/*` family from the locked architecture.
+
 ### What v1 adds (when the corpus platform lands)
 
 Temporal miners (lead-time drift, seasonality) once observation
-history deepens; mining runs recorded server-side under
+history deepens; mining runs recorded and listable server-side under
 `/v1/mining/runs`; a validation workflow that moves a candidate to
 `validated`/`rejected` **by a person or a stricter process, never by
 the miner itself**.

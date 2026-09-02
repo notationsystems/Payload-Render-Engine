@@ -238,6 +238,41 @@ check(!!fpA && fpA === fpB, 'same canonical state ⇒ same fingerprint (two regi
 const tFp = (await tcall('GET', '/api/snapshot'))?.meta?.corpusBuild?.canonicalStateFingerprint;
 check(!!tFp && tFp !== fpA, 'different corpora ⇒ different fingerprints (terminal vs synthetic)');
 
+// mining served as a capability: candidates with full lineage, never facts
+console.log('\n— payload miner (served) —');
+const mineEnv = await call('GET', '/api/mining/patterns');
+check(mineEnv?.status === 'ok' && Array.isArray(mineEnv.data?.patterns), 'mining route serves the standard envelope');
+const mBuild = mineEnv?.meta?.corpusBuild?.id;
+check(
+  !!mBuild && mineEnv.data.run?.corpusBuildId === mBuild,
+  'the run is stamped with the same corpus build the envelope carries'
+);
+check(
+  mineEnv.data.patterns.every((p) => p.corpusBuildId === mBuild && p.miningRunId === mineEnv.data.run.miningRunId),
+  'every pattern carries the run + build lineage'
+);
+check(
+  mineEnv.data.patterns.every((p) => p.validationStatus === 'candidate' && p.supportingRecords.length > 0),
+  "every pattern is a supported CANDIDATE — this service never promotes"
+);
+check(
+  mineEnv.data.run?.algorithms?.every((a) => a.name && a.version),
+  'the run names every algorithm with its version'
+);
+// determinism: two registrations over the same corpus mine identically
+// (compare patterns — run.generatedAt is wall-clock by design)
+const minA = (await callA('GET', '/api/mining/patterns'))?.data?.patterns;
+const minB = (await callB('GET', '/api/mining/patterns'))?.data?.patterns;
+check(
+  !!minA && JSON.stringify(minA) === JSON.stringify(minB),
+  'same corpus build ⇒ identical patterns (two registrations)'
+);
+const capPatterns = (await call('GET', '/api/capabilities'))?.data ?? [];
+check(
+  capPatterns.some((r) => String(r.pattern).includes('/api/mining/patterns')),
+  'capabilities listing names the mining route'
+);
+
 // broker seam: fail-closed without a gateway, credential posture stated
 console.log('\n— markets broker seam —');
 const savedGw = process.env.IBKR_GATEWAY_URL;

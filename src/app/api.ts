@@ -88,6 +88,15 @@ export interface CommandResult {
   message: string;
 }
 
+/** One mining run + its candidates, with WHERE the run happened —
+ *  the served capability or the in-browser fallback. Deterministic
+ *  algorithms mean both paths agree; the label keeps it honest. */
+export interface MinerResult {
+  run: import('../intel/miner').MiningRun;
+  patterns: import('../intel/miner').MinedPattern[];
+  minedAt: 'payload-spatial-api' | 'in-browser';
+}
+
 export interface AppEvents extends Record<string, unknown> {
   select: { id: EntityId | null; source: 'pick' | 'search' | 'command' | 'demo' | 'ui' };
   hover: { id: EntityId | null };
@@ -210,13 +219,17 @@ export interface AppApi {
   addQueryFlows(): void;
   clearQuery(): void;
   isQueryActive(): boolean;
-  /** Payload Miner v0: deterministic pattern candidates over the served
-   *  snapshot, memoized per corpus. Pattern ≠ observed fact — every
-   *  result is a CANDIDATE with algorithm + run + build lineage. */
-  getMinedPatterns(): { run: import('../intel/miner').MiningRun; patterns: import('../intel/miner').MinedPattern[] };
+  /** Payload Miner v0: deterministic pattern candidates, memoized per
+   *  corpus. When the spatial API is the source the SERVED run is
+   *  displayed (mining is the service's capability — the renderer
+   *  dogfoods GET /api/mining/patterns); in-browser mining is the
+   *  labeled fallback, and minedAt says which happened. Pattern ≠
+   *  observed fact — every result is a CANDIDATE with algorithm +
+   *  run + build lineage. */
+  getMinedPatterns(): Promise<MinerResult>;
   /** Light one mined pattern's subgraph (emphasis mechanics; the banner
    *  carries the MINED labeling). */
-  showMinedPattern(id: string): void;
+  showMinedPattern(id: string): Promise<void>;
   clearMinedPattern(): void;
   isPatternActive(): boolean;
   /** Release the tracked live contact (camera chase + trail + readout). */

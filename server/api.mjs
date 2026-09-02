@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { registerMarketRoutes } from './markets.mjs';
+import { runMiner } from '../shared/miner.mjs';
 
 /** Version of the entity/observation/relationship/event schema this
  *  projection serves — part of every corpus build's identity. */
@@ -238,7 +239,12 @@ export async function registerRoutes(corpus) {
     ok(
       routes.map((r) => ({
         method: r.method,
-        pattern: r.pattern.source.replace(/^\^|\$$/g, '').replace(/\(\?<([a-zA-Z]+)>\[\^\/\]\+\)/g, ':$1'),
+        // human/agent-readable route shape: unescape the regex slashes
+        // and render named params as :param
+        pattern: r.pattern.source
+          .replace(/^\^|\$$/g, '')
+          .replace(/\(\?<([a-zA-Z]+)>\[\^\/\]\+\)/g, ':$1')
+          .replace(/\\\//g, '/'),
       }))
     )
   );
@@ -249,6 +255,19 @@ export async function registerRoutes(corpus) {
     const k = resolveKnowledge(query);
     if (k.refusal) return k.refusal;
     return ok(snapshotWithBuild, t.asOf, k.knowledge);
+  });
+
+  // ---- mining: the Data Miner served as a capability. Deterministic
+  // per corpus build (mined over snapshotWithBuild so every candidate
+  // is stamped with the build id the envelope also carries) and
+  // memoized: same build ⇒ same run — asking twice must not fabricate
+  // a second discovery event. Everything served here is a CANDIDATE:
+  // validationStatus never leaves 'candidate' in this service, because
+  // validation is a corpus-platform concern, not a projection's.
+  let miningResult = null;
+  get('/api/mining/patterns', () => {
+    if (!miningResult) miningResult = runMiner(snapshotWithBuild);
+    return ok(miningResult);
   });
 
   get('/api/state/:entityId', ({ params, query }) => {

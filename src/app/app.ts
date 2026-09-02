@@ -63,6 +63,7 @@ import type {
   LayerDef,
   LayerId,
   LiveScreenContact,
+  MinerResult,
   Suggestion,
   ViewPreset,
 } from './api';
@@ -1325,17 +1326,50 @@ export class App implements AppApi {
   // ladder is enforced at the type level (validationStatus 'candidate')
   // and at the surface level (the banner names algorithm/run/build and
   // says CANDIDATE — never observed-fact styling).
+  //
+  // When the spatial API is the source, mining is ITS capability: the
+  // renderer displays the run served at /api/mining/patterns rather
+  // than re-deriving it — dogfooding the product boundary the locked
+  // architecture demands. In-browser mining is the fallback for the
+  // unstamped in-browser corpus (or a failed fetch), and minedAt
+  // labels which path produced the run. The algorithms are shared and
+  // deterministic, so both paths agree on the same build.
 
-  private minerResult: { run: MiningRun; patterns: MinedPattern[] } | null = null;
+  private minerResult: MinerResult | null = null;
+  private minerPromise: Promise<MinerResult> | null = null;
   private activePatternId: string | null = null;
 
-  getMinedPatterns(): { run: MiningRun; patterns: MinedPattern[] } {
-    if (!this.minerResult) this.minerResult = runMiner(this.store.snapshot);
-    return this.minerResult;
+  getMinedPatterns(): Promise<MinerResult> {
+    if (this.minerResult) return Promise.resolve(this.minerResult);
+    if (!this.minerPromise) {
+      this.minerPromise = this.mine().then((r) => {
+        this.minerResult = r;
+        return r;
+      });
+    }
+    return this.minerPromise;
   }
 
-  showMinedPattern(id: string): void {
-    const p = this.getMinedPatterns().patterns.find((x) => x.id === id);
+  private async mine(): Promise<MinerResult> {
+    if (this.dataSourceId === 'payload-spatial-api') {
+      try {
+        const res = await fetch(`${resolveApiBase()}/api/mining/patterns`);
+        const body = (await res.json()) as {
+          status?: string;
+          data?: { run: MiningRun; patterns: MinedPattern[] };
+        };
+        if (res.ok && body.status === 'ok' && body.data?.run && Array.isArray(body.data.patterns)) {
+          return { ...body.data, minedAt: 'payload-spatial-api' };
+        }
+      } catch {
+        // fall through to the labeled in-browser path
+      }
+    }
+    return { ...runMiner(this.store.snapshot), minedAt: 'in-browser' };
+  }
+
+  async showMinedPattern(id: string): Promise<void> {
+    const p = (await this.getMinedPatterns()).patterns.find((x) => x.id === id);
     if (!p) return;
     this.clearQuery(); // one lit structure at a time
     this.activePatternId = id;

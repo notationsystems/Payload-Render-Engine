@@ -60,8 +60,14 @@ export function createPatternsPanel(api: AppApi): { el: HTMLElement } {
 
   let activeId: string | null = null;
 
-  const render = (): void => {
-    const { run, patterns } = api.getMinedPatterns();
+  const render = async (): Promise<void> => {
+    // the run may come over the wire (the served capability) — say so
+    // while it does rather than flashing an empty frame
+    if (!panel.querySelector('.pe-patterns-head')) {
+      panel.innerHTML = '<div class="pe-patterns-lineage">MINING RUN IN PROGRESS…</div>';
+    }
+    const { run, patterns, minedAt } = await api.getMinedPatterns();
+    if (panel.hidden) return; // closed while mining — keep it closed
     panel.replaceChildren();
 
     const head = document.createElement('div');
@@ -84,7 +90,8 @@ export function createPatternsPanel(api: AppApi): { el: HTMLElement } {
     lineage.className = 'pe-patterns-lineage';
     lineage.textContent =
       `RUN ${run.miningRunId} · BUILD ${run.corpusBuildId} · ` +
-      `INPUTS ${run.inputCounts.nodes} NODES / ${run.inputCounts.routes} ROUTES / ${run.inputCounts.flows} FLOWS`;
+      `INPUTS ${run.inputCounts.nodes} NODES / ${run.inputCounts.routes} ROUTES / ${run.inputCounts.flows} FLOWS · ` +
+      `MINED AT ${minedAt.toUpperCase()}`;
     panel.appendChild(lineage);
 
     if (!patterns.length) {
@@ -136,7 +143,7 @@ export function createPatternsPanel(api: AppApi): { el: HTMLElement } {
       <span class="pe-pattern-meta"><span class="pe-pattern-bar"><i style="width:${Math.round(p.score * 100)}%"></i></span>SCORE ${p.score.toFixed(2)} · ${esc(p.algorithm)}@${esc(p.algorithmVersion)} · ${p.supportingRecords.length} RECORDS</span>`;
     r.addEventListener('click', () => {
       setOpen(false); // the globe is the point — get out of its way
-      api.showMinedPattern(p.id);
+      void api.showMinedPattern(p.id);
     });
     return r;
   };
@@ -170,7 +177,7 @@ export function createPatternsPanel(api: AppApi): { el: HTMLElement } {
 
   const setOpen = (open: boolean): void => {
     panel.hidden = !open;
-    if (open) render();
+    if (open) void render();
   };
 
   window.addEventListener('pe:patterns-toggle' as keyof WindowEventMap, () =>
@@ -188,7 +195,7 @@ export function createPatternsPanel(api: AppApi): { el: HTMLElement } {
     activeId = ev.active && ev.pattern ? ev.pattern.id : null;
     card.hidden = !ev.active;
     if (ev.active && ev.pattern) renderCard(ev.pattern);
-    if (!panel.hidden) render(); // keep the row highlight honest
+    if (!panel.hidden) void render(); // keep the row highlight honest
   });
 
   return { el };
