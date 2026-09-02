@@ -201,3 +201,139 @@ export async function fetchOperations(apiBase: string): Promise<OpsReadResult> {
   }
   return { kind: 'unreachable', note: 'spatial API answered with an unrecognized shape' };
 }
+
+// ------------------------------------------------------------------
+// Carrier communications journal (read-only mirror) — the message-
+// level truth beneath the tower's per-load state chips: dispatch
+// attempts with provider + typed failure, and carrier events carrying
+// the full temporal trio (occurredAt / knownAt / recordedAt).
+// ------------------------------------------------------------------
+
+export interface OpsDispatchAttempt {
+  attemptId: string;
+  state: 'sending' | 'delivered' | 'failed';
+  requestedAt: Timestamp;
+  completedAt: Timestamp | null;
+  provider: string | null;
+  providerReceiptId: string | null;
+  failure: { code: string; detail: string; retryable: boolean } | null;
+}
+
+export interface OpsCarrierEvent {
+  eventId: string;
+  carrierEventId: string;
+  eventKind: 'acknowledgement' | 'tracking';
+  status: string;
+  occurredAt: Timestamp;
+  knownAt: Timestamp;
+  recordedAt: Timestamp;
+  evidenceIds: string[];
+}
+
+export interface OpsCommunication {
+  envelope: {
+    operationId: string;
+    loadId: string;
+    carrierId: string;
+    laneId: string;
+    tender: {
+      origin: string;
+      destination: string;
+      equipment: string;
+      pickupWindow: string;
+      agreedRate: {
+        amountMinor: number;
+        currency: string;
+        attestation: OpsAttestation;
+        evidenceIds: string[];
+      };
+    };
+  };
+  deliveryState: 'pending' | 'sending' | 'delivered' | 'failed';
+  acknowledgement: string;
+  latestTrackingStatus: string | null;
+  attempts: OpsDispatchAttempt[];
+  carrierEvents: OpsCarrierEvent[];
+}
+
+export type OpsCommsResult =
+  | { kind: 'ok'; communication: OpsCommunication }
+  | { kind: 'none' } // the tower's 'not_created' — an honest nothing, not an error
+  | { kind: 'refused'; refusal: OpsRefusal }
+  | { kind: 'unreachable'; note: string };
+
+export async function fetchOpsCommunication(
+  apiBase: string,
+  operationId: string
+): Promise<OpsCommsResult> {
+  let body: {
+    status?: string;
+    data?: OpsCommunication;
+    refusal?: OpsRefusal;
+  };
+  try {
+    const res = await fetch(
+      `${apiBase}/api/operations/communications?operationId=${encodeURIComponent(operationId)}`,
+      { headers: { Accept: 'application/json' } }
+    );
+    body = await res.json();
+  } catch (err) {
+    return {
+      kind: 'unreachable',
+      note: `spatial API unreachable at ${apiBase} — ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (body.status === 'refused' && body.refusal) {
+    // a dispatch that was never created is the journal's honest answer
+    if (body.refusal.kind === 'COMMUNICATION_OPERATION_NOT_FOUND') return { kind: 'none' };
+    return { kind: 'refused', refusal: body.refusal };
+  }
+  if (body.status === 'ok' && body.data?.envelope) return { kind: 'ok', communication: body.data };
+  return { kind: 'unreachable', note: 'spatial API answered with an unrecognized shape' };
+}
+
+// ------------------------------------------------------------------
+// Authoritative desk reference: the EIA weekly U.S. retail on-highway
+// diesel benchmark, attribution attached. Absent WITH ITS REASON when
+// the Terminal's source credentials are unconfigured — never a stale
+// or invented number.
+// ------------------------------------------------------------------
+
+export interface OpsFuelBenchmark {
+  retrievedAt: Timestamp;
+  fuel: {
+    kind: 'diesel_benchmark_observation';
+    sourceId: string;
+    seriesId: string;
+    period: string;
+    geography: string;
+    currency: string;
+    unit: string;
+    price: { value: number; attestation: OpsAttestation };
+  };
+}
+
+export type OpsFuelResult =
+  | { kind: 'ok'; benchmark: OpsFuelBenchmark }
+  | { kind: 'refused'; refusal: OpsRefusal }
+  | { kind: 'unreachable'; note: string };
+
+export async function fetchOpsFuel(apiBase: string): Promise<OpsFuelResult> {
+  let body: { status?: string; data?: OpsFuelBenchmark; refusal?: OpsRefusal };
+  try {
+    const res = await fetch(`${apiBase}/api/operations/fuel`, {
+      headers: { Accept: 'application/json' },
+    });
+    body = await res.json();
+  } catch (err) {
+    return {
+      kind: 'unreachable',
+      note: `spatial API unreachable at ${apiBase} — ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (body.status === 'refused' && body.refusal) return { kind: 'refused', refusal: body.refusal };
+  if (body.status === 'ok' && body.data?.fuel?.kind === 'diesel_benchmark_observation') {
+    return { kind: 'ok', benchmark: body.data };
+  }
+  return { kind: 'unreachable', note: 'spatial API answered with an unrecognized shape' };
+}

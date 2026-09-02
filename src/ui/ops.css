@@ -338,3 +338,37 @@
   color: var(--warn);
   opacity: 0.85;
 }
+
+/* ---- carrier comms journal (read-only mirror, under the load row) ---- */
+.ops-comms {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(120, 160, 200, 0.03);
+}
+.ops-comms-rate {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-hi);
+  margin: 2px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.ops-comms-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 10px;
+}
+.ops-comms-t {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  color: var(--text-mid);
+  font-variant-numeric: tabular-nums;
+}
+.ops-comms-via { font-family: var(--font-mono); font-size: 8.5px; color: var(--text-dim); }
+.ops-comms-fail { font-family: var(--font-mono); font-size: 8.5px; color: var(--alert); flex-basis: 100%; }
+.ops-comms-absent { font-family: var(--font-mono); font-size: 8.5px; color: var(--text-dim); font-style: italic; }
+.ops-fuel { border-left: 2px solid var(--line-strong); }

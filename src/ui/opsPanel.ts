@@ -19,11 +19,15 @@
 import type { AppApi } from '../app/api';
 import {
   fetchOperations,
+  fetchOpsCommunication,
+  fetchOpsFuel,
   fmtOpsMetric,
   humanizeOpsCode,
   opsTrackingObserved,
   resolveOpsPlace,
   sortOpsLoads,
+  type OpsCommsResult,
+  type OpsFuelResult,
   type OpsLoad,
   type OpsReadResult,
   type OpsSnapshot,
@@ -78,6 +82,9 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
   let last: OpsReadResult | null = null;
   let lastFetchedAt: number | null = null;
   let timer: number | undefined;
+  /** Comms journal per operation, cached until the next tower refresh. */
+  const commsCache = new Map<string, OpsCommsResult>();
+  let fuel: OpsFuelResult | null = null;
 
   // ---------------------------------------------------------------- render
 
@@ -161,6 +168,65 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
     return parts.join(' · ');
   };
 
+  /** Minutes between two instants, floored at 0. */
+  const lagMin = (a: string, b: string): number =>
+    Math.max(0, Math.round((Date.parse(b) - Date.parse(a)) / 60_000));
+
+  /** The comms journal for one load, rendered into its placeholder. */
+  const renderComms = (host: HTMLElement, r: OpsCommsResult): void => {
+    if (r.kind === 'unreachable') {
+      host.innerHTML = `<div class="ops-comms-absent">COMMS JOURNAL UNREACHABLE — ${esc(r.note)}</div>`;
+      return;
+    }
+    if (r.kind === 'refused') {
+      host.innerHTML = `<div class="ops-comms-absent">${esc(humanizeOpsCode(r.refusal.kind))} — ${esc(r.refusal.message)}</div>`;
+      return;
+    }
+    if (r.kind === 'none') {
+      host.innerHTML =
+        '<div class="ops-comms-absent">NO DISPATCH CREATED — the outbox holds nothing for this operation (the journal answered; an honest nothing, not an error)</div>';
+      return;
+    }
+    const c = r.communication;
+    const rate = c.envelope.tender.agreedRate;
+    const interested = rate.attestation.restsOnInterested
+      ? ' <span class="ops-interest" title="Stated to move a negotiation — the flag routes to measurement, it does not discount the number">NEGOTIATING POSITION</span>'
+      : '';
+    const rows: string[] = [];
+    rows.push(
+      `<div class="ops-comms-rate">AGREED RATE ${esc(rate.currency)} ${(rate.amountMinor / 100).toFixed(2)}${interested} · ${rate.evidenceIds.length} EVIDENCE REF${rate.evidenceIds.length === 1 ? '' : 'S'}</div>`
+    );
+    if (!c.attempts.length && !c.carrierEvents.length) {
+      // a created-but-unsent dispatch is a state, not an empty list
+      rows.push(
+        `<div class="ops-comms-row"><span class="ops-state warn">DISPATCH ${esc(c.deliveryState.toUpperCase())}</span>` +
+          `<span class="ops-comms-via">no delivery attempts recorded yet · ACK ${esc(c.acknowledgement.toUpperCase())}</span></div>`
+      );
+    }
+    for (const a of c.attempts) {
+      const tone = a.state === 'delivered' ? 'ok' : a.state === 'failed' ? 'alert' : 'warn';
+      rows.push(
+        `<div class="ops-comms-row"><span class="ops-state ${tone}">DISPATCH ${esc(a.state.toUpperCase())}</span>` +
+          `<span class="ops-comms-t">${esc(fmtInstant(a.requestedAt))}${a.completedAt ? ` → ${esc(fmtInstant(a.completedAt))}` : ''}</span>` +
+          `<span class="ops-comms-via">${a.provider ? `via ${esc(a.provider)}` : 'provider —'}${a.providerReceiptId ? ` · receipt ${esc(a.providerReceiptId)}` : ''}</span>` +
+          (a.failure
+            ? `<span class="ops-comms-fail">${esc(humanizeOpsCode(a.failure.code))} — ${esc(a.failure.detail)}${a.failure.retryable ? ' (RETRYABLE)' : ' (NOT RETRYABLE)'}</span>`
+            : '') +
+          `</div>`
+      );
+    }
+    for (const ev of c.carrierEvents) {
+      const lag = lagMin(ev.occurredAt, ev.knownAt);
+      rows.push(
+        `<div class="ops-comms-row"><span class="ops-state ${ev.eventKind === 'acknowledgement' ? 'ok' : ''}">${esc(ev.eventKind.toUpperCase())} ${esc(String(ev.status).replace(/_/g, ' ').toUpperCase())}</span>` +
+          `<span class="ops-comms-t">OCCURRED ${esc(fmtInstant(ev.occurredAt))}${lag > 1 ? ` · KNOWN +${lag}M LATER` : ''}</span>` +
+          `<span class="ops-comms-via">${ev.evidenceIds.length} EVIDENCE REF${ev.evidenceIds.length === 1 ? '' : 'S'}</span></div>`
+      );
+    }
+    host.innerHTML =
+      `<div class="ops-col-label">CARRIER COMMS — OUTBOX + EVENT JOURNAL (READ-ONLY MIRROR)</div>` + rows.join('');
+  };
+
   const focusLane = (load: OpsLoad): void => {
     const o = resolveOpsPlace(load.route.origin);
     const d = resolveOpsPlace(load.route.destination);
@@ -206,7 +272,19 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
           · DISPATCHED ${esc(fmtInstant(load.timing.dispatchedAt))} · LAST TRACKING ${esc(fmtInstant(load.timing.lastTrackingOccurredAt))}
         </div>
         ${load.issues.map(issueBlock).join('')}
+        <div class="ops-comms"><div class="ops-comms-absent">READING COMMS JOURNAL…</div></div>
         <div class="ops-lane-note">${resolveOpsPlace(load.route.origin) && resolveOpsPlace(load.route.destination) ? `LANE DRAWN ON GLOBE — ${tracked ? 'solid: tracking evidence exists' : 'DASHED: lane declared, movement unobserved'}. No vehicle marker: the tower serves no position.` : 'LANE NOT DRAWN — endpoints not in the curated place table (never guessed).'}</div>`;
+      // the comms journal loads lazily per expansion, cached per refresh
+      const commsHost = detail.querySelector('.ops-comms') as HTMLElement;
+      const cached = commsCache.get(load.operationId);
+      if (cached) {
+        renderComms(commsHost, cached);
+      } else {
+        void fetchOpsCommunication(resolveApiBase(), load.operationId).then((r) => {
+          commsCache.set(load.operationId, r);
+          if (commsHost.isConnected) renderComms(commsHost, r);
+        });
+      }
       if (resolveOpsPlace(load.route.origin) && resolveOpsPlace(load.route.destination)) {
         const peek = document.createElement('button');
         peek.type = 'button';
@@ -375,6 +453,23 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
     policy.innerHTML = `OPERATIONAL POLICY (STATED, NOT IMPLIED) — ACK GRACE ${snap.policy.acknowledgementGraceMinutes}M · TRACKING STALE AFTER ${snap.policy.trackingStaleMinutes}M · SETTLEMENT DUE ${Math.round(snap.policy.settlementGraceMinutes / 60)}H AFTER DELIVERY`;
     body.appendChild(policy);
 
+    // authoritative desk reference — attributed benchmark, or its
+    // absence WITH the upstream's stated reason (never a stale number)
+    const ref = document.createElement('div');
+    ref.className = 'ops-policy ops-fuel';
+    if (fuel?.kind === 'ok') {
+      const f = fuel.benchmark.fuel;
+      ref.innerHTML =
+        `DESK REFERENCE — DIESEL ${esc(f.currency)} ${f.price.value.toFixed(3)}/${esc(f.unit.replace(/^\$ per /i, ''))}` +
+        ` · PERIOD ${esc(f.period)} · ${esc(f.geography)} · SOURCE ${esc(f.sourceId)} (${esc(f.seriesId)})` +
+        ` · retrieved ${esc(fmtInstant(fuel.benchmark.retrievedAt))}`;
+    } else if (fuel?.kind === 'refused') {
+      ref.innerHTML = `DESK REFERENCE — DIESEL BENCHMARK ABSENT: ${esc(humanizeOpsCode(fuel.refusal.kind))} — ${esc(fuel.refusal.message)}`;
+    } else {
+      ref.textContent = 'DESK REFERENCE — DIESEL BENCHMARK: reading…';
+    }
+    body.appendChild(ref);
+
     const gantt = buildGantt(snap);
     if (gantt) body.appendChild(gantt);
 
@@ -400,7 +495,13 @@ export function createOpsPanel(api: AppApi): { el: HTMLElement } {
     last = await fetchOperations(resolveApiBase());
     recordFeed('operations', last.kind === 'ok' ? 'ok' : last.kind);
     lastFetchedAt = Date.now();
+    commsCache.clear(); // journals may have advanced with the tower
     renderBody();
+    // the weekly benchmark: one read per panel session is honest
+    if (!fuel) {
+      fuel = await fetchOpsFuel(resolveApiBase());
+      renderBody();
+    }
   };
 
   const setPolling = (on: boolean): void => {

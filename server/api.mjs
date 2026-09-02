@@ -472,48 +472,84 @@ export async function registerRoutes(corpus) {
   // URLs, not in storage, not in a rendered page). Every upstream
   // outcome maps to a typed answer — an unconfigured or unauthorized
   // desk is a refusal with a remedy, never an empty desk.
-  get('/api/operations', async () => {
+  /** Authorized upstream GET, shared by every mirror route: the
+   *  fail-closed credential posture and the typed refusal mapping are
+   *  the SAME for all of them by construction. */
+  const opsUpstream = async (path) => {
     const upstreamBase = process.env.TERMINAL_URL ?? 'http://127.0.0.1:3000';
     const token = process.env.PAYLOAD_OPERATIONS_TOKEN;
     if (!token?.trim()) {
-      return refuse(
-        'OPERATIONS_NOT_CONFIGURED',
-        'this spatial API holds no operations authority — the mirror is fail-closed',
-        'set PAYLOAD_OPERATIONS_TOKEN (and TERMINAL_URL) in the spatial API server environment; the credential never reaches the browser'
-      );
+      return {
+        refusal: refuse(
+          'OPERATIONS_NOT_CONFIGURED',
+          'this spatial API holds no operations authority — the mirror is fail-closed',
+          'set PAYLOAD_OPERATIONS_TOKEN (and TERMINAL_URL) in the spatial API server environment; the credential never reaches the browser'
+        ),
+      };
     }
     let res;
     try {
-      res = await fetch(`${upstreamBase}/api/freight/control-tower`, {
+      res = await fetch(`${upstreamBase}${path}`, {
         headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
       });
     } catch (err) {
-      return refuse(
-        'OPERATIONS_UPSTREAM_UNREACHABLE',
-        `the Terminal at ${upstreamBase} did not answer: ${err?.message ?? err}`,
-        'start payload-terminal-v0 (TERMINAL_URL) with its operations journals mounted'
-      );
+      return {
+        refusal: refuse(
+          'OPERATIONS_UPSTREAM_UNREACHABLE',
+          `the Terminal at ${upstreamBase} did not answer: ${err?.message ?? err}`,
+          'start payload-terminal-v0 (TERMINAL_URL) with its operations journals mounted'
+        ),
+      };
     }
     let body;
     try {
       body = await res.json();
     } catch {
-      return refuse(
-        'OPERATIONS_UPSTREAM_UNREADABLE',
-        `the Terminal answered HTTP ${res.status} without readable JSON`,
-        'check the Terminal deployment; the mirror never renders a desk it cannot read'
-      );
+      return {
+        refusal: refuse(
+          'OPERATIONS_UPSTREAM_UNREADABLE',
+          `the Terminal answered HTTP ${res.status} without readable JSON`,
+          'check the Terminal deployment; the mirror never renders a desk it cannot read'
+        ),
+      };
     }
     if (res.status === 401 || res.status === 403) {
-      return refuse(
-        'OPERATIONS_UNAUTHORIZED',
-        body?.detail ?? 'the Terminal refused this mirror\'s operations authority',
-        body?.remedy ?? 'align PAYLOAD_OPERATIONS_TOKEN between the spatial API and the Terminal'
-      );
+      return {
+        refusal: refuse(
+          'OPERATIONS_UNAUTHORIZED',
+          body?.detail ?? "the Terminal refused this mirror's operations authority",
+          body?.remedy ?? 'align PAYLOAD_OPERATIONS_TOKEN between the spatial API and the Terminal'
+        ),
+      };
     }
     if (body?.error === 'operations_not_configured') {
-      return refuse('OPERATIONS_NOT_CONFIGURED', body.detail ?? 'upstream operations are fail-closed', body.remedy ?? 'configure the Terminal operations token');
+      return {
+        refusal: refuse(
+          'OPERATIONS_NOT_CONFIGURED',
+          body.detail ?? 'upstream operations are fail-closed',
+          body.remedy ?? 'configure the Terminal operations token'
+        ),
+      };
     }
+    return { res, body, upstream: `${upstreamBase}${path}` };
+  };
+
+  /** Mirror meta: a live journal projection, not the loaded corpus — say so. */
+  const opsMeta = (asOf, upstream, disclaimer) => ({
+    ...meta(asOf, 'best_known'),
+    sourceClass: 'terminal:operations',
+    valueKind: 'per_record',
+    admissible: null,
+    admissibleBasis: 'journal_projection',
+    readOnlyMirror: true,
+    upstream,
+    disclaimer,
+  });
+
+  get('/api/operations', async () => {
+    const u = await opsUpstream('/api/freight/control-tower');
+    if (u.refusal) return u.refusal;
+    const body = u.body;
     if (body?.kind === 'refusal') {
       // the tower refusing (journal corrupt/unavailable) IS the answer —
       // it passes through typed, never softened into an empty desk
@@ -528,18 +564,87 @@ export async function registerRoutes(corpus) {
     }
     return {
       ...ok(body, body.asOf),
-      meta: {
-        ...meta(body.asOf, 'best_known'),
-        // live journal projection, not the loaded corpus — say so
-        sourceClass: 'terminal:operations',
-        valueKind: 'per_record',
-        admissible: null,
-        admissibleBasis: 'journal_projection',
-        readOnlyMirror: true,
-        upstream: `${upstreamBase}/api/freight/control-tower`,
-        disclaimer:
-          'READ-ONLY MIRROR of the Terminal brokerage control tower — a projection over append-only operation journals; commands execute only in the Terminal desk',
-      },
+      meta: opsMeta(
+        body.asOf,
+        u.upstream,
+        'READ-ONLY MIRROR of the Terminal brokerage control tower — a projection over append-only operation journals; commands execute only in the Terminal desk'
+      ),
+    };
+  });
+
+  // carrier communications journal, mirrored read-only: dispatch
+  // attempts (provider, receipt, typed failure), acknowledgement, and
+  // carrier events carrying the full temporal trio (occurredAt /
+  // knownAt / recordedAt) — the message-level truth under the tower's
+  // per-load state chips
+  get('/api/operations/communications', async ({ query }) => {
+    const operationId = query.get('operationId');
+    if (operationId !== null && !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(operationId)) {
+      return refuse(
+        'OPERATIONS_REQUEST_INVALID',
+        'operationId must be a bounded internal identifier',
+        'pass the operationId exactly as the control tower lists it'
+      );
+    }
+    const u = await opsUpstream(
+      `/api/freight/communications${operationId ? `?operationId=${encodeURIComponent(operationId)}` : ''}`
+    );
+    if (u.refusal) return u.refusal;
+    const body = u.body;
+    if (body?.kind === 'refusal') {
+      return refuse(body.code ?? 'COMMUNICATIONS_REFUSED', body.detail ?? 'the communications journal refused', body.remedy ?? 'see the Terminal operations runbook');
+    }
+    if (!Array.isArray(body?.communications) && !body?.envelope) {
+      return refuse(
+        'OPERATIONS_UPSTREAM_UNREADABLE',
+        'the Terminal answered with neither a communications list nor a communication snapshot',
+        'check the Terminal version; this mirror speaks the communications contract'
+      );
+    }
+    return {
+      ...ok(body),
+      meta: opsMeta(
+        RANGE.now,
+        u.upstream,
+        'READ-ONLY MIRROR of the carrier communications journal — dispatches and event capture execute only in the Terminal desk'
+      ),
+    };
+  });
+
+  // authoritative diesel benchmark (EIA weekly U.S. on-highway), the
+  // desk reference the twin can honestly request without operator
+  // input; carrier-authority pulls need usdot+carrierId from an
+  // operator and stay in the Terminal desk
+  get('/api/operations/fuel', async () => {
+    const u = await opsUpstream('/api/freight/sources?includeDiesel=1');
+    if (u.refusal) return u.refusal;
+    const fuel = u.body?.fuel;
+    if (!fuel) {
+      return refuse(
+        'OPERATIONS_UPSTREAM_UNREADABLE',
+        'the sources surface answered without a fuel section',
+        'check the Terminal version; this mirror speaks the freight-sources contract'
+      );
+    }
+    if (fuel.kind === 'refusal') {
+      // an unconfigured or failed source pull passes through typed —
+      // the benchmark is absent WITH ITS REASON, never a stale number
+      return refuse(fuel.code ?? 'SOURCE_REFUSED', fuel.detail ?? 'the diesel benchmark pull refused', fuel.remedy ?? 'configure the EIA credentials in the Terminal environment');
+    }
+    if (fuel.kind !== 'diesel_benchmark_observation') {
+      return refuse(
+        'OPERATIONS_UPSTREAM_UNREADABLE',
+        `the sources surface answered kind '${fuel.kind}' — not a diesel benchmark observation`,
+        'check the Terminal version; this mirror speaks the freight-sources contract'
+      );
+    }
+    return {
+      ...ok({ retrievedAt: u.body.retrievedAt, fuel }),
+      meta: opsMeta(
+        RANGE.now,
+        u.upstream,
+        'READ-ONLY MIRROR of an authoritative source pull — EIA weekly U.S. retail on-highway diesel benchmark, attribution attached'
+      ),
     };
   });
 

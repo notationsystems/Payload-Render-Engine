@@ -204,6 +204,29 @@ check(
   opsDown?.status === 'refused' && opsDown.refusal.kind === 'OPERATIONS_UPSTREAM_UNREACHABLE',
   'unreachable Terminal → typed refusal, never an empty desk'
 );
+// the deeper mirror routes share the exact posture by construction
+const commsDown = await call('GET', '/api/operations/communications?operationId=op-1');
+check(
+  commsDown?.status === 'refused' && commsDown.refusal.kind === 'OPERATIONS_UPSTREAM_UNREACHABLE',
+  'communications mirror shares the fail-closed posture'
+);
+const fuelDown = await call('GET', '/api/operations/fuel');
+check(
+  fuelDown?.status === 'refused' && fuelDown.refusal.kind === 'OPERATIONS_UPSTREAM_UNREACHABLE',
+  'fuel-benchmark mirror shares the fail-closed posture'
+);
+const commsBadId = await call('GET', `/api/operations/communications?operationId=${encodeURIComponent('../x')}`);
+check(
+  commsBadId?.status === 'refused' && commsBadId.refusal.kind === 'OPERATIONS_REQUEST_INVALID',
+  'malformed operationId refused before any upstream call'
+);
+delete process.env.PAYLOAD_OPERATIONS_TOKEN;
+const commsNoAuth = await call('GET', '/api/operations/communications');
+check(
+  commsNoAuth?.status === 'refused' && commsNoAuth.refusal.kind === 'OPERATIONS_NOT_CONFIGURED',
+  'communications mirror fail-closed without authority'
+);
+process.env.PAYLOAD_OPERATIONS_TOKEN = 'test-token';
 if (savedToken === undefined) delete process.env.PAYLOAD_OPERATIONS_TOKEN;
 else process.env.PAYLOAD_OPERATIONS_TOKEN = savedToken;
 if (savedUrl === undefined) delete process.env.TERMINAL_URL;
