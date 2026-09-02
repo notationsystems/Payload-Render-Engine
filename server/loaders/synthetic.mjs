@@ -57,5 +57,38 @@ export async function loadSyntheticCorpus() {
     },
     // one vintage means the two modes genuinely coincide — both are honest
     knowledgeModes: ['best_known', 'as_known_then'],
+    // CorpusDefinition (declared half): this corpus as an output of the
+    // corpus machinery — 𝒞 = F(ontology, sources, rules...). Empirical
+    // type censuses are DERIVED by the service, not declared here.
+    definition: {
+      corpus: 'physical-economy',
+      ontology: { name: 'payload-physical-economy', version: '0.1' },
+      source_registry: [
+        {
+          id: 'synthetic:world',
+          class: 'authored_fixture',
+          description:
+            'hand-authored demo world (src/data/synthetic/world.ts) — representative throughout, categorically inadmissible as real-world evidence',
+        },
+      ],
+      extraction_rules: {
+        basis: 'authored',
+        description: 'entities are authored directly in the ontology — no extraction step exists',
+      },
+      resolution_rules: {
+        basis: 'authored',
+        description: 'identity is authored; no entity resolution is required or performed',
+      },
+      validation_rules: {
+        admissibility:
+          'categorical: every record is representative (valueKind=representative, admissible=false) — the basis is stated, never implied',
+        stateReadings: 'deterministic resolver — every entity always reads known',
+      },
+      access_policy: {
+        status: 'ABSENT',
+        reason:
+          'no DataPolicy labels exist yet — the UI contract for policy lineage is reserved by decision record §18, and this definition will carry the labels when they land',
+      },
+    },
   };
 }

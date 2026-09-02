@@ -162,6 +162,11 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
     if (!trimmed) return;
     const res = api.runCommand(trimmed);
     showResult(res.message, res.ok);
+    // a command that ran hands the keyboard back to the scene: the
+    // surface it opened (registry, sitrep, definition…) owns the next
+    // Esc instead of the input silently swallowing it. A failed
+    // command keeps focus so the typo can be corrected in place.
+    if (res.ok) input.blur();
   };
 
   const chooseSuggestion = (s: Suggestion): void => {

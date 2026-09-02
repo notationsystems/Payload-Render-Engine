@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { registerMarketRoutes } from './markets.mjs';
-import { runMiner } from '../shared/miner.mjs';
+import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
 
 /** Version of the entity/observation/relationship/event schema this
  *  projection serves — part of every corpus build's identity. */
@@ -268,6 +268,55 @@ export async function registerRoutes(corpus) {
   get('/api/mining/patterns', () => {
     if (!miningResult) miningResult = runMiner(snapshotWithBuild);
     return ok(miningResult);
+  });
+
+  // ---- corpus definition: the corpus as a MANUFACTURED artifact of
+  // the corpus machinery — 𝒞 = F(ontology, sources, extraction,
+  // resolution, validation, mining, policy, publication). The DECLARED
+  // half comes from the loader (the rules it actually enforces, kept
+  // adjacent to the enforcing code); the type censuses are DERIVED
+  // from the served snapshot and say so. Absent capabilities (access
+  // policy) are stated with reasons, never invented.
+  get('/api/corpus/definition', () => {
+    const census = (arr, key) => {
+      const m = {};
+      for (const x of arr) {
+        const k = key(x) ?? 'unspecified';
+        m[k] = (m[k] ?? 0) + 1;
+      }
+      return m;
+    };
+    const declared = corpus.definition ?? {
+      status: 'ABSENT',
+      reason: `loader '${corpus.kind}' declares no CorpusDefinition`,
+    };
+    return ok({
+      ...declared,
+      entity_types: {
+        basis: 'derived_from_snapshot',
+        nodeKinds: census(snapshot.nodes, (n) => n.kind),
+      },
+      relation_types: {
+        basis: 'derived_from_snapshot',
+        routeModes: census(snapshot.routes, (r) => r.mode),
+        flows: snapshot.flows.length,
+        flowSegments: snapshot.flows.reduce((s, f) => s + f.segments.length, 0),
+        commodities: snapshot.commodities.length,
+      },
+      observation_types: {
+        basis: 'derived_from_snapshot',
+        metrics: census(snapshot.observations ?? [], (o) => o.metric),
+      },
+      mining_programs: { basis: 'registered_algorithms', programs: MINING_PROGRAMS },
+      publication_contract: {
+        envelope:
+          '{status, data, meta} — meta carries basis, knownAt, admissibility, attribution, corpusBuild',
+        refusals:
+          'typed SCREAMING_SNAKE refusals with remedies at HTTP 200; 404 reserved for capabilities that do not exist',
+        knowledgeModes: corpus.knowledgeModes,
+        schemaVersion: SCHEMA_VERSION,
+      },
+    });
   });
 
   get('/api/state/:entityId', ({ params, query }) => {

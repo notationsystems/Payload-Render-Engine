@@ -588,6 +588,48 @@ export async function loadTerminalCorpus({
         fetchedAt: now,
       },
     },
+    // CorpusDefinition (declared half): this corpus as an output of the
+    // corpus machinery. The rules stated here are the ones this loader
+    // actually enforces above — a definition that drifted from the code
+    // would be a lie, so keep them adjacent.
+    definition: {
+      corpus: 'physical-economy',
+      ontology: { name: 'payload-physical-economy', version: '0.1' },
+      source_registry: [
+        {
+          id: 'payload-terminal-v0',
+          class: 'projection_capture',
+          endpoints: [
+            '/api/economy?commodity=<id>',
+            '/api/economy/table?commodity=<id>&format=json&limit=0',
+            '/api/infrastructure',
+          ],
+          description:
+            'route-per-capability projections of the Terminal corpus — one capture; revision chains present upstream but unreplayable here',
+        },
+      ],
+      extraction_rules: {
+        basis: 'explicit_field_mapping',
+        description:
+          'exhaustive (kind,stage)→NodeKind tables over upstream FIELDS — never an id-string semantic; unmapped records are EXCLUDED with their reasons counted (mappingReport.excluded), never guessed into a kind',
+      },
+      resolution_rules: {
+        basis: 'upstream_identity',
+        description:
+          'upstream ids are canonical; cross-references that do not resolve are recorded (mappingReport.unresolvedRefs), never invented; facility↔material relations derive only from upstream declarations (mappingReport.derivedFields)',
+      },
+      validation_rules: {
+        admissibility:
+          "earned per record (the Terminal validator semantics): value_kind='representative' ⇒ inadmissible as real-world evidence; reported/estimated ⇒ admissible — the corpus MIXES both and each record says which it is",
+        stateReadings:
+          "entities with evidence read 'unobserved' (measured never), all others 'no_history' — nothing synthesizes a state",
+      },
+      access_policy: {
+        status: 'ABSENT',
+        reason:
+          'no DataPolicy labels exist yet — the UI contract for policy lineage is reserved by decision record §18, and this definition will carry the labels when they land',
+      },
+    },
     // the loader's own conservation report, exposed for tests and /api/health
     mappingReport: {
       mapped: {

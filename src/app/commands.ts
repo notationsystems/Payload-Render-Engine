@@ -128,7 +128,7 @@ const PRESETS: ViewPreset[] = [
 const HINT = 'TRY: find <place> · show <layer> · follow the load';
 
 const HELP_MESSAGE =
-  'FIND <NAME> · PRODUCERS/CONSUMERS OF <MATERIAL> · PATTERNS = MINED CANDIDATES · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
+  'FIND <NAME> · PRODUCERS/CONSUMERS OF <MATERIAL> · PATTERNS = MINED CANDIDATES · CORPUS = DEFINITION · SHOW/HIDE <LAYER> · FLOWS ON/OFF · PLAY/PAUSE · SPEED 1H/6H/24H · NOW · ' +
   'COMPARE <A> VS <B> · SHIFT-CLICK = PIN A/B COMPARE · HOLD B = ROUTE BRUSH · CLICK LIVE CONTACT = TRACK (ESC RELEASES) · D = DETECTIONS · KEYS 1–5 = SENSOR STYLE · ' +
   'WORLD/FREIGHT/OPERATIONS/TRADE/COMMODITIES/MARKETS/NETWORK/INTELLIGENCE/AGENTS/SCENARIOS · BRIEF = SITREP · FOLLOW THE LOAD · EXIT';
 
@@ -171,6 +171,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'producers of ', label: 'producers of <material>', hint: 'QUERY' },
   { text: 'consumers of ', label: 'consumers of <material>', hint: 'QUERY' },
   { text: 'patterns', label: 'patterns — mined candidates', hint: 'MINER' },
+  { text: 'corpus', label: 'corpus — definition of the loaded corpus', hint: 'CORPUS' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -309,6 +310,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'patterns' || lower === 'mine' || lower === 'miner') {
     window.dispatchEvent(new CustomEvent('pe:patterns-toggle'));
     return ok('PATTERN REGISTRY — mined candidates with algorithm · run · build lineage');
+  }
+
+  // -- corpus definition: the corpus as a manufactured artifact
+  if (lower === 'corpus' || lower === 'definition' || lower === 'corpus definition') {
+    window.dispatchEvent(new CustomEvent('pe:corpus-toggle'));
+    return ok('CORPUS DEFINITION — declared rules · derived censuses · stated absences');
   }
   if (lower === 'clear pattern' || lower === 'exit pattern') {
     api.clearMinedPattern();

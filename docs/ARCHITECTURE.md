@@ -739,3 +739,56 @@ history deepens; mining runs recorded and listable server-side under
 `/v1/mining/runs`; a validation workflow that moves a candidate to
 `validated`/`rejected` **by a person or a stricter process, never by
 the miner itself**.
+
+## 20. CorpusDefinition — corpora as manufactured artifacts
+
+The physical-economy graph (companies → facilities → commodities →
+suppliers → trade → logistics → ports → vessels → infrastructure →
+markets → flows → events) stays enormous — but it is **one output**
+of the corpus machinery, not the machinery itself:
+
+> 𝒞ᵢ = F(Oᵢ, Sᵢ, Rᵢ, Vᵢ, Mᵢ, Pᵢ)
+
+PayloadOS's deep abstraction is the **CorpusDefinition** — ontology,
+entity/relation/observation types, source registry, extraction rules,
+resolution rules, validation rules, mining programs, access policy,
+publication contract. Rather than hard-coding Facility/Port/Vessel
+into the platform, the platform manufactures corpora from
+definitions.
+
+### v0 in this repo
+
+Every corpus loader now **declares its definition adjacent to the
+code that enforces it** (a definition that drifted from the loader
+would be a lie): the synthetic loader declares `authored`
+extraction/resolution and categorical inadmissibility; the Terminal
+loader declares `explicit_field_mapping` extraction (exhaustive
+field→kind tables, exclusions counted), `upstream_identity`
+resolution, and per-record admissibility. `GET /api/corpus/definition`
+serves the assembled artifact:
+
+- the **declared half** from the loader — the rules it enforces;
+- **derived censuses** computed from the served snapshot (entity
+  kinds, route modes, observation metrics), labeled
+  `derived_from_snapshot` — the definition says what the corpus
+  *exhibits*, not just what it intends;
+- **mining_programs** from the single registered-algorithm registry
+  in `shared/miner.mjs` (the same list every MiningRun manifests);
+- **publication_contract** — the envelope, the refusal vocabulary,
+  the knowledge modes this corpus can honestly answer;
+- **access_policy: ABSENT, with its reason** — no DataPolicy labels
+  exist yet, and the definition says so rather than inventing them.
+
+The renderer wears it: the `corpus` command opens the definition
+overlay (declared rules · derived censuses · stated absences); on the
+in-browser corpus the surface refuses with a remedy instead of
+reconstructing a definition client-side.
+
+### What this reserves
+
+When the corpus platform manufactures a second corpus (a different
+ontology, different sources), this service loads it by definition
+rather than by new code paths; DataPolicy labels land in
+`access_policy`; extraction/resolution/validation rule declarations
+become executable configuration instead of prose descriptions of
+adjacent code.

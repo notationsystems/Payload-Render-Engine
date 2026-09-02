@@ -31,6 +31,7 @@ import { createReticle } from './ui/reticle';
 import { createPinsPanel } from './ui/pinsPanel';
 import { createQueryCard } from './ui/queryCard';
 import { createPatternsPanel } from './ui/patternsPanel';
+import { createCorpusPanel } from './ui/corpusPanel';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -74,6 +75,7 @@ async function start(): Promise<void> {
   hud.appendChild(createPinsPanel(app).el);
   hud.appendChild(createQueryCard(app).el);
   hud.appendChild(createPatternsPanel(app).el);
+  hud.appendChild(createCorpusPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 
@@ -85,8 +87,10 @@ async function start(): Promise<void> {
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     // the architecture overlay owns Escape while it is open
     if (document.querySelector('.os-arch:not([hidden])')) return;
-    // so does the pattern registry (its own handler closes it)
+    // so do the pattern registry and the corpus definition overlay
+    // (their own handlers close them)
     if (document.querySelector('.pe-patterns:not([hidden])')) return;
+    if (document.querySelector('.pe-corpus:not([hidden])')) return;
     if (app.isDemoActive()) app.stopFollowTheLoad();
     else if (app.isLiveTracking()) app.releaseLiveTrack();
     else if (app.isPatternActive()) app.clearMinedPattern();

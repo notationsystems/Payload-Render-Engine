@@ -34,6 +34,18 @@ const PARAMS = {
   corridorMinFlows: 5,
 };
 
+/** The registered mining programs — the single registry both the run
+ *  manifest and the corpus definition serve. */
+export const MINING_PROGRAMS = [
+  {
+    name: 'origin-share',
+    version: '0.1',
+    parameters: { minFlows: PARAMS.concentrationMinFlows, minShare: PARAMS.concentrationMinShare },
+  },
+  { name: 'articulation-points (Tarjan)', version: '0.1', parameters: {} },
+  { name: 'corridor-share', version: '0.1', parameters: { minFlows: PARAMS.corridorMinFlows } },
+];
+
 /**
  * Mine one snapshot. Pure: no I/O, no mutation of the snapshot.
  * @param {import('./miner.d.mts').MinableSnapshot} snapshot
@@ -173,11 +185,7 @@ export function runMiner(snapshot) {
   const run = {
     miningRunId,
     corpusBuildId,
-    algorithms: [
-      { name: 'origin-share', version: '0.1', parameters: { minFlows: PARAMS.concentrationMinFlows, minShare: PARAMS.concentrationMinShare } },
-      { name: 'articulation-points (Tarjan)', version: '0.1', parameters: {} },
-      { name: 'corridor-share', version: '0.1', parameters: { minFlows: PARAMS.corridorMinFlows } },
-    ],
+    algorithms: MINING_PROGRAMS,
     inputCounts: {
       nodes: snapshot.nodes.length,
       routes: snapshot.routes.length,

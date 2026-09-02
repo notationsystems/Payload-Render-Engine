@@ -42,4 +42,8 @@ export interface MiningRun {
 /** The subset of WorldSnapshot the miner reads (declared fields only). */
 export type MinableSnapshot = WorldSnapshot;
 
+/** The registered mining programs — the single registry both the run
+ *  manifest and the corpus definition serve. */
+export const MINING_PROGRAMS: { name: string; version: string; parameters: Record<string, number> }[];
+
 export function runMiner(snapshot: MinableSnapshot): { run: MiningRun; patterns: MinedPattern[] };

@@ -273,6 +273,45 @@ check(
   'capabilities listing names the mining route'
 );
 
+// corpus definition: the corpus as a manufactured, self-describing artifact
+console.log('\n— corpus definition —');
+const defEnv = await call('GET', '/api/corpus/definition');
+const def = defEnv?.data;
+check(defEnv?.status === 'ok' && !!def?.ontology?.name, 'definition served with a declared ontology');
+check(
+  Array.isArray(def?.source_registry) && def.source_registry.every((s) => s.id && s.class && s.description),
+  'source registry names every source with its class'
+);
+check(
+  !!def?.extraction_rules?.basis && !!def?.resolution_rules?.basis && !!def?.validation_rules?.admissibility,
+  'extraction, resolution, and validation rules declared'
+);
+check(
+  def?.entity_types?.basis === 'derived_from_snapshot' &&
+    Object.values(def.entity_types.nodeKinds).reduce((a, b) => a + b, 0) ===
+      (await call('GET', '/api/snapshot'))?.data?.nodes?.length,
+  'entity-type census is DERIVED and sums to the served snapshot'
+);
+check(
+  def?.mining_programs?.programs?.length === 3 &&
+    def.mining_programs.programs.every((p) => p.name && p.version),
+  'mining programs come from the registered-algorithm registry'
+);
+check(
+  def?.access_policy?.status === 'ABSENT' && /DataPolicy/.test(def?.access_policy?.reason ?? ''),
+  'access policy is honestly ABSENT with its reason — never invented'
+);
+check(
+  !!def?.publication_contract?.envelope && Array.isArray(def?.publication_contract?.knowledgeModes),
+  'publication contract states the envelope and knowledge modes'
+);
+const tDef = (await tcall('GET', '/api/corpus/definition'))?.data;
+check(
+  tDef?.extraction_rules?.basis === 'explicit_field_mapping' &&
+    def?.extraction_rules?.basis === 'authored',
+  'the two loaders declare DIFFERENT extraction rules — definitions describe, not decorate'
+);
+
 // broker seam: fail-closed without a gateway, credential posture stated
 console.log('\n— markets broker seam —');
 const savedGw = process.env.IBKR_GATEWAY_URL;
