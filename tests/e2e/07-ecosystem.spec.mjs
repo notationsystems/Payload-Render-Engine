@@ -301,5 +301,57 @@ export async function run(browser) {
     await page.close();
   }
 
+  // ---- 6. the lazy-load cancel race ---------------------------------
+  // An instrument loads on first open, so there is a window between the
+  // command and the chunk landing. Two things must hold in it: the
+  // operator sees something immediately, and if they change their mind
+  // the panel does not pop open behind them when the chunk arrives.
+  // The window is normally too short to hit, so hold the chunk open.
+  {
+    const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+    await page.route('**/ecosystemPanel*', async (route) => {
+      await new Promise((res) => setTimeout(res, 3000));
+      await route.continue();
+    });
+    await page.goto(`${VITE}/?api=${encodeURIComponent(API)}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !!window.payloadEarth, null, { timeout: 40000 });
+    await page.waitForTimeout(1500);
+
+    await page.evaluate(() => window.payloadEarth.api.runCommand('ecosystem'));
+    await page.waitForTimeout(400);
+    const during = await page.evaluate(() => {
+      const el = document.querySelector('.pe-eco');
+      return { present: !!el, lazy: el?.classList.contains('pe-lazy') ?? false };
+    });
+    r.ok(
+      during.present && during.lazy,
+      'the operator sees the instrument immediately, before its code has arrived'
+    );
+
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    r.ok(
+      !(await page.evaluate(() => !!document.querySelector('.pe-eco'))),
+      'Esc during the load removes it'
+    );
+
+    await page.waitForTimeout(4000);
+    r.ok(
+      !(await page.evaluate(() => !!document.querySelector('.pe-eco'))),
+      'and the panel does not open behind an operator who moved on'
+    );
+
+    await page.evaluate(() => window.payloadEarth.api.runCommand('ecosystem'));
+    await page.waitForTimeout(2500);
+    r.ok(
+      await page.evaluate(() => {
+        const el = document.querySelector('.pe-eco');
+        return !!el && !el.hidden && !el.classList.contains('pe-lazy');
+      }),
+      'a cancelled instrument still opens on the next attempt'
+    );
+    await page.close();
+  }
+
   return r.done();
 }
