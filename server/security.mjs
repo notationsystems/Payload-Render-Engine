@@ -309,3 +309,71 @@ export function safeEqual(a, b) {
   if (ba.length !== bb.length) return false;
   return timingSafeEqual(ba, bb);
 }
+
+// ------------------------------------------------- bounded upstream reads
+
+/**
+ * SEC-151 — an upstream body is untrusted in SIZE as well as content.
+ *
+ * `await res.json()` buffers whatever the far side sends: a hostile,
+ * compromised, or merely broken upstream can exhaust this service's
+ * memory with one response. (Reading the whole body and THEN checking
+ * its length — as one feed did — allocates first and objects after,
+ * which is not a control at all.)
+ *
+ * This reads through the stream with a running byte count and aborts
+ * the moment the cap is crossed, so the peak allocation is bounded by
+ * the cap and not by the sender's generosity.
+ */
+export const UPSTREAM_CAPS = {
+  json: 8 * 1024 * 1024, // structured upstream answers (Terminal, markets)
+  feed: 24 * 1024 * 1024, // bulk public feeds (TLE sets, FIRMS CSV)
+};
+
+export class UpstreamTooLarge extends Error {
+  constructor(cap, label) {
+    super(`${label ?? 'upstream'} response exceeds the ${cap}B cap`);
+    this.name = 'UpstreamTooLarge';
+    this.cap = cap;
+  }
+}
+
+/** Read a fetch Response as text, never buffering past `maxBytes`. */
+export async function readCapped(res, maxBytes = UPSTREAM_CAPS.json, label = 'upstream') {
+  // a declared length over the cap is refused before a single byte lands
+  const declared = Number(res.headers?.get?.('content-length') ?? NaN);
+  if (Number.isFinite(declared) && declared > maxBytes) throw new UpstreamTooLarge(maxBytes, label);
+
+  const body = res.body;
+  if (!body?.getReader) {
+    // no stream available (mocked/fixture transports): fall back, then
+    // enforce — still better than no bound at all
+    const text = await res.text();
+    if (text.length > maxBytes) throw new UpstreamTooLarge(maxBytes, label);
+    return text;
+  }
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let out = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw new UpstreamTooLarge(maxBytes, label);
+      }
+      out += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  return out + decoder.decode();
+}
+
+/** Read a capped JSON body. Parse errors stay the caller's to type. */
+export async function readCappedJson(res, maxBytes = UPSTREAM_CAPS.json, label = 'upstream') {
+  return JSON.parse(await readCapped(res, maxBytes, label));
+}

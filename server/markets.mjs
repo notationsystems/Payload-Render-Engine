@@ -28,6 +28,7 @@
  * the client never parses instrument-name strings.
  */
 
+import { readCappedJson, UPSTREAM_CAPS } from './security.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -95,7 +96,8 @@ async function cachedJson(name, ttlMs, fetcher) {
 async function getJson(url, timeoutMs = 15_000) {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs), headers: FETCH_HEADERS });
   if (!res.ok) throw new Error(`${new URL(url).host} → HTTP ${res.status}`);
-  return res.json();
+  // SEC-151 — bounded read: a market upstream is untrusted in size too
+  return readCappedJson(res, UPSTREAM_CAPS.json, new URL(url).host);
 }
 
 const pace = (ms = 150) => new Promise((r) => setTimeout(r, ms));
@@ -352,7 +354,7 @@ export function registerMarketRoutes(get, { ok, refuse, meta }) {
         headers: FETCH_HEADERS,
       });
       if (!auth.ok) throw new Error(`gateway → HTTP ${auth.status}`);
-      const status = await auth.json();
+      const status = await readCappedJson(auth, UPSTREAM_CAPS.json, "ibkr gateway");
       let accounts = null;
       if (status.authenticated) {
         // a bad accounts response degrades to accounts:null — it must
@@ -362,7 +364,7 @@ export function registerMarketRoutes(get, { ok, refuse, meta }) {
             signal: AbortSignal.timeout(10_000),
             headers: FETCH_HEADERS,
           });
-          if (acc.ok) accounts = await acc.json();
+          if (acc.ok) accounts = await readCappedJson(acc, UPSTREAM_CAPS.json, "ibkr gateway");
         } catch {
           accounts = null;
         }

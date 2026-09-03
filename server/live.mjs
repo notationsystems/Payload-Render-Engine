@@ -16,6 +16,7 @@
  * them by SGP4 and must label them as computed (basis + TLE age).
  */
 
+import { readCapped, readCappedJson, UPSTREAM_CAPS } from './security.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -102,8 +103,9 @@ async function cachedFetch(name, feed) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(20_000), headers: FETCH_HEADERS });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const text = await res.text();
-      if (text.length > feed.capBytes) throw new Error(`exceeds ${feed.capBytes}B cap`);
+      // capped DURING the read: checking length after res.text() has
+      // already allocated the whole body is not a control (SEC-151)
+      const text = await readCapped(res, feed.capBytes, url);
       bodies.push({ url, text });
     } catch (err) {
       failures.push({ url, error: String(err?.message ?? err) });
@@ -159,7 +161,7 @@ export function registerLiveRoutes(get, { ok, refuse, meta }) {
           { signal: AbortSignal.timeout(20_000), headers: FETCH_HEADERS }
         );
         if (!res.ok) throw new Error(`api.adsb.lol → HTTP ${res.status}`);
-        const body = await res.json();
+        const body = await readCappedJson(res, UPSTREAM_CAPS.json, "adsb.lol");
         const ac = (body.ac ?? [])
           .filter((a) => Number.isFinite(a.lat) && Number.isFinite(a.lon))
           .sort((a, b) => (a.dst ?? 999) - (b.dst ?? 999))
@@ -225,7 +227,7 @@ export function registerLiveRoutes(get, { ok, refuse, meta }) {
         { signal: AbortSignal.timeout(30_000), headers: FETCH_HEADERS }
       );
       if (!res.ok) throw new Error(`firms → HTTP ${res.status}`);
-      const text = await res.text();
+      const text = await readCapped(res, UPSTREAM_CAPS.feed, "firms");
       const lines = text.split('\n');
       const header = lines[0].split(',');
       const ix = (n) => header.indexOf(n);

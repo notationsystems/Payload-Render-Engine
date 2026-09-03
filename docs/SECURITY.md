@@ -109,6 +109,15 @@ is given so a failure names its own invariant.
   **[checked: tls-verify]**
 - **SEC-018** *Only GET/OPTIONS are served.* Any other method is refused
   at the transport layer. **[checked: method-guard]**
+- **SEC-106** *Development surfaces bind loopback by default.* The vite
+  dev and preview servers bind `127.0.0.1` unless `PAYLOAD_DEV_HOST` is
+  set explicitly, serve no CORS, and refuse to serve files outside the
+  project root (`.env*`, `*.pem`, `*.key`, `.live-cache/**` denied).
+  A dev server on all interfaces is the same confused-deputy shape as a
+  wildcard CORS header, one layer down: it hands any host on the network
+  the operator's source tree and, through the module graph, its
+  configuration. The API's own bind is checked at startup by
+  `assertSafeBinding`. **[checked: bind-guard, in server/test.mjs]**
 
 ### Secrets and authority
 
@@ -144,14 +153,48 @@ is given so a failure names its own invariant.
   the OS renders, including its own verification claims.
   **[checked: api-base-validation]**
 
+### Agent and tool authority
+
+The agent surface is the one place in this system where a
+non-deterministic actor chooses what to call. It is therefore held to a
+narrower contract than the UI it drives, and the contract is mechanical,
+not documentary.
+
+- **SEC-011** *An agent may not grant itself capabilities.* No tool
+  reaches a capability whose name begins `dispatch`, `mutate`, `write`,
+  `commit`, `approve`, `delete`, `rotate` or `sign`. There is no
+  execution identity in this service, so there is nothing an agent could
+  legitimately dispatch *with*; the check exists so that the day such an
+  identity is introduced, the surface fails loudly rather than
+  inheriting authority by accident. **[checked: tool-capability]**
+- **SEC-012** *Tool invocation is allowlisted.* Every `api.*` member the
+  tool surface reaches must appear in `TOOL_CAPABILITY_ALLOWLIST`
+  (`src/app/toolSurface.ts`). Adding a capability is a reviewable edit,
+  not an import away. The allowlist is view-level by construction: a
+  tool must never reach authority the operator's own UI lacks.
+  **[checked: tool-capability]**
+- **SEC-013** applies here in its sharpest form: a credential never
+  enters an LLM context. Authority reaches the model only as
+  PRESENT/ABSENT, and the routes that spend it are server-side.
+
 ### Abuse and integrity
 
 - **SEC-150** *Metered and proxied routes are rate limited* per client,
   with a typed refusal (`RATE_LIMITED`) carrying a retry hint.
   **[checked: rate-limit]**
+- **SEC-151** *Every upstream body read is size-bounded.* No
+  `res.json()` / `res.text()` outside `server/security.mjs`; all reads
+  go through `readCapped` / `readCappedJson`, which check
+  `content-length`, then stream with a byte counter and cancel the body
+  the moment the cap is crossed. Caps: 8 MiB for JSON, 24 MiB for feed
+  payloads. A cap that buffers first and measures afterwards is not a
+  control — the memory is already spent. **[checked: bounded-reads]**
 - **SEC-160** *Dependencies are pinned and minimal.* `package-lock.json`
-  is committed; the runtime dependency set is four packages.
-  **[checked: lockfile]**
+  is committed; the runtime dependency set is four packages, and the
+  advisory surface is checked, not assumed. The build toolchain is held
+  at a version with no known advisories (`npm audit` → 0) because a dev
+  server with a path-traversal or wildcard-CORS defect is an operator
+  compromise, not a build-time inconvenience. **[checked: lockfile]**
 - **SEC-009** *Provenance stays cryptographically bound* — the
   commitment manifest and inclusion proofs (§Verification Envelope,
   ARCHITECTURE §21) are the tamper-evidence layer; a tampered record
@@ -219,6 +262,8 @@ FIRMS_MAP_KEY             NASA FIRMS key — server-side only
 IBKR_GATEWAY_URL          broker gateway location — server-side only
 HOST / PORT               bind address; defaults to 127.0.0.1 (never 0.0.0.0
                           without an origin allowlist and TLS termination)
+PAYLOAD_DEV_HOST          vite dev/preview bind address; defaults to 127.0.0.1
+                          (set it deliberately, never `true`)
 ```
 
 Binding to a non-loopback interface without setting

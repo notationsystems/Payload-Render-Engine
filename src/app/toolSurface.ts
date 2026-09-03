@@ -12,6 +12,42 @@
  */
 
 import type { AppApi, LayerId, ViewPreset } from './api';
+
+/**
+ * SEC-012 — the capability allowlist for the agent/tool surface.
+ *
+ * Every AppApi member a tool may reach is named here, and
+ * `scripts/check-security.mjs` fails the build if a tool reaches
+ * anything else. Adding a capability therefore becomes a deliberate,
+ * reviewable act rather than an import away.
+ *
+ * Every entry is VIEW-LEVEL: it changes what is displayed, never what
+ * is true. That is the same boundary the renderer as a whole obeys
+ * (INV-6), so an agent driving this surface has exactly the authority
+ * a human clicking the UI has — and no more.
+ *
+ * `runCommand` is deliberately listed and deliberately broad: it is
+ * the command vocabulary, not a wider authority. Commands are
+ * view-level for the same reason, and the routes any of them can
+ * reach are rate-limited server-side (SEC-150). Recorded here so the
+ * breadth is stated rather than discovered.
+ */
+export const TOOL_CAPABILITY_ALLOWLIST = Object.freeze([
+  // camera / focus
+  'camera', 'focus', 'select', 'getSelection', 'getSelectedCountry',
+  // layers + presets (display only)
+  'getLayers', 'setLayerVisible', 'getPreset', 'setPreset',
+  'getFlowMode', 'setFlowMode',
+  // time
+  'clock',
+  // read-only queries over the loaded corpus
+  'store', 'search', 'getDataSourceId',
+  // counterfactual frames — computed, never state
+  'listScenarios', 'rankScenarios', 'runScenario', 'clearScenario',
+  // demo + the command vocabulary
+  'startFollowTheLoad', 'runCommand',
+]);
+
 import { fetchOperations } from '../data/operations';
 import { resolveApiBase } from '../data/sources';
 

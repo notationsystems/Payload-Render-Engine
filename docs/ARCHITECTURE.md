@@ -959,11 +959,28 @@ the full invariant list. The engineering shape:
   attacker-chosen backend would otherwise control every claim the OS
   renders *including its own verification*, so a refused base fails
   closed to the in-browser corpus and says so.
-- **`scripts/check-security.mjs`** — 11 invariants in `npm run check`:
+- **`readCapped` / `readCappedJson`** — every upstream body read is
+  bounded (8 MiB JSON, 24 MiB feed): `content-length` is checked, then
+  the body is streamed with a byte counter and cancelled the moment the
+  cap is crossed. The reads these replaced buffered the whole response
+  and *then* measured it, which is not a control — the memory is
+  already spent by the time the check runs (SEC-151).
+- **`TOOL_CAPABILITY_ALLOWLIST`** (`src/app/toolSurface.ts`) — the agent
+  reaches an enumerated set of view-level capabilities and nothing
+  else. Adding one is a reviewable edit rather than an import away, and
+  no capability whose name dispatches, mutates, writes, commits,
+  approves, deletes, rotates or signs may appear (SEC-011/012). There is
+  no execution identity here to dispatch *with*; the check exists so
+  that the day one lands, the tool surface fails loudly instead of
+  inheriting authority by accident.
+- **`scripts/check-security.mjs`** — 14 invariants in `npm run check`:
   no committed secret, one escaper, quote coverage, no wildcard CORS,
   TLS never disabled, no user-steerable egress, storage allowlist,
   API-base validation, GET-only routing, error redaction, pinned
-  lockfile. Each failure names its invariant and its remedy.
+  lockfile, tool-capability allowlist, no self-granted capability,
+  bounded upstream reads. Each failure names its invariant and its
+  remedy — and each was proven to bite by injecting a real violation
+  before being trusted.
 - **`tests/e2e/05-security.spec.mjs`** — attacks, not assertions: a
   hostile loopback backend serves XSS payloads through the real render
   chain, and a foreign `?api=` is checked to be refused *and never
@@ -980,6 +997,18 @@ structural, not incidental:
    upstream text was an attribute-injection sink. Closed by the single
    hardened escaper, verified by driving real payloads through the
    render chain.
+
+3. Every proxy read was unbounded. A hostile or merely broken upstream
+   could answer a multi-gigabyte body and exhaust the service — and one
+   read that *looked* capped checked the length only after buffering
+   the whole payload. Closed by SEC-151, which is now mechanical: a
+   bare `res.json()` anywhere under `server/` fails the check.
+4. The dev server bound every interface (`host: true`) and its
+   toolchain carried two live advisories, one of them "any website can
+   read the dev server" — the same confused-deputy class as finding 1,
+   one layer down. Closed by loopback-by-default binding, an `fs.deny`
+   list, and a toolchain upgrade to a version with a clean advisory
+   surface (SEC-106/160).
 
 The identity separation in SECURITY.md §5 is the security half of the
 Notation Substrate's `notation://` namespace contract: one canonical

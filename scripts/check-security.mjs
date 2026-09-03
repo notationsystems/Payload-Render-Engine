@@ -268,6 +268,57 @@ console.log('— security invariants —');
   );
 }
 
+
+// ---------------------------------------------------------------- SEC-012
+// The agent/tool surface may reach only allowlisted capabilities.
+// Adding one must be a deliberate, reviewable act — not an import away.
+{
+  const src = read(join(ROOT, 'src/app/toolSurface.ts'));
+  // strip line comments BEFORE splitting: a comment line otherwise
+  // swallows the entry that follows it on the next line
+  const listedRaw = (src.match(/TOOL_CAPABILITY_ALLOWLIST = Object\.freeze\(\[([\s\S]*?)\]\)/)?.[1] ?? '')
+    .replace(/\/\/[^\n]*/g, '');
+  const listed = new Set([...listedRaw.matchAll(/['"`]([\w$]+)['"`]/g)].map((m) => m[1]));
+  // what the tools actually reach, minus the allowlist declaration itself
+  const body = src.replace(/TOOL_CAPABILITY_ALLOWLIST = Object\.freeze\(\[[\s\S]*?\]\)/, '');
+  const reached = new Set([...body.matchAll(/\bapi\.([a-zA-Z_$][\w$]*)/g)].map((m) => m[1]));
+  const unlisted = [...reached].filter((c) => !listed.has(c));
+  check(
+    'SEC-012',
+    'the tool surface reaches only allowlisted capabilities',
+    unlisted.length === 0,
+    unlisted.join(' · '),
+    'add the capability to TOOL_CAPABILITY_ALLOWLIST in src/app/toolSurface.ts only if it is view-level — a tool must never reach authority the UI itself lacks'
+  );
+  check(
+    'SEC-011',
+    'no tool reaches a mutating or dispatching capability',
+    ![...reached].some((c) => /^(dispatch|mutate|write|commit|approve|delete|rotate|sign)/i.test(c)),
+    [...reached].filter((c) => /^(dispatch|mutate|write|commit|approve|delete|rotate|sign)/i.test(c)).join(' · '),
+    'a dispatching capability needs an authenticated execution identity and an approval gate before any agent may reach it'
+  );
+}
+
+// ---------------------------------------------------------------- SEC-151
+// Every upstream body read is bounded: a hostile or broken upstream
+// must not be able to exhaust this service's memory.
+{
+  const offenders = [];
+  for (const f of walk(join(ROOT, 'server'))) {
+    if (f.endsWith('security.mjs')) continue; // defines the bounded reader
+    for (const m of read(f).matchAll(/await\s+(\w+)\.(json|text)\(\)/g)) {
+      offenders.push(`${rel(f)}: ${m[0]}`);
+    }
+  }
+  check(
+    'SEC-151',
+    'every upstream body read is size-bounded',
+    offenders.length === 0,
+    offenders.join(' · '),
+    'use readCapped / readCappedJson from server/security.mjs — res.json() buffers whatever the far side sends'
+  );
+}
+
 // ------------------------------------------------------------------ verdict
 console.log('');
 if (failures.length) {

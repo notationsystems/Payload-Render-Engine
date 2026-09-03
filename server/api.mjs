@@ -18,6 +18,7 @@ import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { registerMarketRoutes } from './markets.mjs';
 import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
+import { readCappedJson, UPSTREAM_CAPS } from './security.mjs';
 
 /** Version of the entity/observation/relationship/event schema this
  *  projection serves — part of every corpus build's identity. */
@@ -506,7 +507,7 @@ export async function registerRoutes(corpus) {
     }
     let body;
     try {
-      body = await res.json();
+      body = await readCappedJson(res, UPSTREAM_CAPS.json, "terminal upstream");
     } catch {
       return refuse('REFUSALS_UPSTREAM_UNREADABLE', `the Terminal answered HTTP ${res.status} without readable JSON`, 'check the Terminal deployment');
     }
@@ -768,7 +769,7 @@ export async function registerRoutes(corpus) {
     }
     let body;
     try {
-      body = await res.json();
+      body = await readCappedJson(res, UPSTREAM_CAPS.json, "terminal upstream");
     } catch {
       return {
         refusal: refuse(
@@ -993,7 +994,7 @@ export async function registerRoutes(corpus) {
     }
     let body;
     try {
-      body = await res.json();
+      body = await readCappedJson(res, UPSTREAM_CAPS.json, "terminal upstream");
     } catch {
       return refuse('INJECTION_UPSTREAM_UNREADABLE', `the Terminal answered HTTP ${res.status} without readable JSON`, 'check the Terminal deployment');
     }
