@@ -2891,3 +2891,21 @@ input {
   white-space: nowrap;
 }
 .pi-address:hover .pi-address-shape { color: var(--accent); border-color: var(--accent); }
+
+/* "records moved" — the one build-delta state that asks for attention.
+   The other three are census-toned on purpose: a corpus that recompiled
+   without changing anything is the normal morning, and colouring it
+   would teach the operator to ignore the colour. */
+.pe-corpus-alert {
+  margin: 3px 0;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 93, 110, 0.42);
+  border-left: 2px solid var(--alert);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
+  color: var(--text-mid);
+}
+.pe-corpus-alert b { color: var(--text-hi); font-weight: 500; }

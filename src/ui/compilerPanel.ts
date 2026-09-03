@@ -16,6 +16,7 @@
  */
 
 import { esc } from '../core/escape';
+import { compareBuild, markBuildSeen, type BuildDelta } from '../core/workspace';
 import type { AppApi } from '../app/api';
 import { resolveApiBase } from '../data/sources';
 
@@ -48,6 +49,41 @@ interface CorpusBuildMeta {
   generatedAt: string;
   merkleRoot?: string;
   commitment?: { algorithm: string; leaves: number };
+}
+
+/**
+ * "Has the corpus moved since I last looked?" — the first question a
+ * desk asks each morning, and the half of it this projection can answer.
+ *
+ * The two-field comparison is the point. A build id contains its own
+ * generation time, so it changes on every recompile and says nothing;
+ * the Merkle root changes only when a committed record does. Same root,
+ * new id means the corpus was rebuilt and nothing in it moved — which
+ * is most mornings, and is the answer that saves an operator the walk.
+ *
+ * WHICH records moved is deliberately not answered. It would need both
+ * builds' contents, and holding two builds so this surface could diff
+ * them would make the projection a store. That is stated as an ABSENCE
+ * with what would unblock it, rather than left as a blank the reader
+ * has to interpret.
+ */
+function deltaHtml(delta: BuildDelta): string {
+  const since = (at: string): string => `since your last session (${esc(at.slice(0, 16))}Z)`;
+  const body = (() => {
+    switch (delta.kind) {
+      case 'FIRST_SESSION':
+        return '<div class="pe-corpus-census">FIRST SESSION on this browser — there is no earlier build to compare against. The next visit will have one.</div>';
+      case 'UNCHANGED':
+        return `<div class="pe-corpus-census">SAME BUILD — the corpus has not been recompiled ${since(delta.seenAt)}.</div>`;
+      case 'REBUILT_UNCHANGED':
+        return `<div class="pe-corpus-census">REBUILT, NOTHING MOVED — the corpus recompiled ${since(delta.seenAt)} (was <b>${esc(delta.from)}</b>) and the commitment root is identical, so no committed record differs. A build id changes on every compile; the root changes only when a record does.</div>`;
+      case 'RECORDS_MOVED':
+        return `<div class="pe-corpus-alert">RECORDS MOVED — the commitment root differs from the build you last saw ${since(delta.seenAt)} (was <b>${esc(delta.from)}</b>). At least one committed record changed.</div>`;
+    }
+  })();
+  return `${body}
+    <div class="pe-corpus-absent">WHICH records changed is ABSENT — answering it needs both builds' contents, and holding two builds so this surface could diff them would make the projection a store. It reads canonical state; it does not keep it.</div>
+    <div class="pe-corpus-remedy">UNBLOCKED BY: build history in the substrate — the Terminal, or the corpus-graph plane once it exists — retaining prior builds and serving a diff. This engine would render it the day it is served; it cannot hold it.</div>`;
 }
 
 export function createCompilerPanel(api: AppApi): { el: HTMLElement } {
@@ -102,6 +138,9 @@ export function createCompilerPanel(api: AppApi): { el: HTMLElement } {
       }
     }
 
+    // compare BEFORE marking, or the answer is always "unchanged"
+    const delta = compareBuild(build);
+
     el.innerHTML = `
       <div class="pe-patterns-head">
         <span class="pe-corpus-kicker">COMPILER</span>
@@ -111,6 +150,7 @@ export function createCompilerPanel(api: AppApi): { el: HTMLElement } {
       </div>
       <div class="pe-corpus-banner">The compile is answerable: this build's identity, its record census, and the loader's conservation report — an upstream record never disappears silently. Representations are disposable; canonical state is not.</div>
       <div class="pe-corpus-body">
+        ${section('SINCE YOU LAST LOOKED', deltaHtml(delta))}
         ${section(
           'BUILD IDENTITY',
           build
@@ -177,6 +217,10 @@ export function createCompilerPanel(api: AppApi): { el: HTMLElement } {
         }
       </div>`;
     el.querySelector('.pe-patterns-x')!.addEventListener('click', () => setOpen(false));
+    // the bookmark moves only once the operator has actually been shown
+    // the comparison — marking earlier would answer their next question
+    // with a delta they never saw
+    markBuildSeen(build);
   };
 
   const renderRefusal = (message: string, remedy: string): void => {

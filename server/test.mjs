@@ -1085,5 +1085,72 @@ console.log('\n— addressability —');
   check(addressOf('') === null && addressOf(undefined) === null, 'empty input yields no address');
 }
 
+// --------------------------------------------------------------------
+// "Has the corpus moved since I last looked?" — the four states
+//
+// The build id contains its own generation time, so it changes on every
+// recompile and on its own says nothing. The Merkle root changes only
+// when a committed record does. Distinguishing those two is the whole
+// value: same root with a new id is the normal morning, and telling an
+// operator otherwise sends them looking for a change that is not there.
+// --------------------------------------------------------------------
+console.log('\n— build delta —');
+{
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => store.get(k) ?? null,
+    setItem: (k, v) => store.set(k, v),
+    removeItem: (k) => store.delete(k),
+    key: (i) => [...store.keys()][i] ?? null,
+    get length() {
+      return store.size;
+    },
+  };
+  const { compareBuild, markBuildSeen } = await import('../src/core/workspace.ts');
+
+  const A = { id: 'build-x-1111', merkleRoot: 'a'.repeat(64) };
+  const A2 = { id: 'build-x-2222', merkleRoot: 'a'.repeat(64) }; // recompiled, same records
+  const B = { id: 'build-x-3333', merkleRoot: 'b'.repeat(64) }; // a record moved
+
+  check(compareBuild(A).kind === 'FIRST_SESSION', 'with no bookmark the answer is FIRST_SESSION, never "unchanged"');
+  check(compareBuild(null).kind === 'FIRST_SESSION', 'an unstamped corpus yields FIRST_SESSION rather than a guess');
+
+  markBuildSeen(A);
+  check(compareBuild(A).kind === 'UNCHANGED', 'the same build reads UNCHANGED');
+
+  const rebuilt = compareBuild(A2);
+  check(
+    rebuilt.kind === 'REBUILT_UNCHANGED' && rebuilt.from === A.id,
+    'a new build id with the SAME root reads REBUILT_UNCHANGED — the id moves on every compile, the root only on a record'
+  );
+
+  const moved = compareBuild(B);
+  check(
+    moved.kind === 'RECORDS_MOVED' && moved.from === A.id,
+    'a different root reads RECORDS_MOVED, and names the build it is comparing against'
+  );
+
+  // the bookmark is a bookmark: it must never carry build CONTENTS
+  markBuildSeen(B);
+  const raw = JSON.parse(store.get('pe.workspace/v1'));
+  const keys = Object.keys(raw.lastBuild ?? {});
+  check(
+    keys.every((k) => ['id', 'merkleRoot', 'seenAt'].includes(k)),
+    `the bookmark holds only id, root and time (${keys.join(', ')}) — two builds' contents here would make the projection a store`
+  );
+  check(
+    !JSON.stringify(raw).includes('nodes') && !JSON.stringify(raw).includes('observations'),
+    'no record travels into browser storage with the bookmark'
+  );
+
+  // a root that is missing on either side must not be read as a match
+  markBuildSeen({ id: 'build-x-4444' });
+  check(
+    compareBuild({ id: 'build-x-5555' }).kind === 'RECORDS_MOVED',
+    'without roots to compare, a changed build is reported as moved rather than assumed unchanged — the safe direction'
+  );
+  delete globalThis.localStorage;
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');
 process.exit(failures ? 1 : 0);
