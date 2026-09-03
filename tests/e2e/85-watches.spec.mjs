@@ -49,12 +49,36 @@ export async function run(browser) {
       proofCount: Object.keys(a.inclusionProofs ?? {}).length,
       build: a.corpusBuild?.merkleRoot?.length === 64,
       proofNote: a.proofNote ?? '',
+      addresses: Object.values(a.addresses ?? {}),
+      addressNote: a.addressNote ?? '',
+      refs: (a.graph?.nodes ?? []).filter((n) => n.entityRef).map((n) => n.entityRef),
     };
   });
   r.ok(audit.hasGraph, 'export carries the full chain');
   r.ok(audit.proofCount >= 1, `export attaches ${audit.proofCount} inclusion proof(s)`);
   r.ok(audit.build, 'export carries the committed build');
   r.ok(/verify-inclusion/.test(audit.proofNote), 'export states how to verify offline');
+
+  // The ids in the export are shaped by whichever apparatus minted them,
+  // so an auditor who does not know that convention has opaque strings.
+  // The notation:// form is what makes this object portable rather than
+  // only verifiable — an auditor can navigate back to what they checked.
+  r.ok(
+    audit.addresses.length >= 1,
+    `export carries notation:// addresses for its records (${audit.addresses.length})`
+  );
+  r.ok(
+    audit.addresses.every((u) => typeof u === 'string' && u.startsWith('notation://')),
+    'every exported address is a notation:// URI'
+  );
+  r.ok(
+    audit.addresses.length === new Set(audit.refs).size,
+    `every referenced record got an address (${audit.addresses.length} of ${new Set(audit.refs).size})`
+  );
+  r.ok(
+    /grants no access/i.test(audit.addressNote),
+    'the export states that an address names a record and grants nothing'
+  );
 
   await page.evaluate(() => localStorage.removeItem('pe.watches/v1'));
   await page.close();

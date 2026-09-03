@@ -16,6 +16,7 @@ import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { EntityId } from '../data/contracts';
 import { resolveApiBase } from '../data/sources';
+import { addressOf } from '../intel/notation';
 import type { InjectionResult } from '../data/injection';
 import type { MinedPattern } from '../intel/miner';
 import {
@@ -204,6 +205,23 @@ export function createWarrantPanel(api: AppApi): { el: HTMLElement } {
       notes: doc.notes,
       corpusBuild: api.store.snapshot.meta.corpusBuild ?? null,
     };
+
+    // Addresses travel with the export. The ids above are shaped by the
+    // apparatus that minted them, so they are legible to whoever knows
+    // that convention and opaque to everyone else. The notation:// form
+    // is the cross-apparatus way to say the same identity — which is
+    // what makes this object portable rather than only verifiable.
+    const addresses: Record<string, string> = {};
+    for (const node of doc.nodes) {
+      if (!node.entityRef) continue;
+      const a = addressOf(node.entityRef);
+      if (a) addresses[node.entityRef] = a.uri;
+    }
+    if (Object.keys(addresses).length) {
+      audit.addresses = addresses;
+      audit.addressNote =
+        'notation:// addresses for the records in this chain. Each resolves back to its own record — paste one into the OS command bar, or GET /api/notation/resolve?uri=… against the projection service. An address NAMES a record; it grants no access to it.';
+    }
     const proofs: Record<string, unknown> = {};
     if (api.getDataSourceId() === 'payload-spatial-api') {
       const ids = [...new Set(doc.nodes.map((n) => n.entityRef).filter((x): x is EntityId => !!x))].slice(0, 12);
