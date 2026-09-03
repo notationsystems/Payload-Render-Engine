@@ -109,11 +109,17 @@ function sourceNode(c: Ctx, source: string, count: number): string {
   return id;
 }
 
-function buildNode(c: Ctx, buildId: string | undefined): string {
+function buildNode(c: Ctx, build: { id: string; merkleRoot?: string } | undefined): string {
   return add(
     c,
-    buildId
-      ? { id: 'build', layer: 4, label: buildId, sub: 'corpus build', basis: 'build' }
+    build
+      ? {
+          id: 'build',
+          layer: 4,
+          label: build.id,
+          sub: build.merkleRoot ? `committed ⌗${build.merkleRoot.slice(0, 12)}…` : 'corpus build',
+          basis: 'build',
+        }
       : {
           id: 'build',
           layer: 4,
@@ -230,8 +236,9 @@ export function buildSelectionWarrant(
     }
   }
 
-  const build = buildNode(c, store.snapshot.meta.corpusBuild?.id);
+  const build = buildNode(c, store.snapshot.meta.corpusBuild);
   for (const [, sid] of c.sourceIds) link(c, sid, build, 'build');
+  c.notes.push('verification level: PROVENANCE — per-record provenance on the records; the state read itself is a deterministic projection');
 
   const admissible = obs.filter((o) => o.provenance.admissible !== false && o.provenance.valueKind !== 'representative').length;
   if (obs.length) {
@@ -290,8 +297,17 @@ export function buildPatternWarrant(
       `showing ${records.length} of ${pattern.supportingRecords.length} supporting records — capped, stated`
     );
   }
-  const build = buildNode(c, pattern.corpusBuildId === 'unstamped-corpus' ? undefined : pattern.corpusBuildId);
+  const storeBuild = store.snapshot.meta.corpusBuild;
+  const build = buildNode(
+    c,
+    pattern.corpusBuildId === 'unstamped-corpus'
+      ? undefined
+      : storeBuild?.id === pattern.corpusBuildId
+        ? storeBuild
+        : { id: pattern.corpusBuildId }
+  );
   for (const [, sid] of c.sourceIds) link(c, sid, build, 'build');
+  c.notes.push('verification level: REPRODUCIBLE — algorithm@version + parameters + build fully name this run; a re-run reproduces identical candidates');
   c.notes.push('a mined pattern is a CANDIDATE — validation is a person or a stricter process, never the miner');
   return { subjectKind: 'pattern', title: 'WHY THIS PATTERN — MINED, NOT OBSERVED', nodes: c.nodes, edges: c.edges, notes: c.notes };
 }
@@ -344,8 +360,9 @@ export function buildQueryWarrant(
   if (matched.length > RECORD_CAP) {
     c.notes.push(`showing ${RECORD_CAP} of ${matched.length} matched facilities — capped, stated`);
   }
-  const build = buildNode(c, store.snapshot.meta.corpusBuild?.id);
+  const build = buildNode(c, store.snapshot.meta.corpusBuild);
   for (const [, sid] of c.sourceIds) link(c, sid, build, 'build');
+  c.notes.push('verification level: REPRODUCIBLE — a pure field filter over the build; anyone with the snapshot reproduces this set');
   return { subjectKind: 'query', title: `WHY THIS RESULT SET — ${label}`, nodes: c.nodes, edges: c.edges, notes: c.notes };
 }
 
@@ -401,6 +418,7 @@ export function buildInjectionWarrant(store: WorldStore, result: InjectionResult
     basis: 'absent',
   });
   for (const [, sid] of c.sourceIds) link(c, sid, 'build', 'hypothetical');
+  c.notes.push('verification level: PROVENANCE only — computed upstream; not reproducible from served inputs');
   c.notes.push('this chain terminates at an ENGINE, not at evidence — a simulated outcome is not an outcome');
   return { subjectKind: 'injection', title: 'WHY THIS HYPOTHETICAL — AND WHY IT IS ONLY THAT', nodes: c.nodes, edges: c.edges, notes: c.notes };
 }

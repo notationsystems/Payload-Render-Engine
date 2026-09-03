@@ -343,6 +343,47 @@ check(
 if (savedTermUrl === undefined) delete process.env.TERMINAL_URL;
 else process.env.TERMINAL_URL = savedTermUrl;
 
+// verification envelope + commitment manifest: the trust ladder, honest
+console.log('\n— verification envelope + commitments —');
+const { verifyInclusion } = await import('../scripts/verify-inclusion.mjs');
+const vSnap = (await call('GET', '/api/snapshot'))?.meta?.verification;
+check(
+  vSnap?.level === 'REPRODUCIBLE' && /^[0-9a-f]{64}$/.test(vSnap?.merkleRoot ?? ''),
+  'snapshot answers REPRODUCIBLE with a 64-hex merkle root'
+);
+check(
+  vSnap?.unreachedLevels?.map((u) => u.level).join(',') === 'ATTESTED,ZK_VERIFIED' &&
+    vSnap.unreachedLevels.every((u) => u.requires.length > 20),
+  'unreached levels named with exactly what each requires — absent, never simulated'
+);
+const vState = (await call('GET', `/api/state/${encodeURIComponent('node:port-shanghai')}`))?.meta?.verification;
+check(vState?.level === 'PROVENANCE', 'a plain state read answers PROVENANCE (per-record, on the data)');
+const vMine = (await call('GET', '/api/mining/patterns'))?.meta?.verification;
+check(vMine?.level === 'REPRODUCIBLE', 'a mining run answers REPRODUCIBLE (inputs + program fully name it)');
+const manifest = (await call('GET', '/api/corpus/commitments'))?.data;
+check(
+  manifest?.algorithm === 'sha256-merkle/0.1' &&
+    manifest.leaves === Object.values(manifest.collections).reduce((a, b) => a + b, 0),
+  'manifest leaf count equals the sum of its collection counts — conservation'
+);
+check(/NOT ATTESTATION/.test(manifest?.note ?? ''), 'the manifest states what it is not');
+const rootA = (await callA('GET', '/api/corpus/commitments'))?.data?.merkleRoot;
+const rootB = (await callB('GET', '/api/corpus/commitments'))?.data?.merkleRoot;
+check(!!rootA && rootA === rootB, 'same canonical state ⇒ same merkle root (two registrations)');
+const tRoot = (await tcall('GET', '/api/corpus/commitments'))?.data?.merkleRoot;
+check(!!tRoot && tRoot !== rootA, 'different corpora ⇒ different roots');
+const proof = (await call('GET', '/api/corpus/commitments?record=node%3Aport-shanghai'))?.data;
+check(!!proof?.path?.length && proof.root === manifest.merkleRoot, 'inclusion proof served with a path to the manifest root');
+const verdict = verifyInclusion(proof);
+check(verdict.ok === true, 'inclusion proof verifies OFFLINE (scripts/verify-inclusion.mjs)');
+const tampered = { ...proof, record: { ...proof.record, name: 'Port of Somewhere Else' } };
+check(verifyInclusion(tampered).ok === false, 'a tampered record FAILS offline verification');
+const badRec = await call('GET', '/api/corpus/commitments?record=node%3Adoes-not-exist');
+check(
+  badRec?.status === 'refused' && badRec.refusal.kind === 'UNKNOWN_RECORD',
+  'unknown record → typed refusal with resolution remedy'
+);
+
 // corpus definition: the corpus as a manufactured, self-describing artifact
 console.log('\n— corpus definition —');
 const defEnv = await call('GET', '/api/corpus/definition');

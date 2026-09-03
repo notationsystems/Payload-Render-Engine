@@ -47,6 +47,8 @@ interface CorpusBuildMeta {
   schemaVersion: string;
   compilerVersion: string;
   generatedAt: string;
+  merkleRoot?: string;
+  commitment?: { algorithm: string; leaves: number };
 }
 
 export function createCompilerPanel(api: AppApi): { el: HTMLElement } {
@@ -122,6 +124,19 @@ export function createCompilerPanel(api: AppApi): { el: HTMLElement } {
               ])
             : '<div class="pe-corpus-absent">UNSTAMPED — this corpus was not compiled by the projection service</div>'
         )}
+        ${
+          build?.merkleRoot
+            ? section(
+                'COMMITMENT MANIFEST',
+                kv([
+                  ['merkle root', build.merkleRoot],
+                  ['algorithm', build.commitment?.algorithm ?? '—'],
+                  ['leaves', String(build.commitment?.leaves ?? '—')],
+                ]) +
+                  '<div class="pe-corpus-absent">COMMITMENT, NOT ATTESTATION — the root binds records to this build; any record + its inclusion proof (GET /api/corpus/commitments?record=&lt;id&gt;) verifies OFFLINE via scripts/verify-inclusion.mjs. Binding the root to a time or identity needs a signature the corpus platform will hold — none exists yet.</div>'
+              )
+            : ''
+        }
         ${section('RECORD CENSUS', `<div class="pe-corpus-census">${esc(censusLine(h.counts))}</div>`)}
         ${
           mr

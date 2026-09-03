@@ -817,3 +817,71 @@ rather than by new code paths; DataPolicy labels land in
 `access_policy`; extraction/resolution/validation rule declarations
 become executable configuration instead of prose descriptions of
 adjacent code.
+
+## 21. Decision record — the Verification Envelope and the trust ladder
+
+**The doctrine:** *provenance everywhere + cryptographic proof where
+it adds economic or audit value.* Formally the nested ladder
+
+> `PROVENANCE ⊂ REPRODUCIBLE ⊂ ATTESTED ⊂ ZK_VERIFIED`
+
+Every answer this service serves now carries `meta.verification`:
+the level the answer has **earned**, the basis for that level, and —
+critically — `unreachedLevels`, stating exactly what each missing
+level requires. Absent capability is stated, never simulated.
+
+### What each level means here, today
+
+- **PROVENANCE** (default): per-record provenance (source, knownAt,
+  valueKind, admissibility) travels on the records themselves. Plain
+  state reads, mirrors, and upstream-computed answers (injection,
+  refusals, ops) sit here.
+- **REPRODUCIBLE**: inputs + program + versions fully name the
+  result. The snapshot (content-addressed by fingerprint + Merkle
+  root), the mining run (algorithm@version + parameters + build), the
+  corpus definition, and the commitment manifest earn it.
+- **ATTESTED** — *absent*: requires a signature over the build root
+  by a key the corpus platform holds. No signing capability exists in
+  this projection service, and the envelope says so.
+- **ZK_VERIFIED** — *absent*: requires the SP1/zkVM execution layer
+  proving a computation against committed inputs. Corpus-platform
+  work, not begun. When it lands, it proves **computation integrity**
+  (given committed inputs and the declared program, this output is
+  correct) — never that source observations were true. That
+  distinction is preserved in the vocabulary now so it cannot blur
+  later.
+
+### The commitment manifest (real today, no zk required)
+
+The compiler seam builds a Merkle tree per corpus build
+(`sha256-merkle/0.1`): one leaf per canonical record
+(`sha256("<collection>:<id>\n" + JSON(record))`), odd nodes promoted
+unchanged. The root rides on `corpusBuild.merkleRoot`.
+
+- `GET /api/corpus/commitments` — the manifest (root, leaf counts by
+  collection, the leaf rule).
+- `GET /api/corpus/commitments?record=<id>` — an **inclusion proof**:
+  the record, its leaf, its path, the root.
+- `scripts/verify-inclusion.mjs` — verifies a proof **offline**,
+  without trusting this service: recompute the leaf from content,
+  fold the path, compare the root. A tampered record fails.
+
+What the proof means is stated in the tool's own verdict: membership
+in the build — not truth of the record (provenance's job), not when
+the root was made (attestation's job, absent until roots are signed).
+
+### Where it is worn
+
+The compiler console shows the COMMITMENT MANIFEST section; the
+warrant graph's BUILD node reads `committed ⌗<root>…`, and every
+warrant subject's notes state its verification level (a mined
+pattern: REPRODUCIBLE; an upstream hypothetical: PROVENANCE only).
+
+### The discipline (from the lock-in)
+
+Do not zk-prove OCR tokens, embeddings, coordinates, or raw
+observations. Reserve proof for: corpus build integrity, important
+deterministic metrics, policy-sensitive transformations, historical
+snapshot commitments, external attestations, high-value API
+computations. Everything else carries ordinary provenance and
+deterministic lineage — which this service already serves.

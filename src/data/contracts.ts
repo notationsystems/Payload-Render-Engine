@@ -458,6 +458,11 @@ export interface WorldSnapshot {
       schemaVersion: string;
       compilerVersion: string;
       generatedAt: Timestamp;
+      /** Merkle root over per-record commitments — tamper-evidence,
+       *  NOT attestation: binding the root to a time or key is the
+       *  corpus platform's signing work, absent until it exists. */
+      merkleRoot?: string;
+      commitment?: { algorithm: string; leaves: number };
     };
   };
 }

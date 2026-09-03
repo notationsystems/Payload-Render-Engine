@@ -52,12 +52,59 @@ export async function registerRoutes(corpus) {
     )
     .digest('hex')
     .slice(0, 16);
+  // ---- commitment manifest: tamper-evidence, not attestation --------
+  // Per-record commitments folded into one Merkle root, so a third
+  // party holding ONE record + its inclusion path can verify it
+  // belongs to THIS build without seeing the rest of the corpus.
+  // What this does NOT do — and says so: binding the root to a time
+  // or an identity requires a signature the corpus platform will hold;
+  // no signing capability exists in this projection service.
+  const COMMIT_ALGORITHM = 'sha256-merkle/0.1';
+  const sha256 = (s) => createHash('sha256').update(s).digest('hex');
+  const leafHash = (collection, rec) => sha256(`${collection}:${rec.id}\n${JSON.stringify(rec)}`);
+  const COMMIT_COLLECTIONS = ['nodes', 'routes', 'flows', 'commodities', 'events', 'assertions', 'observations'];
+  const commitLeaves = [];
+  const commitIndex = new Map(); // record id → { index, collection, record }
+  for (const collection of COMMIT_COLLECTIONS) {
+    for (const rec of snapshot[collection] ?? []) {
+      if (!commitIndex.has(rec.id)) {
+        commitIndex.set(rec.id, { index: commitLeaves.length, collection, record: rec });
+      }
+      commitLeaves.push(leafHash(collection, rec));
+    }
+  }
+  // levels bottom-up; an odd node is promoted unchanged (documented in
+  // the manifest so external verifiers fold the same way)
+  const commitLevels = [commitLeaves];
+  while (commitLevels.at(-1).length > 1) {
+    const prev = commitLevels.at(-1);
+    const next = [];
+    for (let i = 0; i < prev.length; i += 2) {
+      next.push(i + 1 < prev.length ? sha256(prev[i] + prev[i + 1]) : prev[i]);
+    }
+    commitLevels.push(next);
+  }
+  const merkleRoot = commitLevels.at(-1)[0] ?? sha256('empty-corpus');
+  const inclusionPath = (index) => {
+    const path = [];
+    let i = index;
+    for (let lvl = 0; lvl < commitLevels.length - 1; lvl++) {
+      const layer = commitLevels[lvl];
+      const sib = i ^ 1;
+      if (sib < layer.length) path.push({ side: sib < i ? 'left' : 'right', hash: layer[sib] });
+      i = Math.floor(i / 2);
+    }
+    return path;
+  };
+
   const corpusBuild = {
     id: `build-${corpus.kind}-${canonicalStateFingerprint.slice(0, 8)}`,
     canonicalStateFingerprint,
     schemaVersion: SCHEMA_VERSION,
     compilerVersion: `${corpus.kind}-loader/0.1`,
     generatedAt: snapshot.meta.generatedAt,
+    merkleRoot,
+    commitment: { algorithm: COMMIT_ALGORITHM, leaves: commitLeaves.length },
   };
   // the build identity rides on RESPONSES, never on the canonical
   // object itself — the loader stays a pure projection (byte-identical
@@ -91,6 +138,36 @@ export async function registerRoutes(corpus) {
    * from the corpus loader — the synthetic corpus is categorically
    * inadmissible; a projected corpus earns it per record.
    */
+  // ---- verification envelope: the trust ladder, worn per answer -----
+  // PROVENANCE ⊂ REPRODUCIBLE ⊂ ATTESTED ⊂ ZK_VERIFIED. Every answer
+  // states the level it has EARNED and exactly what the unreached
+  // levels require — absent capability is stated, never simulated.
+  const UNREACHED = Object.freeze([
+    {
+      level: 'ATTESTED',
+      requires:
+        'a signature over the build root by a key the corpus platform holds — no signing capability exists in this projection service',
+    },
+    {
+      level: 'ZK_VERIFIED',
+      requires:
+        'an SP1/zkVM execution layer proving the computation against committed inputs — corpus-platform work, not begun',
+    },
+  ]);
+  const verification = (level, basis, extra = {}) => ({
+    level,
+    basis,
+    ...extra,
+    unreachedLevels: UNREACHED,
+  });
+  /** REPRODUCIBLE: inputs + program + versions fully name the result. */
+  const reproducible = (basis, extra = {}) =>
+    verification('REPRODUCIBLE', basis, {
+      merkleRoot,
+      canonicalStateFingerprint,
+      ...extra,
+    });
+
   const meta = (asOf, knowledge, frame) => ({
     // vintages travels IN metaDefaults — a per-corpus claim, never a
     // route-level constant
@@ -114,6 +191,13 @@ export async function registerRoutes(corpus) {
     },
     // which build of the corpus produced this answer — always answerable
     corpusBuild,
+    // default trust level: per-record provenance travels on the data;
+    // routes whose result is fully named by inputs+program override
+    // this with REPRODUCIBLE
+    verification: verification(
+      'PROVENANCE',
+      'per-record provenance (source, knownAt, valueKind, admissibility) travels on the records themselves'
+    ),
     disclaimer: snapshot.meta.disclaimer,
   });
 
@@ -254,7 +338,55 @@ export async function registerRoutes(corpus) {
     if (t.refusal) return t.refusal;
     const k = resolveKnowledge(query);
     if (k.refusal) return k.refusal;
-    return ok(snapshotWithBuild, t.asOf, k.knowledge);
+    const env = ok(snapshotWithBuild, t.asOf, k.knowledge);
+    env.meta.verification = reproducible(
+      'content-addressed: the canonical-state fingerprint and Merkle root fully name this snapshot'
+    );
+    return env;
+  });
+
+  // ---- commitment manifest + per-record inclusion proofs ------------
+  // GET /api/corpus/commitments            → the manifest
+  // GET /api/corpus/commitments?record=<id> → an inclusion proof a
+  // third party can verify OFFLINE (scripts/verify-inclusion.mjs)
+  // without trusting this service.
+  get('/api/corpus/commitments', ({ query }) => {
+    const recordId = query.get('record');
+    if (recordId === null) {
+      const byCollection = {};
+      for (const col of COMMIT_COLLECTIONS) byCollection[col] = (snapshot[col] ?? []).length;
+      const env = ok({
+        algorithm: COMMIT_ALGORITHM,
+        merkleRoot,
+        leaves: commitLeaves.length,
+        collections: byCollection,
+        leafRule: 'sha256(`${collection}:${id}` + "\\n" + JSON.stringify(record)); odd nodes promote unchanged',
+        note: 'COMMITMENT, NOT ATTESTATION — the root binds records to this build; binding the build to a time or an identity requires a signature the corpus platform will hold, and none exists here',
+      });
+      env.meta.verification = reproducible('the manifest is a pure function of canonical state');
+      return env;
+    }
+    const entry = commitIndex.get(recordId);
+    if (!entry) {
+      return refuse(
+        'UNKNOWN_RECORD',
+        `no canonical record '${recordId}' in this build's commitment manifest`,
+        'GET /api/search?q=<name> resolves ids; the manifest covers nodes, routes, flows, commodities, events, assertions, observations'
+      );
+    }
+    const env = ok({
+      record: entry.record,
+      collection: entry.collection,
+      index: entry.index,
+      leaf: commitLeaves[entry.index],
+      path: inclusionPath(entry.index),
+      root: merkleRoot,
+      algorithm: COMMIT_ALGORITHM,
+      verify:
+        'recompute the leaf from the record content, fold the path, compare the root — scripts/verify-inclusion.mjs does this offline, without trusting this service',
+    });
+    env.meta.verification = reproducible('an inclusion proof is verifiable by construction');
+    return env;
   });
 
   // ---- mining: the Data Miner served as a capability. Deterministic
@@ -267,7 +399,11 @@ export async function registerRoutes(corpus) {
   let miningResult = null;
   get('/api/mining/patterns', () => {
     if (!miningResult) miningResult = runMiner(snapshotWithBuild);
-    return ok(miningResult);
+    const env = ok(miningResult);
+    env.meta.verification = reproducible(
+      'algorithm@version + parameters + the corpus build fully name this run — a re-run reproduces identical candidates'
+    );
+    return env;
   });
 
   // ---- the refused:* work queue, mirrored. Everything the UPSTREAM
@@ -349,7 +485,7 @@ export async function registerRoutes(corpus) {
       status: 'ABSENT',
       reason: `loader '${corpus.kind}' declares no CorpusDefinition`,
     };
-    return ok({
+    const env = ok({
       ...declared,
       entity_types: {
         basis: 'derived_from_snapshot',
@@ -369,13 +505,15 @@ export async function registerRoutes(corpus) {
       mining_programs: { basis: 'registered_algorithms', programs: MINING_PROGRAMS },
       publication_contract: {
         envelope:
-          '{status, data, meta} — meta carries basis, knownAt, admissibility, attribution, corpusBuild',
+          '{status, data, meta} — meta carries basis, knownAt, admissibility, attribution, corpusBuild, verification',
         refusals:
           'typed SCREAMING_SNAKE refusals with remedies at HTTP 200; 404 reserved for capabilities that do not exist',
         knowledgeModes: corpus.knowledgeModes,
         schemaVersion: SCHEMA_VERSION,
       },
     });
+    env.meta.verification = reproducible('declared rules + a derived census — a pure function of the loader and canonical state');
+    return env;
   });
 
   get('/api/state/:entityId', ({ params, query }) => {
