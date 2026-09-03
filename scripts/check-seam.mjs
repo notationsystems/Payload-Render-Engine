@@ -55,6 +55,37 @@ for (const file of walk(DATA_DIR)) {
   }
 }
 
+// ---------------------------------------------------------------------
+// INV-7 — the help cannot drift from the grammar.
+//
+// The vocabulary overlay says "every row is a real capability that
+// exists today; nothing aspirational is listed". The dangerous half of
+// that promise is the other direction: a capability the grammar accepts
+// and the help never mentions is a feature nobody can find, which for an
+// operator surface is the same as not shipping it.
+{
+  const commands = readFileSync(join(ROOT, 'src/app/commands.ts'), 'utf8');
+  const vocab = readFileSync(join(ROOT, 'src/ui/vocabPanel.ts'), 'utf8');
+  const listed = [...commands.matchAll(/\{ text: '([^']+)'/g)].map((m) => m[1].trim());
+  const missing = listed.filter((text) => {
+    // Capitalised entries are SEED EXAMPLES for the command bar's
+    // suggestion list — 'Find Toronto' is an instance of the generic
+    // 'find <name>' the vocabulary already documents. The convention is
+    // the data's own, and requiring a help row per example would be
+    // requiring the help to list its own examples.
+    if (/^[A-Z]/.test(text)) return false;
+    // a row may name several spellings ('security · posture'), so match
+    // on the primary word rather than the whole label
+    const head = text.replace(/[<:/].*$/, '').trim().split(/\s+/)[0];
+    return head.length > 2 && !vocab.includes(head);
+  });
+  if (missing.length) {
+    violations.push(
+      `src/ui/vocabPanel.ts: ${missing.length} command(s) the grammar accepts and the vocabulary never lists: ${missing.join(', ')}`
+    );
+  }
+}
+
 if (violations.length) {
   console.error('SEAM CHECK FAILED — renderer must never become authoritative:\n');
   for (const v of violations) console.error('  ✗ ' + v);

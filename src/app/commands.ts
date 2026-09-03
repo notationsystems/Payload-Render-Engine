@@ -11,6 +11,7 @@
 import type { AppApi, CommandResult, LayerId, Suggestion, ViewPreset } from './api';
 import type { EntityId, Flow, Route } from '../data/contracts';
 import type { SearchResult } from '../data/store';
+import { navigateNotation } from '../intel/notation';
 
 // ------------------------------------------------------------------
 // Static tables (immutable data, not state)
@@ -179,6 +180,9 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'system', label: 'system — the control plane', hint: 'CONTROL' },
   { text: 'security', label: 'security — posture, invariant ledger, refusal journal', hint: 'CONTROL' },
   { text: 'ecosystem', label: 'ecosystem — the Notation Systems apparatus register', hint: 'CONTROL' },
+  { text: 'notation://', label: 'notation://<kind>/<id> — resolve an identity and go there', hint: 'ADDRESS' },
+  { text: 'notation', label: 'notation — the identity space: kinds, holders, id shapes', hint: 'CONTROL' },
+  { text: 'provenance', label: 'provenance — the vocabulary alignment and what adopting it costs', hint: 'CONTROL' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -300,6 +304,11 @@ function runCompare(api: AppApi, aq: string, bq: string): CommandResult {
 // ------------------------------------------------------------------
 
 export function executeCommand(api: AppApi, input: string): CommandResult {
+  // -- notation:// is an ADDRESS. This rule runs before everything else:
+  // an identity must never be shadowed by a fuzzy match on its text.
+  if (input.trim().toLowerCase().startsWith('notation://')) {
+    return navigateNotation(api, input.trim());
+  }
   const text = normalize(input);
   if (!text) return err(HINT);
   const lower = text.toLowerCase();
@@ -361,7 +370,15 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
     return ok('REFUSALS WORK QUEUE — one mechanism per group, one shared remedy, ranked');
   }
   // -- the apparatus register: Notation Systems, and where this OS sits
-  if (lower === 'ecosystem' || lower === 'apparatus' || lower === 'notation') {
+  if (lower === 'provenance' || lower === 'alignment' || lower === 'valuekind') {
+    window.dispatchEvent(new CustomEvent('pe:vocabulary-toggle'));
+    return ok('PROVENANCE VOCABULARY — four vocabularies, one proposal, and the measured cost of adopting it');
+  }
+  if (lower === 'notation' || lower === 'identity' || lower === 'uri') {
+    window.dispatchEvent(new CustomEvent('pe:notation-toggle'));
+    return ok('NOTATION IDENTITY SPACE — the kinds, who holds each, and the id shapes actually minted');
+  }
+  if (lower === 'ecosystem' || lower === 'apparatus') {
     window.dispatchEvent(new CustomEvent('pe:ecosystem-toggle'));
     return ok('APPARATUS REGISTER — the corpus lifecycle, its owners, and the stage nobody owns');
   }

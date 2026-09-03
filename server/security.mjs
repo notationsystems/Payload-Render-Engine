@@ -35,7 +35,7 @@ import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
  *    opposite of loopback. Folding it into one set silently made
  *    world-binding look safe (caught by the binding test).
  */
-const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']);
+export const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0']);
 const LOOPBACK_BIND_ADDRESSES = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 
 const csv = (v) =>

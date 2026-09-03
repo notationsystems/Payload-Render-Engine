@@ -16,7 +16,7 @@
       is the control that actually stops XSS from executing.
 
       style-src carries 'unsafe-inline' and the reason is stated rather
-      than hidden: thirteen render sites write a computed width or a
+      than hidden: 15 render sites write a computed width or a
       palette colour into a style attribute. None of them takes wire
       text — but CSP cannot know that, so the honest label is that
       style-src is relaxed and script-src is not.

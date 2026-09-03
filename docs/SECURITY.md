@@ -159,7 +159,7 @@ is given so a failure names its own invariant.
   BEHIND the escaper: the escaper stops the injection, the CSP stops
   what an injection that got through could do with itself. `style-src`
   keeps `'unsafe-inline'` and the reason is stated rather than hidden —
-  thirteen render sites write a computed width or palette colour into a
+  15 render sites write a computed width or palette colour into a
   style attribute, none of them from wire text. The mirror is written
   as the *policy*, not as the two ports we happen to use: a CSP
   narrower than the documented policy breaks a legitimate deployment
@@ -176,9 +176,14 @@ non-deterministic actor chooses what to call. It is therefore held to a
 narrower contract than the UI it drives, and the contract is mechanical,
 not documentary.
 
-- **SEC-011** *An agent may not grant itself capabilities.* No tool
-  reaches a capability whose name begins `dispatch`, `mutate`, `write`,
-  `commit`, `approve`, `delete`, `rotate` or `sign`. There is no
+- **SEC-011** *An agent may not grant itself capabilities.* No module
+  **anywhere in the renderer** reaches a capability whose name begins
+  `dispatch`, `mutate`, `write`, `commit`, `approve`, `delete`, `rotate`
+  or `sign`. The check scans the whole tree rather than the tool surface
+  alone: `runCommand` is deliberately broad, so every module the command
+  grammar can reach is inside an agent's blast radius, and an allowlist
+  that stopped at one file would be checking the door while leaving the
+  corridor behind it unwatched. There is no
   execution identity in this service, so there is nothing an agent could
   legitimately dispatch *with*; the check exists so that the day such an
   identity is introduced, the surface fails loudly rather than

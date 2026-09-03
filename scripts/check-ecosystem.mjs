@@ -27,7 +27,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { APPARATUSES, LIFECYCLE, CONVERGENCES, DIVERGENCES } from '../shared/ecosystem.mjs';
+import { APPARATUSES, LIFECYCLE, CONVERGENCES, DIVERGENCES, applyProbes, ecosystemRegister } from '../shared/ecosystem.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 /** The workspace that holds this repo and its siblings. */
@@ -150,6 +150,64 @@ console.log('\nAPPARATUS REGISTER — checked against the trees it describes\n')
     longShort.map((a) => `${a.id}:${a.short ?? '(missing)'}`).join(' · '),
     'give it a short of 16 characters or fewer — seven stages share one row, and a name that overflows pushes the unowned stage out of view'
   );
+
+  // An apparatus owning NO lifecycle stage is either a deliberate
+  // statement (it sits beside the corpus rather than in it) or a row
+  // someone forgot to finish. Those look identical in a table, so the
+  // deliberate case has to say so.
+  const stageless = APPARATUSES.filter(
+    (a) => a.stages.length === 0 && !a.stagesNote && !a.absence?.reason
+  );
+  check(
+    'ECO-014',
+    'an apparatus that owns no lifecycle stage says why',
+    stageless.length === 0,
+    stageless.map((a) => a.id).join(' · '),
+    'add stagesNote (it sits beside the corpus) or an absence reason (it is not built) — an empty stage list with no explanation reads as an unfinished row'
+  );
+
+  // A row must not contradict itself: claiming a stage while declaring
+  // that it owns none is the kind of drift no count can catch.
+  const contradicts = APPARATUSES.filter(
+    (a) => a.stages.length > 0 && /not a stage in the corpus lifecycle/i.test(a.declares ?? '')
+  );
+  check(
+    'ECO-015',
+    'no apparatus claims a stage it declares it does not own',
+    contradicts.length === 0,
+    contradicts.map((a) => a.id).join(' · '),
+    'decide which is true and make both say it — a register that disagrees with itself is worse than one that is merely incomplete'
+  );
+
+  // A headline that disagrees with the table under it is worse than no
+  // headline, because the headline is the part people quote. The counts
+  // must survive a probe changing a row's presence.
+  {
+    const base = ecosystemRegister();
+    const probed = applyProbes(base, { terminal: { reachable: true, latencyMs: 1, at: 'probe' } });
+    const agrees = (r) =>
+      r.counts.observed === r.apparatuses.filter((a) => a.presence === 'OBSERVED').length &&
+      r.counts.present === r.apparatuses.filter((a) => a.presence === 'PRESENT').length &&
+      r.counts.declared === r.apparatuses.filter((a) => a.presence === 'DECLARED').length &&
+      r.counts.apparatuses === r.apparatuses.length;
+    check(
+      'ECO-008',
+      'the presence counts reconcile with the rows, before and after a probe',
+      agrees(base) && agrees(probed),
+      `base ${agrees(base) ? 'ok' : 'DISAGREES'} · probed ${agrees(probed) ? 'ok' : 'DISAGREES'}`,
+      'derive the counts from the rows they summarise rather than carrying them alongside — a probe that changes a presence must change the count with it'
+    );
+    // a failed probe reports REACHABILITY, never existence
+    const down = applyProbes(base, { terminal: { reachable: false, at: 'probe', detail: 'ECONNREFUSED' } });
+    const row = down.apparatuses.find((a) => a.id === 'terminal');
+    check(
+      'ECO-009',
+      'an apparatus that did not answer stays PRESENT and says why',
+      row?.presence === 'PRESENT' && /did not answer/.test(row.presenceBasis),
+      `${row?.presence} — ${row?.presenceBasis?.slice(0, 80)}`,
+      'a stopped service must never read as an unbuilt apparatus: the probe is evidence about reachability, and the tree is still on disk either way'
+    );
+  }
 
   // The one that matters most: an unowned lifecycle stage must be
   // visible, not silently dropped from the map.

@@ -18,8 +18,10 @@ import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { registerMarketRoutes } from './markets.mjs';
 import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
-import { ecosystemRegister } from '../shared/ecosystem.mjs';
-import { readCappedJson, securityPosture, UPSTREAM_CAPS } from './security.mjs';
+import { applyProbes, ecosystemRegister } from '../shared/ecosystem.mjs';
+import { locate, notationSpace } from '../shared/notation.mjs';
+import { vocabularyAlignment } from '../shared/vocabulary.mjs';
+import { allowedHosts, LOOPBACK_HOSTNAMES, readCappedJson, scrubSecrets, securityPosture, UPSTREAM_CAPS } from './security.mjs';
 
 /** Version of the entity/observation/relationship/event schema this
  *  projection serves — part of every corpus build's identity. */
@@ -394,6 +396,8 @@ export async function registerRoutes(corpus, runtime = {}) {
       { id: 'operations', family: 'OPERATIONS', label: 'brokerage control tower (mirror)', node: 'terminal', routes: ['/api/operations', '/api/operations/communications', '/api/operations/fuel'], probe: '/api/operations', provenance: 'terminal:operations', authority: { required: 'PAYLOAD_OPERATIONS_TOKEN', present: present('PAYLOAD_OPERATIONS_TOKEN') }, ladder: { observed: true, proposed: 'from journal', approved: 'from journal', dispatched: 'from journal', note: 'the desk proposes and authorizes IN THE TERMINAL; this mirror reads the journal — a cell lights only from a recorded fact' }, dataDomains: ['loads', 'carriers', 'communications'], instrument: 'operations' },
       { id: 'live', family: 'LIVE', label: 'live feeds (aircraft · satellites · seismic · fires)', node: 'spatial-api', routes: ['/api/live/aircraft', '/api/live/satellites', '/api/live/quakes', '/api/live/fires'], probe: '/api/live/quakes', provenance: 'external:observed', ladder: observeOnly, dataDomains: ['contacts', 'hazards'], instrument: 'layers' },
       { id: 'markets', family: 'MARKETS', label: 'FX · crypto · derivatives desks', node: 'spatial-api', routes: ['/api/markets/fx', '/api/markets/crypto', '/api/markets/derivatives'], probe: '/api/markets/fx', provenance: 'external:reported', ladder: observeOnly, dataDomains: ['prices'], instrument: 'markets' },
+      { id: 'vocabulary', family: 'CONTROL', label: 'provenance vocabulary alignment (proposed)', node: 'spatial-api', routes: ['/api/vocabulary/alignment'], probe: '/api/vocabulary/alignment', provenance: 'declared + measured', ladder: observeOnly, dataDomains: ['vocabulary'], instrument: 'vocabulary' },
+      { id: 'notation', family: 'CONTROL', label: 'notation:// identity resolver', node: 'spatial-api', routes: ['/api/notation/space', '/api/notation/resolve'], probe: '/api/notation/space', provenance: 'declared identity space', ladder: observeOnly, dataDomains: ['identity'], instrument: 'notation' },
       { id: 'ecosystem', family: 'CONTROL', label: 'Notation Systems apparatus register', node: 'spatial-api', routes: ['/api/ecosystem/register'], probe: '/api/ecosystem/register', provenance: 'read from each apparatus tree', ladder: observeOnly, dataDomains: ['apparatuses', 'lifecycle', 'vocabulary'], instrument: 'ecosystem' },
       { id: 'security', family: 'CONTROL', label: 'security posture + refusal journal', node: 'spatial-api', routes: ['/api/security/posture'], probe: '/api/security/posture', provenance: 'read from the live gate', ladder: observeOnly, dataDomains: ['policy', 'invariants', 'refusals'], instrument: 'security' },
       { id: 'markets.broker', family: 'MARKETS', label: 'broker session (IBKR)', node: 'ibkr', routes: ['/api/markets/broker'], probe: '/api/markets/broker', provenance: 'broker:session', authority: { required: 'IBKR_GATEWAY_URL', present: present('IBKR_GATEWAY_URL') }, ladder: { observed: true, proposed: false, approved: false, dispatched: false, note: 'no order path exists in this service — observe only, fail-closed' }, dataDomains: ['positions'], instrument: 'markets' },
@@ -423,11 +427,290 @@ export async function registerRoutes(corpus, runtime = {}) {
   // register was read from each tree at a stated time. It is a scan, not
   // a probe, and a surface that let it read as live would be claiming an
   // observation it never made.
-  get('/api/ecosystem/register', () => {
-    const env = ok(ecosystemRegister());
+  // Reachability is measured, not assumed — but a register read must not
+  // wait on a stopped apparatus, so the probe is bounded and its result
+  // is cached briefly. A stale-but-stated reading beats a slow one.
+  const PROBE_TIMEOUT_MS = 1500;
+  const PROBE_CACHE_MS = 15_000;
+  let probeCache = { at: 0, results: {} };
+
+  const probeApparatuses = async () => {
+    if (Date.now() - probeCache.at < PROBE_CACHE_MS) return probeCache.results;
+    const results = {};
+    for (const app of ecosystemRegister().apparatuses) {
+      if (!app.probe) continue;
+      const at = new Date().toISOString();
+      // SEC-105 — the destination is constrained AT THE CALL SITE, not
+      // merely by where the values came from. The register is frozen and
+      // nothing a caller sends reaches here, but a probe target read out
+      // of a data structure is the shape of an SSRF primitive, so it is
+      // validated as if it were untrusted: a fixed path shape, and a
+      // host that must be loopback unless the operator named it.
+      const path = app.probe.path;
+      const base = process.env[app.probe.via] ?? app.probe.fallback;
+      if (!/^\/api\/[A-Za-z0-9/_-]{1,64}$/.test(path)) {
+        results[app.id] = { reachable: false, at, detail: 'probe path refused by shape' };
+        continue;
+      }
+      let target;
+      try {
+        target = new URL(base);
+      } catch {
+        results[app.id] = { reachable: false, at, detail: 'probe base is not a URL' };
+        continue;
+      }
+      const allowedHost =
+        LOOPBACK_HOSTNAMES.has(target.hostname) || allowedHosts(process.env)?.includes(target.hostname.toLowerCase());
+      if (!allowedHost || !/^https?:$/.test(target.protocol)) {
+        results[app.id] = {
+          reachable: false,
+          at,
+          detail: `probe destination refused: ${target.protocol}//${target.hostname} is neither loopback nor in PAYLOAD_ALLOWED_HOSTS`,
+        };
+        continue;
+      }
+      const t0 = Date.now();
+      try {
+        const res = await fetch(`${base}${path}`, {
+          headers: { Accept: 'application/json' },
+          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+        });
+        results[app.id] = res.ok
+          ? { reachable: true, latencyMs: Date.now() - t0, at }
+          : { reachable: false, at, detail: `HTTP ${res.status}` };
+      } catch (err) {
+        // the message may name an internal host — scrub it like any other
+        results[app.id] = {
+          reachable: false,
+          at,
+          detail: scrubSecrets(err instanceof Error ? err.message : String(err)).slice(0, 120),
+        };
+      }
+    }
+    probeCache = { at: Date.now(), results };
+    return results;
+  };
+
+  get('/api/ecosystem/register', async () => {
+    const probes = await probeApparatuses();
+    const env = ok({
+      ...applyProbes(ecosystemRegister(), probes),
+      probing: {
+        timeoutMs: PROBE_TIMEOUT_MS,
+        cacheMs: PROBE_CACHE_MS,
+        probed: Object.keys(probes),
+        note: 'only apparatuses that expose an HTTP surface are probed. A failed probe reports REACHABILITY, never whether the tree exists — a stopped service must not read as an unbuilt apparatus.',
+      },
+    });
     env.meta.verification = verification(
       'PROVENANCE',
-      'read from each apparatus own tree at the stated time; every row carries readFrom - the files the claim came from. A scan, not a probe: presence OBSERVED means this OS reached it, PRESENT means the tree carries source, DECLARED means a repository exists and carries none.'
+      'two readings, and they are different kinds. The CLAIMS are a scan: read from each apparatus own tree at the stated time, with readFrom naming the files. The PRESENCE is measured where an apparatus exposes an HTTP surface - OBSERVED carries the moment and the latency of a probe that answered; PRESENT means either nothing to probe or a probe that did not answer, which is a fact about reachability and never about whether the tree exists.'
+    );
+    return env;
+  });
+
+  // ---- provenance vocabulary alignment ------------------------------
+  // The register recorded a structural divergence: four apparatuses
+  // carry four partially-overlapping vocabularies for how a value came
+  // to be known, and a value crossing two of them is relabelled by hand
+  // at each seam. This route writes the relabelling down and MEASURES
+  // what adopting one vocabulary would cost.
+  //
+  // PROPOSED, never applied. Nothing here relabels a record and no
+  // surface may render a proposed label as if it were the record's own.
+  // The decision has migration cost in four trees and belongs to
+  // whoever owns the substrate; what this owes is an accurate statement
+  // of the disagreement and a number for the fix.
+  //
+  // The tally is counted from the RECORDS, not read from the
+  // declaration - which is how `representative` was found: 211 records
+  // carrying a kind no vocabulary in the ecosystem had written down.
+  get('/api/vocabulary/alignment', () => {
+    const tally = {};
+    const bump = (k) => {
+      if (typeof k === 'string' && k) tally[k] = (tally[k] ?? 0) + 1;
+    };
+    for (const collection of [snapshot.observations, snapshot.nodes, snapshot.routes, snapshot.flows, snapshot.events]) {
+      for (const rec of collection ?? []) bump(rec?.provenance?.valueKind);
+    }
+    const env = ok({
+      ...vocabularyAlignment(tally),
+      measuredOver: {
+        corpusBuildId: corpusBuild.id,
+        records: Object.values(tally).reduce((n, x) => n + x, 0),
+        of: 'every served record carrying provenance.valueKind',
+      },
+    });
+    env.meta.verification = verification(
+      'PROVENANCE',
+      'the alignment is DECLARED and proposed; the tally beside it is MEASURED from the served records. Read them as different things - the first is an argument, the second is a count.'
+    );
+    return env;
+  });
+
+  // ---- the notation:// resolver -------------------------------------
+  // One canonical identity space, many physical representations - the
+  // standing invariant, and until now unimplemented. The register named
+  // the first useful step and it was deliberately NOT a migration: a
+  // resolver that answers "what does this URI name, and which apparatus
+  // holds it" without anything having to renumber.
+  //
+  // A resolver, not an allocator. It mints nothing, stores nothing, and
+  // renames nothing: every apparatus id keeps working exactly as it did,
+  // and a notation:// URI is a second way to say one.
+  //
+  // A name is not a capability. Resolving a URI reports what it names
+  // and where that lives; it never grants access to it, and no kind in
+  // the space names a credential, a session or an agent (SECURITY.md 5).
+  //
+  // Most of the space has no implementation, and that is reported rather
+  // than hidden: an unheld kind resolves to a typed refusal naming the
+  // apparatus that WOULD hold it and what has to exist first. A map of
+  // where things live is the honest artifact, and right now the more
+  // useful one.
+  get('/api/notation/space', () => {
+    // The divergence is reported as a MEASUREMENT, not an assertion:
+    // count the id shapes actually present in the served corpus. "One
+    // canonical identity space" is a claim, and this is the number that
+    // says how far the corpus is from it right now.
+    const shapeOf = (id) =>
+      /^ent:[^:]+:/.test(id)
+        ? 'ent:type:name'
+        : id.includes(':')
+          ? 'other-prefixed'
+          : /-/.test(id)
+            ? 'bare-hyphenated'
+            : 'bare';
+    const tally = {};
+    for (const rec of snapshot.nodes) tally[shapeOf(rec.id)] = (tally[shapeOf(rec.id)] ?? 0) + 1;
+    const shapes = Object.entries(tally)
+      .map(([shape, count]) => ({ shape, count }))
+      .sort((a, b) => b.count - a.count);
+    const env = ok({
+      ...notationSpace(),
+      observed: {
+        of: 'entity ids in the served corpus',
+        corpusBuildId: corpusBuild.id,
+        shapes,
+        distinctShapes: shapes.length,
+        note:
+          shapes.length > 1
+            ? `this corpus mints ${shapes.length} entity id shapes. The resolver accepts all of them and reports which one answered; it does not normalise them, because an undocumented relabelling is where provenance is lost.`
+            : 'this corpus mints one entity id shape',
+      },
+    });
+    env.meta.verification = verification(
+      'PROVENANCE',
+      'the declared identity space and which apparatus holds each kind; resolvableHere is this projection answering for itself, never for another apparatus'
+    );
+    return env;
+  });
+
+  get('/api/notation/resolve', ({ query }) => {
+    const found = locate(query.get('uri') ?? '');
+    if (!found.ok) {
+      return refuse(found.refusal.kind, found.refusal.message, found.refusal.remedy);
+    }
+    // A kind whose holder is elsewhere is REFUSED with the holder named.
+    if (!found.resolvableHere) {
+      return refuse(
+        'NOTATION_HELD_ELSEWHERE',
+        `${found.uri} names ${found.names}; ${found.unavailable}`,
+        `${found.unblockedBy}. Holder: ${found.holder ?? 'no apparatus holds this kind'}`
+      );
+    }
+
+    const [head, ...tail] = found.segments;
+    const binding = (() => {
+      switch (found.kind) {
+        case 'node': {
+          const reg = ecosystemRegister();
+          if (head === 'org') return reg.organization.id === tail[0] ? { of: 'organization', record: reg.organization } : null;
+          if (head === 'apparatus') {
+            const app = reg.apparatuses.find((x) => x.notation === found.uri || x.id === tail[0] || x.repo.endsWith(`/${tail[0]}`));
+            return app ? { of: 'apparatus', record: app } : null;
+          }
+          return null;
+        }
+        case 'entity': {
+          // An apparatus id keeps working. This corpus mints more than
+          // one id shape - `ent:<type>:<name>` and a bare hyphenated
+          // form - so the resolver tries both and REPORTS which one
+          // answered. Silently normalising them would be exactly the
+          // undocumented relabelling that loses provenance at a seam.
+          const candidates = [
+            { id: `ent:${head}:${tail.join(':')}`, shape: 'ent:type:name' },
+            { id: `${head}-${tail.join('-')}`, shape: 'bare-hyphenated' },
+            { id: `${head}:${tail.join(':')}`, shape: 'type:name' },
+            { id: tail.join(':'), shape: 'bare' },
+            { id: found.segments.join(':'), shape: 'joined' },
+          ];
+          for (const c of candidates) {
+            const rec =
+              snapshot.nodes.find((n) => n.id === c.id) ??
+              snapshot.routes.find((n) => n.id === c.id) ??
+              snapshot.flows.find((n) => n.id === c.id);
+            if (rec) {
+              return {
+                of: 'record',
+                canonicalId: rec.id,
+                idShape: c.shape,
+                ...(c.shape === 'ent:type:name'
+                  ? {}
+                  : {
+                      shapeNote:
+                        'resolved through a non-primary id shape this corpus also mints. The name is right and the record is right; the SHAPE is the identity divergence, stated rather than normalised away.',
+                    }),
+                record: rec,
+              };
+            }
+          }
+          return null;
+        }
+        case 'observation': {
+          const id = found.segments.join(':');
+          const rec = snapshot.observations.find((o) => o.id === id || o.id.endsWith(id));
+          return rec ? { of: 'observation', canonicalId: rec.id, record: rec } : null;
+        }
+        case 'dataset': {
+          if (head !== 'corpus') return null;
+          return corpusBuild.id === tail[0] || tail[0] === 'current'
+            ? { of: 'corpusBuild', canonicalId: corpusBuild.id, record: corpusBuild }
+            : null;
+        }
+        case 'transform': {
+          const prog = MINING_PROGRAMS.find((p) => p.name === head || p.id === head);
+          return prog ? { of: 'miningProgram', canonicalId: `${prog.name}@${prog.version ?? '0.1'}`, record: prog } : null;
+        }
+        case 'proof': {
+          if (head !== 'merkle') return null;
+          const recordId = tail.join(':');
+          return { of: 'inclusionProof', canonicalId: recordId, route: `/api/corpus/commitments?record=${encodeURIComponent(recordId)}` };
+        }
+        default:
+          return null;
+      }
+    })();
+
+    if (!binding) {
+      return refuse(
+        'NOTATION_NAMES_NOTHING',
+        `${found.uri} is a well-formed name in this space, and nothing in the served corpus answers to it`,
+        `the kind is held by ${found.holder}; check the identifier, or GET /api/notation/space for the shape each kind takes. A well-formed name that resolves to nothing is not an error - most of a namespace is unpopulated at any moment.`
+      );
+    }
+
+    const env = ok({
+      uri: found.uri,
+      kind: found.kind,
+      names: found.names,
+      holder: found.holder,
+      note: found.note,
+      ...binding,
+    });
+    env.meta.verification = verification(
+      'PROVENANCE',
+      'the URI was resolved against the served corpus build; resolution reports what a name refers to and never grants access to it'
     );
     return env;
   });

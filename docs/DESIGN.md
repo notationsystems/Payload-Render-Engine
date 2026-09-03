@@ -185,3 +185,42 @@ under `prefers-reduced-motion`.
 6. Does it use only palette colors — and none of the **reserved**
    treatments — for decoration?
 7. Does its motion collapse under reduced-motion?
+
+## Colour is a vocabulary, and chrome must not spend it
+
+Several tokens in this OS carry meaning that the legend teaches and the
+renderer relies on:
+
+| token | means |
+| --- | --- |
+| `--mined` gold | a MINED candidate — computed by a named algorithm, never observed |
+| `--mode-*` | a transport mode (road, rail, maritime, air, pipeline) |
+| violet, dashed | a HYPOTHETICAL frame — computed, not state |
+| `--ok` / `--warn` / `--alert` | healthy / needs attention / blocked |
+
+A panel border is chrome. Spending a semantic token on chrome dilutes
+the one place it carries meaning: gold on a panel that is not about
+mined patterns teaches the operator that gold means nothing in
+particular, and by the time it appears on a real mined candidate the
+lesson is already lost.
+
+So the control-plane instruments — the surfaces where the OS describes
+itself rather than the world — are achromatic or take the interactive
+accent, and reserve hue for distinctions that are genuinely categorical:
+
+- **SECURITY** steel, with the three-valued state carrying the colour
+  (ENFORCED green · DEPLOYMENT amber · ABSENT grey)
+- **APPARATUS REGISTER** accent, with presence carrying SOLID / HOLLOW /
+  GREY-DASHED exactly as the entity legend does
+- **IDENTITY SPACE** achromatic — it is the one surface with no
+  categorical content at all: it is about names, not about kinds of
+  thing in the world. What hue it uses is the OS's own accent, saying
+  "this surface answers for that", never a colour borrowed from the data
+- **PROVENANCE VOCABULARY** steel, with the relation chips carrying the
+  argument: SAME green, NARROWS accent, ORTHOGONAL amber (a hazard that
+  looks like agreement), UNMAPPED alert (needs a human)
+
+*Known deviation:* the COMPILER console still takes `--mode-maritime` as
+chrome, from before this rule was written down. It is a dilution by the
+same argument and worth correcting the next time that surface is opened
+for other reasons.

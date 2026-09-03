@@ -7,6 +7,7 @@ import './ui/theme.css';
 import './ui/inspect.css';
 import './ui/os.css';
 import { App } from './app/app';
+import type { AppApi } from './app/api';
 import { buildToolSurface } from './app/toolSurface';
 import { createCommandBar } from './ui/commandBar';
 import { createLayerPanel } from './ui/layerPanel';
@@ -31,20 +32,96 @@ import { createReticle } from './ui/reticle';
 import { createPinsPanel } from './ui/pinsPanel';
 import { createQueryCard } from './ui/queryCard';
 import { createPatternsPanel } from './ui/patternsPanel';
-import { createCorpusPanel } from './ui/corpusPanel';
-import { createCompilerPanel } from './ui/compilerPanel';
 import { createInjectionCard } from './ui/injectionCard';
-import { createRefusalsPanel } from './ui/refusalsPanel';
-import { createSecurityPanel } from './ui/securityPanel';
-import { createEcosystemPanel } from './ui/ecosystemPanel';
 import { createWarrantPanel } from './ui/warrantPanel';
-import { createVocabPanel } from './ui/vocabPanel';
 import { createWatchesPanel } from './ui/watchesPanel';
 import { loadWorkspace, saveWorkspace } from './core/workspace';
 import { recordEvent } from './core/journal';
 import { createSystemPanel } from './ui/systemPanel';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
+
+/**
+ * Mount an overlay instrument the first time it is asked for.
+ *
+ * These panels are opened by command and none of them is needed to
+ * render the Earth, so loading them at boot spends startup on surfaces
+ * most sessions never open.
+ *
+ * The operator must never press a command and see nothing. A dynamic
+ * import takes a beat — a chunk fetch in production, a module transform
+ * in dev — and an empty screen during it reads as "the command did not
+ * work", which is the one impression an operator surface cannot afford.
+ * So a placeholder wearing the panel's own class is appended
+ * IMMEDIATELY, and swapped for the real panel when it lands. That also
+ * keeps the DOM contract other code relies on: the element with that
+ * class exists from the moment it was asked for, not from whenever the
+ * network settled.
+ *
+ * Esc during the wait cancels: the placeholder goes and the panel is not
+ * opened behind the operator's back when it finally arrives.
+ *
+ * A failed load is stated rather than swallowed — the operator pressed a
+ * key and is owed an answer either way — and the mount is released so a
+ * retry is possible.
+ */
+function lazyPanel(
+  hud: HTMLElement,
+  api: AppApi,
+  event: string,
+  panelClass: string,
+  load: () => Promise<{ el: HTMLElement }>
+): void {
+  let mounted = false;
+  const name = event.replace('pe:', '').replace('-toggle', '').toUpperCase();
+
+  window.addEventListener(event as keyof WindowEventMap, () => {
+    if (mounted) return; // the real panel owns this event now
+    mounted = true;
+
+    let cancelled = false;
+    const placeholder = document.createElement('div');
+    placeholder.className = `pe-corpus ${panelClass} pe-lazy`;
+    placeholder.innerHTML =
+      '<div class="pe-patterns-head"><span class="pe-patterns-title"></span></div>' +
+      '<div class="pe-corpus-body"><div class="pe-patterns-lineage"></div></div>';
+    const title = placeholder.querySelector('.pe-patterns-title');
+    const line = placeholder.querySelector('.pe-patterns-lineage');
+    if (title) title.textContent = name;
+    if (line) line.textContent = 'OPENING…';
+    hud.appendChild(placeholder);
+
+    const onEsc = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return;
+      cancelled = true;
+      placeholder.remove();
+      mounted = false;
+      e.stopImmediatePropagation();
+    };
+    window.addEventListener('keydown', onEsc);
+    const done = (): void => {
+      window.removeEventListener('keydown', onEsc);
+      placeholder.remove();
+    };
+
+    void load()
+      .then(({ el }) => {
+        done();
+        if (cancelled) return; // the operator changed their mind mid-load
+        hud.appendChild(el);
+        window.dispatchEvent(new CustomEvent(event));
+      })
+      .catch((err) => {
+        done();
+        mounted = false;
+        api.events.emit('toast', {
+          title: `INSTRUMENT UNAVAILABLE — ${name}`,
+          body: `the surface failed to load: ${err instanceof Error ? err.message : String(err)}. The command is still valid — try again, or check that the bundle is complete.`,
+          tone: 'alert',
+        });
+      });
+  });
+}
 
 async function start(): Promise<void> {
   const canvas = document.getElementById('scene') as HTMLCanvasElement;
@@ -86,14 +163,16 @@ async function start(): Promise<void> {
   hud.appendChild(createPinsPanel(app).el);
   hud.appendChild(createQueryCard(app).el);
   hud.appendChild(createPatternsPanel(app).el);
-  hud.appendChild(createCorpusPanel(app).el);
-  hud.appendChild(createCompilerPanel(app).el);
+  lazyPanel(hud, app, 'pe:corpus-toggle', '', async () => (await import('./ui/corpusPanel')).createCorpusPanel(app));
+  lazyPanel(hud, app, 'pe:compiler-toggle', 'pe-compiler', async () => (await import('./ui/compilerPanel')).createCompilerPanel(app));
   hud.appendChild(createInjectionCard(app).el);
-  hud.appendChild(createRefusalsPanel(app).el);
-  hud.appendChild(createSecurityPanel(app).el);
-  hud.appendChild(createEcosystemPanel(app).el);
+  lazyPanel(hud, app, 'pe:refusals-toggle', 'pe-refusals', async () => (await import('./ui/refusalsPanel')).createRefusalsPanel(app));
+  lazyPanel(hud, app, 'pe:security-toggle', 'pe-security', async () => (await import('./ui/securityPanel')).createSecurityPanel(app));
+  lazyPanel(hud, app, 'pe:ecosystem-toggle', 'pe-eco', async () => (await import('./ui/ecosystemPanel')).createEcosystemPanel(app));
+  lazyPanel(hud, app, 'pe:notation-toggle', 'pe-nota', async () => (await import('./ui/notationPanel')).createNotationPanel(app));
+  lazyPanel(hud, app, 'pe:vocabulary-toggle', 'pe-voc', async () => (await import('./ui/vocabularyPanel')).createVocabularyPanel(app));
   hud.appendChild(createWarrantPanel(app).el);
-  hud.appendChild(createVocabPanel(app).el);
+  lazyPanel(hud, app, 'pe:vocab-toggle', 'pe-vocab', async () => (await import('./ui/vocabPanel')).createVocabPanel(app));
   hud.appendChild(createWatchesPanel(app).el);
   hud.appendChild(createSystemPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);

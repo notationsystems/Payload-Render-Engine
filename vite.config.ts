@@ -23,6 +23,25 @@ export default defineConfig({
     chunkSizeWarningLimit: 1500,
   },
   server: {
+    // The instrument panels are loaded on first open (see lazyPanel in
+    // src/main.ts). In a production build those are static chunks, but a
+    // COLD dev server discovers their module graph at that moment and
+    // can re-optimize dependencies — which forces a full page reload
+    // mid-session, exactly when the operator asked to open something.
+    // Warming them at startup moves that discovery to boot, where it
+    // costs nothing anyone is waiting on.
+    warmup: {
+      clientFiles: [
+        './src/ui/securityPanel.ts',
+        './src/ui/ecosystemPanel.ts',
+        './src/ui/notationPanel.ts',
+        './src/ui/vocabularyPanel.ts',
+        './src/ui/corpusPanel.ts',
+        './src/ui/compilerPanel.ts',
+        './src/ui/refusalsPanel.ts',
+        './src/ui/vocabPanel.ts',
+      ],
+    },
     host: devHost,
     strictPort: false,
     // the dev server is a build tool, not an API: nothing legitimate

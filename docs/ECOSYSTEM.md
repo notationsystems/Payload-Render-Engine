@@ -30,14 +30,33 @@ Nothing here was inferred from a repository name, a README summary, or a
 guess about intent. A register that made unsourced assertions about
 provenance-bearing systems would be self-refuting.
 
-**Presence is stated, not assumed.**
+**Presence is measured where it can be, stated where it cannot.**
 
 | state | means |
 | --- | --- |
-| `OBSERVED` | this OS reached it and it answered |
-| `PRESENT` | its tree carries source; not probeable from here |
+| `OBSERVED` | probed and answered — the row carries the moment and the latency |
+| `PRESENT` | its tree carries source; either nothing to probe, or probed and it did not answer |
 | `DECLARED` | a repository exists and carries no implementation |
 | `SCAFFOLD` | a starter tree, not yet made into anything |
+
+An apparatus that exposes an HTTP surface is probed at read time and
+upgraded to `OBSERVED`. Leaving such a row at `PRESENT` would understate
+what the system already knows about itself — and understating is the
+more dangerous direction, because it hides a dependency other
+apparatuses may already be relying on.
+
+A **failed probe reports reachability, never existence.** An apparatus
+that did not answer stays `PRESENT` and says why. Collapsing those two
+would let a stopped service read as an unbuilt apparatus, which is the
+one confusion this register exists to prevent.
+
+The probe is bounded (1.5s, cached 15s) so a register read never waits
+on a stopped apparatus, and its destination is constrained at the call
+site: a fixed path shape, and a host that must be loopback unless the
+operator named it in `PAYLOAD_ALLOWED_HOSTS`. Pointed at
+`169.254.169.254` it refuses and says so — a probe target read out of a
+data structure is the shape of an SSRF primitive, so it is validated as
+if it were untrusted even though nothing a caller sends reaches it.
 
 **The gaps are rows, not omissions.** A named-but-unbuilt apparatus gets
 a `DECLARED` row with the reason and what would unblock it. A register
@@ -52,9 +71,12 @@ here already refuses on its own data.
 ```
 ACQUISITION → PERCEPTION → EVIDENCE → CANONICAL STATE → GRAPH PLANE → PROJECTION → OPERATOR
      DAF          OCR         DAF         Terminal        (nobody)      Render        Render
-  Gods-Eye                                                              Engine       Engine
+                                                                        Engine       Engine
                                                                                     Terminal
 ```
+
+God's Eye View sits beside this diagram rather than on it, and Tradewind
+is not on it at all — see §2.6 and §2.7.
 
 Each stage is a question:
 
@@ -146,11 +168,16 @@ produced it and the level at which it can be verified.
 - **Speaks** *epistemic ladder*: `Observation` `DerivedMetric` `MinedPattern` `Hypothesis` `Inference`, and orthogonally the *verification ladder* `PROVENANCE ⊂ REPRODUCIBLE ⊂ ATTESTED ⊂ ZK_VERIFIED`, with the unreached levels stating what each missing rung requires.
 
 ### 2.6 God's Eye View — `PRESENT`
-`notation://node/apparatus/gods-eye-view` · stage: ACQUISITION
+`notation://node/apparatus/gods-eye-view` · **owns no lifecycle stage**
 
-A real-time intelligence console for planet Earth. A sibling observation
-surface, not a stage in the corpus lifecycle: it renders live feeds and
-keeps none of them.
+A real-time intelligence console for planet Earth. It renders live feeds
+and keeps none of them.
+
+It owns no stage, and the distinction is the point. Acquisition *into
+the corpus* is the Data Acquisition Channel's; God's Eye observes the
+same world through a different surface and contributes nothing to the
+corpus. Listing it under ACQUISITION would say this ecosystem acquires
+from it — crediting the corpus with evidence it never received.
 
 - **Speaks** *layer honesty*: `LIVE` `UNAVAILABLE` `KEY REQUIRED`. A keyless install is told which half of a mission it is getting, on the layer row, rather than the launcher trimming what it offers down to the lowest-configured install.
 
@@ -223,6 +250,47 @@ the evidence) rather than as competing values on the first. The OCR
 states are a **third axis** (position in the pipeline) and should not be
 flattened into either.
 
+**Measured, and it changed the finding.** `GET /api/vocabulary/alignment`
+counts the `valueKind` on every served record. Against the Terminal
+corpus, at the time of writing — **the route is the source, this table
+is a reading of it**, and a number quoted from a document rather than
+from the system is how a measurement becomes a belief:
+
+| kind | records | relation | proposed |
+| --- | ---: | --- | --- |
+| `reported` | 547 | SAME | → `asserted` |
+| `estimated` | 227 | **ORTHOGONAL** | stays — different axis |
+| `representative` | 211 | **UNMAPPED** | needs a decision |
+| `derived` | 59 | SAME | unchanged |
+
+Two things fell out of counting that reading the declarations had
+missed:
+
+**A fifth kind nobody had written down.** `representative` — 211 records,
+all carrying `admissible: false` — is a stand-in value held for shape
+rather than for claim. No apparatus declares it and no vocabulary has a
+counterpart. It is not a synonym for anything, so the alignment marks it
+`UNMAPPED` and it needs a human decision rather than a mapping. This is
+the argument for measuring a vocabulary instead of reading it.
+
+**The proposal needs three axes, not one canonical list.** `estimated`
+is not an alternative to `measured` — a value is measured OR asserted on
+the ORIGIN axis and, separately, direct OR estimated on the DISTANCE
+axis. Collapsing them forces a choice that discards one of the two
+facts, which is exactly how `estimated` ends up competing with
+`observed` in a single enum and neither meaning survives. The OCR states
+are a third axis (position in the pipeline) and belong to neither.
+
+So the shape of the fix is: 547 records rename cleanly, 227 stay put on a
+second axis, and 211 need someone to decide what `representative` means
+before anything is adopted.
+
+**Nothing is applied.** `GET /api/vocabulary/alignment` and the
+PROVENANCE instrument (`provenance`) render the proposal as PROPOSED,
+and a test asserts that no served record has acquired a proposed label.
+A surface that made the map agree with itself while the trees still
+disagreed would be the silent relabelling this exists to stop.
+
 **Owned by:** substrate.
 
 ### 4.2 The `notation://` identity space is specified and unimplemented — *structural*
@@ -241,6 +309,12 @@ cross-apparatus query.
 one apparatus that answers *"what does this `notation://` URI name, and
 which apparatus holds it"* without anything having to renumber.
 
+**Built** — see §7. The resolver exists in the projection layer, which
+is the one place it could be built without asking any apparatus to
+change. It resolves what this projection holds and refuses everything
+else with the holder named. That does not close the divergence; it makes
+it navigable, and it measures it.
+
 **Owned by:** substrate.
 
 ### 4.3 The graph plane has a repository and no implementation — *gap*
@@ -255,6 +329,61 @@ everyone can see is a better artifact than a graph half-built inside a
 projection layer that is forbidden to hold state.
 
 **Owned by:** substrate.
+
+---
+
+## 7. The `notation://` resolver
+
+The identity space is specified in the substrate directive and, until
+now, unimplemented. §4.2 named the first useful step and it was
+deliberately not a migration. That step is built:
+
+- `shared/notation.mjs` — the scheme: eleven kinds, who holds each, and
+  whether this projection can answer for it
+- `GET /api/notation/space` — the space, plus the **measurement** below
+- `GET /api/notation/resolve?uri=…` — resolution over the served corpus
+- the command bar — a `notation://` URI is an **address**: typing one
+  navigates the OS or refuses with the apparatus that holds it
+- the NOTATION instrument (`notation`) — the space, the measurement, and
+  a working address field
+
+### What it is, and is not
+
+A **resolver, not an allocator**: it mints nothing, stores nothing, and
+renames nothing. Every apparatus id keeps working exactly as it did; a
+`notation://` URI is a second way to *say* one, never a thing anything
+has to migrate to.
+
+**A name is not a capability.** Resolving a URI reports what it names and
+where that lives; it never grants access to it. Three kinds are
+permanently absent from the space and the surface shows them as such —
+`credential`, `session`, `agent` — because a URI that can name a
+credential is a credential that will eventually be dereferenced. An
+omission nobody can see is indistinguishable from an oversight, so it is
+stated as a decision.
+
+**Refusal is the point.** Six of eleven kinds resolve here; four are held
+by another apparatus and one is held by nobody. Each of those refuses
+with the holder named and what would have to exist first. A resolver
+that returned nothing for them would be useless, and one that pretended
+would be worse — so the refusals are the map.
+
+### The measurement
+
+`GET /api/notation/space` counts the entity id shapes actually present
+in the served corpus. Against the Terminal corpus it reported, at the
+time of writing — again, the route is the source:
+
+```
+  76  ent:type:name
+  57  bare-hyphenated
+```
+
+*One canonical identity space* is a claim; that is the number saying how
+true it currently is — and the divergence turns out to run **inside** a
+single apparatus, not only between them. The resolver accepts both
+shapes and **reports which one answered** rather than normalising them,
+because an undocumented relabelling is exactly where provenance is lost.
 
 ---
 

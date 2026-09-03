@@ -32,7 +32,17 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       ['compiler · build', 'the build + its conservation report and commitment manifest'],
       ['refusals', 'the refused:* work queue — one mechanism per group, one shared remedy'],
       ['watches', 'standing conditions with stated bases; every trip logged'],
+    ],
+  },
+  {
+    title: 'KNOW THE SYSTEM',
+    rows: [
       ['system · control', 'the control plane: live topology, capability ladder (observed → proposed → approved → dispatched), session journal'],
+      ['security · posture', 'what is enforced, what the deployment must close, what is ABSENT with its reason — and the refusal journal'],
+      ['ecosystem · apparatus', 'the Notation Systems register: the corpus lifecycle, who owns each stage, and the stage nobody owns'],
+      ['notation · identity', 'the notation:// identity space — kinds, holders, and the id shapes this corpus actually mints'],
+      ['notation://<kind>/<id>', 'an ADDRESS: resolve an identity and go there, or be told which apparatus holds it'],
+      ['provenance · alignment', 'four vocabularies for how a value came to be known, and the measured cost of adopting one'],
     ],
   },
   {
@@ -50,6 +60,7 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       ['operations', 'the brokerage control tower mirror — exception-first, read-only'],
       ['brief · sitrep', 'the composed situation report, basis labeled'],
       ['markets', 'FX · crypto · derivatives desks'],
+      ['follow the load', 'the guided tour: one load walked end to end, narrated from real records'],
       ['agents', 'the structured tool surface'],
     ],
   },

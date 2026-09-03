@@ -1035,6 +1035,82 @@ structural, not incidental:
    list, and a toolchain upgrade to a version with a clean advisory
    surface (SEC-106/160).
 
+## 24. The apparatus register and the notation:// resolver
+
+**docs/ECOSYSTEM.md** is the register: the seven apparatuses of Notation
+Systems, the corpus lifecycle stage each owns, what each refuses, and
+where the trees converge and diverge. `shared/ecosystem.mjs` is its
+single source, served at `GET /api/ecosystem/register`, rendered by the
+ECOSYSTEM instrument, and held to the actual trees by
+`scripts/check-ecosystem.mjs` — PRESENT must carry source, DECLARED must
+not, every absence must carry its reason, every divergence its owner.
+
+`shared/notation.mjs` implements the identity space the substrate
+directive specified: eleven kinds, who holds each, and — the part that
+makes it useful today — a typed refusal naming the holder for the kinds
+this projection cannot answer for. A `notation://` URI is an address in
+the command bar: it navigates or it refuses, and the address rule runs
+before any fuzzy match so an identity is never shadowed by its own text.
+
+Presence in the register is probed, not asserted: an apparatus that
+exposes an HTTP surface is reached at read time and carries the moment
+and latency of the probe that answered. A probe that fails reports
+REACHABILITY and never existence — a stopped service must not read as an
+unbuilt apparatus. The probe is bounded and cached, and its destination
+is validated at the call site (fixed path shape; loopback host unless
+the operator named one), because a target read out of a data structure
+is the shape of an SSRF primitive whatever its provenance. The presence
+counts are derived from the rows they summarise, so a probe that changes
+a row changes the headline with it.
+
+`shared/vocabulary.mjs` is the third piece: the provenance vocabulary
+alignment. It declares each apparatus's terms, proposes a mapping onto
+three orthogonal axes (origin · distance from evidence · pipeline
+stage), and — the part that makes it decidable — MEASURES what adopting
+it would do to the served corpus. Every row is typed by what kind of
+relationship it claims: SAME is a rename, NARROWS is a refinement,
+ORTHOGONAL is a hazard (merging destroys a fact), UNMAPPED needs a
+human. Nothing is applied, and a test asserts no served record has
+acquired a proposed label.
+
+The instruments are lazily mounted. Eight overlay surfaces — the four
+new ones plus corpus, compiler, refusals and vocabulary — load on first
+open rather than at boot, and the main bundle went from 987 kB to 920 kB
+while five surfaces were added.
+
+`lazyPanel` is the helper, and its shape is set by one rule: **the
+operator must never press a command and see nothing.** Deferring the
+module must not defer the element, so a placeholder wearing the panel's
+own class is appended immediately (present in ~40 ms) and swapped for
+the real panel when it lands. That keeps the DOM contract other code
+relies on — the element exists from the moment it was asked for — and
+gives the operator feedback in the window where a chunk is still in
+flight. Esc during that window cancels, so a panel never opens behind
+someone who has moved on; a failed load raises a toast rather than
+swallowing the command.
+
+Two contracts became mechanical alongside them. The **answer envelope**
+is now swept across every parameterless route rather than asserted
+per-route: verification level AND basis, the corpus build that produced
+the answer, and a remedy on every refusal. Per-route assertions test the
+routes someone remembered to test; a sweep means a route added later
+inherits the contract instead of quietly opting out of it. And **INV-7**
+holds the vocabulary overlay to the command grammar — a command the
+grammar accepts and the help never lists is a feature nobody can find,
+which for an operator surface is the same as not shipping it. Capitalised
+entries are exempt as seed examples of generic forms already documented.
+
+Two things this pass measured rather than asserted. The served corpus
+mints two entity id shapes (76 `ent:type:name`, 57 bare-hyphenated), so
+the identity divergence runs inside one apparatus and not only between
+them; the resolver accepts both and reports which answered. And SEC-011
+was widened from the tool surface to the whole renderer: `runCommand` is
+deliberately broad, so every module the command grammar can reach is
+inside an agent's blast radius, and an allowlist that stopped at one
+file was checking the door while leaving the corridor unwatched.
+
+---
+
 The identity separation in SECURITY.md §5 is the security half of the
 Notation Substrate's `notation://` namespace contract: one canonical
 identity space, many representations — with service and agent identity

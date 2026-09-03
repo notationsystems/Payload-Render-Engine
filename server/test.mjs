@@ -703,8 +703,12 @@ console.log('\n— apparatus register —');
 
   // A scan is not a probe, and the trust level must not claim otherwise.
   check(
+    /CLAIMS are a scan/i.test(answer.meta.verification.basis) && /PRESENCE is measured/i.test(answer.meta.verification.basis),
+    'the basis distinguishes the scanned claims from the probed presence — two different kinds of knowing on one surface'
+  );
+  check(
     answer.meta.verification.level === 'PROVENANCE',
-    'the register is served at PROVENANCE — it was read at a stated time, not probed now'
+    'the register is served at PROVENANCE — claims scanned from the trees, presence probed where probeable'
   );
 
   // The honesty properties, held mechanically rather than by review.
@@ -731,6 +735,33 @@ console.log('\n— apparatus register —');
     'the unowned stage still has an apparatus row, so it cannot vanish from the map'
   );
 
+  // Reachability is measured where it can be, and the measurement is
+  // bounded: a register read must not wait on a stopped apparatus.
+  check(Array.isArray(d.probing?.probed), 'the register names which apparatuses it probed');
+  check(
+    d.probing.timeoutMs > 0 && d.probing.timeoutMs <= 5000,
+    `the probe is bounded (${d.probing?.timeoutMs}ms) — a register read never waits on a stopped apparatus`
+  );
+  check(
+    /reachability, never whether the tree exists/i.test(d.probing.note),
+    'the register states that a failed probe is about reachability, not existence'
+  );
+  for (const id of d.probing.probed) {
+    const row = d.apparatuses.find((a) => a.id === id);
+    check(
+      row && (row.presence === 'OBSERVED' || row.presence === 'PRESENT'),
+      `${id}: a probed apparatus lands on OBSERVED or PRESENT, never DECLARED — a stopped service is not an unbuilt one`
+    );
+    check(typeof row.probedAt === 'string', `${id}: the probe result says WHEN it was taken`);
+  }
+
+  // the headline must never disagree with the table under it
+  check(
+    d.counts.observed === d.apparatuses.filter((a) => a.presence === 'OBSERVED').length &&
+      d.counts.present === d.apparatuses.filter((a) => a.presence === 'PRESENT').length,
+    'the presence counts reconcile with the rows after probing'
+  );
+
   // It is a MAP, not a mirror: no apparatus record may travel in it.
   const serialized = JSON.stringify(d);
   check(
@@ -746,6 +777,267 @@ console.log('\n— apparatus register —');
   check(!again.includes(canary), 'SEC-013 the register echoes no credential value');
   if (savedTok === undefined) delete process.env.PAYLOAD_OPERATIONS_TOKEN;
   else process.env.PAYLOAD_OPERATIONS_TOKEN = savedTok;
+}
+
+// --------------------------------------------------------------------
+// The notation:// resolver — a name is not a capability
+// --------------------------------------------------------------------
+console.log('\n— notation resolver —');
+{
+  const R = (uri) => call('GET', `/api/notation/resolve?uri=${encodeURIComponent(uri)}`);
+
+  // the space itself
+  const space = await call('GET', '/api/notation/space');
+  check(space.status === 'ok', 'GET /api/notation/space answers');
+  check(
+    space.data.counts.kinds >= 10 && space.data.counts.resolvableHere >= 1,
+    'the space declares its kinds and how many this projection answers for'
+  );
+  check(
+    space.data.counts.unheld >= 1,
+    'a kind no apparatus holds is declared as such, not omitted from the space'
+  );
+  // the divergence as a MEASUREMENT, not an assertion
+  check(
+    Array.isArray(space.data.observed?.shapes) && space.data.observed.shapes.length >= 1,
+    'the space reports the id shapes actually minted in the served corpus'
+  );
+
+  // forbidden kinds are refused permanently, and say so
+  const cred = await R('notation://credential/ops/token');
+  check(cred.status === 'refused' && cred.refusal.kind === 'NOTATION_KIND_FORBIDDEN', 'a credential URI is refused by design');
+  check(
+    /not an oversight|omission is the control/i.test(cred.refusal.remedy),
+    'the forbidden refusal says the omission is deliberate, not a gap to be filled'
+  );
+  for (const k of ['session', 'agent']) {
+    const out = await R(`notation://${k}/x/y`);
+    check(out.status === 'refused' && out.refusal.kind === 'NOTATION_KIND_FORBIDDEN', `a ${k} URI is refused by design`);
+  }
+
+  // malformed input is refused with a remedy, never guessed at
+  for (const [uri, kind] of [
+    ['', 'NOTATION_URI_EMPTY'],
+    ['https://evil.example/x', 'NOTATION_URI_SCHEME'],
+    ['notation://nonsense/x', 'NOTATION_KIND_UNKNOWN'],
+    ['notation://entity', 'NOTATION_URI_INCOMPLETE'],
+    ['notation://entity/<script>alert(1)</script>', 'NOTATION_URI_SEGMENT_INVALID'],
+    // a malformed address is refused, never silently rewritten: two
+    // inputs that should be distinguishable must not collapse to one
+    ['notation://entity//escondida', 'NOTATION_URI_EMPTY_SEGMENT'],
+    ['notation://node//apparatus/x', 'NOTATION_URI_EMPTY_SEGMENT'],
+  ]) {
+    const out = await R(uri);
+    check(out.status === 'refused' && out.refusal.kind === kind, `${kind} for ${uri || '(empty)'}`);
+    check(typeof out.refusal.remedy === 'string' && out.refusal.remedy.length > 10, `${kind} carries a remedy`);
+  }
+
+  const trailing = await R('notation://node/org/notation-systems/');
+  check(trailing.status === 'ok', 'one trailing slash is idiomatic and still resolves');
+
+  // a kind held elsewhere is refused WITH the holder named — the refusal
+  // is the map, and a silent miss would throw the map away
+  const held = await R('notation://artifact/abc123');
+  check(held.status === 'refused' && held.refusal.kind === 'NOTATION_HELD_ELSEWHERE', 'a kind held by another apparatus is refused');
+  check(/ocr|Holder:/i.test(held.refusal.remedy), 'the refusal names the apparatus that holds it');
+
+  // resolvable kinds resolve, and report which id shape answered
+  const org = await R('notation://node/org/notation-systems');
+  check(org.status === 'ok' && org.data.of === 'organization', 'the organization resolves');
+  const app = await R('notation://node/apparatus/payload-ocr-agent');
+  check(app.status === 'ok' && app.data.of === 'apparatus', 'an apparatus resolves from the register');
+  const build = await R('notation://dataset/corpus/current');
+  check(build.status === 'ok' && build.data.of === 'corpusBuild', 'the current corpus build resolves');
+
+  // a well-formed name that names nothing is not an error
+  const nothing = await R('notation://entity/mine/definitely-not-here');
+  check(
+    nothing.status === 'refused' && nothing.refusal.kind === 'NOTATION_NAMES_NOTHING',
+    'a well-formed name that answers to nothing is refused, not an error'
+  );
+  check(
+    /most of a namespace is unpopulated/i.test(nothing.refusal.remedy),
+    'and the refusal says so — an empty name is the normal case, not a fault'
+  );
+
+  // A NAME IS NOT A CAPABILITY: resolution must never carry authority
+  const canary = `canary-${randomUUID()}`;
+  const savedTok = process.env.PAYLOAD_OPERATIONS_TOKEN;
+  process.env.PAYLOAD_OPERATIONS_TOKEN = canary;
+  const sweep = JSON.stringify([
+    await R('notation://node/apparatus/payload-terminal'),
+    await R('notation://dataset/corpus/current'),
+    await call('GET', '/api/notation/space'),
+  ]);
+  check(!sweep.includes(canary), 'SEC-013 no resolution carries a credential value');
+  if (savedTok === undefined) delete process.env.PAYLOAD_OPERATIONS_TOKEN;
+  else process.env.PAYLOAD_OPERATIONS_TOKEN = savedTok;
+
+  // SEC-105 — a URI must never be able to steer an outbound host
+  const ssrf = await R('notation://source/evil.example/steal');
+  check(
+    ssrf.status === 'refused',
+    'SEC-105 a source URI naming a host is refused — no input selects an outbound destination'
+  );
+}
+
+// --------------------------------------------------------------------
+// Provenance vocabulary alignment — proposed, measured, never applied
+// --------------------------------------------------------------------
+console.log('\n— vocabulary alignment —');
+{
+  const out = await call('GET', '/api/vocabulary/alignment');
+  check(out.status === 'ok', 'GET /api/vocabulary/alignment answers');
+  const d = out.data;
+
+  check(d.status === 'PROPOSED', 'the alignment is marked PROPOSED, never adopted');
+  check(/substrate/i.test(d.ownedBy), 'the decision is owned by the substrate, not by this surface');
+  check(/nothing here is applied/i.test(d.warning), 'the surface states that nothing is relabelled');
+
+  // three axes, and the reason they must stay separate
+  check(d.axes.length === 3, 'the proposal separates origin, distance and stage');
+  check(
+    d.axes.every((a) => typeof a.basis === 'string' && a.basis.length > 40),
+    'every axis states WHY it is an axis rather than a value on another'
+  );
+
+  // ORTHOGONAL rows are the hazard: they look like agreement
+  const orth = d.alignment.filter((r) => r.relation === 'ORTHOGONAL');
+  check(orth.length >= 1, 'at least one term is marked ORTHOGONAL — merging it would destroy a fact');
+  check(
+    orth.every((r) => /destroy|lost|discard|flatten/i.test(r.note)),
+    'each orthogonal row says what merging it would cost'
+  );
+
+  // UNMAPPED rows must not quietly acquire a target
+  const unmapped = d.alignment.filter((r) => r.relation === 'UNMAPPED');
+  check(unmapped.length >= 1, 'a term with no counterpart is marked UNMAPPED, not force-fitted');
+  check(
+    unmapped.some((r) => r.term === 'representative'),
+    'representative is UNMAPPED — it is a fifth idea, found by counting the corpus rather than reading a declaration'
+  );
+
+  // the measurement, which is the whole point
+  check(d.impact !== null, 'the served alignment carries a migration impact');
+  check(Boolean(d.measuredOver), 'the impact names the corpus build it was counted over');
+
+  // The corpus under test may label no value provenance at all. That is
+  // an ABSENCE, not a clean bill of health, and the surface must say so
+  // rather than showing a table of zeroes.
+  if (d.impact.status === 'ABSENT') {
+    check(
+      typeof d.impact.reason === 'string' && /does not label|nothing to align/i.test(d.impact.reason),
+      'an unlabelled corpus is reported as ABSENT with its reason, not as zero of every label'
+    );
+    check(
+      typeof d.impact.unblockedBy === 'string' && d.impact.unblockedBy.length > 20,
+      'and the absence states what would unblock it'
+    );
+    check(d.impact.rows.length === 0 && d.impact.total === 0, 'an absent impact carries no invented rows');
+  } else {
+    check(d.measuredOver.records > 0, `the impact is counted over real records (${d.measuredOver.records})`);
+    check(
+      d.impact.total === d.impact.rows.reduce((n, r) => n + r.count, 0),
+      'the impact total is the sum of its rows — a headline that does not reconcile is worse than none'
+    );
+    check(
+      d.impact.renamed + d.impact.unchanged + d.impact.needsDecision === d.impact.total,
+      'every counted record lands in exactly one of rename / unchanged / needs-a-decision'
+    );
+  }
+  check(
+    d.impact.needsDecision === 0 || d.impact.undecidedTerms.length > 0,
+    'if records need a decision, the terms that need it are named'
+  );
+  check(
+    typeof d.impact.verdict === 'string' && d.impact.verdict.length > 20,
+    'the impact states a verdict a reviewer can act on'
+  );
+
+  // A case-insensitive lookup must not decide an AXIS. `observed` is an
+  // origin in the Terminal and `OBSERVED` a pipeline stage in the OCR
+  // Agent; matching loosely across them would silently assign the wrong
+  // axis — the exact relabelling this alignment exists to prevent.
+  {
+    const { alignTerm } = await import('../shared/vocabulary.mjs');
+    check(alignTerm('observed')?.axis === 'origin', 'an exact term keeps its own axis');
+    check(alignTerm('OBSERVED')?.axis === 'stage', 'a differently-cased term is a DIFFERENT term with its own axis');
+    const amb = alignTerm('Observed');
+    check(
+      amb?.relation === 'AMBIGUOUS' && amb.axis === null,
+      'a loose match spanning two axes refuses rather than guessing which one was meant'
+    );
+    check(
+      alignTerm('Observed', 'terminal')?.axis === 'origin',
+      'naming the apparatus resolves the ambiguity — the caller says what they meant'
+    );
+  }
+
+  // an ORTHOGONAL term must never be counted as a clean rename
+  const orthRow = d.impact.rows.find((r) => r.relation === 'ORTHOGONAL');
+  if (orthRow) check(orthRow.renames === false, 'an orthogonal term is never counted as a free rename');
+
+  // the alignment must not leak into the records themselves
+  const snap = await call('GET', '/api/snapshot');
+  const kinds = new Set();
+  for (const rec of snap.data.observations ?? []) if (rec?.provenance?.valueKind) kinds.add(rec.provenance.valueKind);
+  check(
+    !kinds.has('asserted'),
+    'SEC-017/INV-6 the proposal is not applied to served records — a record still carries the label its apparatus gave it'
+  );
+}
+
+// --------------------------------------------------------------------
+// The answer envelope, swept across EVERY parameterless route
+//
+// Per-route assertions test the routes someone remembered to test. This
+// sweeps the whole surface, so a route added later inherits the contract
+// instead of quietly opting out of it. Five routes were added in one
+// pass recently; that is exactly when an envelope contract drifts.
+// --------------------------------------------------------------------
+console.log('\n— answer envelope, whole surface —');
+{
+  const { PROXIED_PREFIXES } = await import('./security.mjs');
+  const swept = [];
+  for (const route of routes) {
+    const path = route.pattern.source
+      .replace(/^\^|\$$/g, '')
+      .replace(/\\\//g, '/');
+    // skip parameterised routes (no id to supply) and anything that
+    // would spend an upstream's quota from a test run
+    if (path.includes('(?<')) continue;
+    if (PROXIED_PREFIXES.some((p) => path.startsWith(p))) continue;
+    swept.push(path);
+  }
+  check(swept.length >= 10, `the sweep covers the served surface (${swept.length} parameterless routes)`);
+
+  const noVerification = [];
+  const noBuild = [];
+  const refusalNoRemedy = [];
+  for (const path of swept) {
+    const out = await call('GET', path);
+    if (out.status === 'refused') {
+      if (!out.refusal?.remedy || out.refusal.remedy.length < 10) refusalNoRemedy.push(path);
+      continue;
+    }
+    if (out.status !== 'ok') continue;
+    const v = out.meta?.verification;
+    if (!v?.level || !v?.basis || v.basis.length < 20) noVerification.push(path);
+    if (!out.meta?.corpusBuild?.id) noBuild.push(path);
+  }
+
+  check(
+    noVerification.length === 0,
+    `every ok answer states its verification level AND its basis${noVerification.length ? ` — missing on ${noVerification.join(', ')}` : ''}`
+  );
+  check(
+    noBuild.length === 0,
+    `every ok answer names the corpus build that produced it${noBuild.length ? ` — missing on ${noBuild.join(', ')}` : ''}`
+  );
+  check(
+    refusalNoRemedy.length === 0,
+    `every refusal carries a remedy${refusalNoRemedy.length ? ` — missing on ${refusalNoRemedy.join(', ')}` : ''}`
+  );
 }
 
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');

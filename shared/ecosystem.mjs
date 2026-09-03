@@ -30,8 +30,14 @@
  * `presence` distinguishes what was seen from what was said:
  *
  *   OBSERVED   this OS has probed it and it answered
- *   PRESENT    the tree exists and carries source; not probeable from
- *              here (no HTTP surface, or not running)
+ *   PRESENT    the tree exists and carries source; either it exposes no
+ *              HTTP surface to probe, or it was probed and did not answer
+ *
+ * A row that CAN be probed carries a `probe` and is upgraded to OBSERVED
+ * at read time, with the moment and the latency attached. Leaving such a
+ * row at PRESENT would understate what the system already knows about
+ * itself, and understating is the more dangerous direction: it hides a
+ * dependency that other apparatuses may already be relying on.
  *   DECLARED   a repository exists and carries no implementation yet
  *   SCAFFOLD   a starter tree that has not been made into anything
  *
@@ -147,6 +153,9 @@ export const APPARATUSES = Object.freeze([
     stages: ['canonical', 'operator'],
     presence: 'PRESENT',
     presenceBasis: 'serves an HTTP surface; this OS reads it through the projection service',
+    // SEC-105 - the destination is fixed in code (or its documented env
+    // var), never selected by anything a caller sends
+    probe: { path: '/api/health', via: 'TERMINAL_URL', fallback: 'http://127.0.0.1:3000' },
     declares:
       'Canonical state for the physical economy, and the operations desk over it. Freight modelled as discrete manufacturing: a load is a unit under process control, with a genealogy reconstructible afterwards.',
     holds: [
@@ -219,7 +228,13 @@ export const APPARATUSES = Object.freeze([
     repo: 'notationsystems/gods-eye-view',
     label: "God's Eye View",
     short: "God's Eye",
-    stages: ['acquisition'],
+    // owns NO lifecycle stage, and the distinction is the point: it
+    // observes the same world through a different surface, and nothing
+    // it sees enters the corpus. Listing it under ACQUISITION would say
+    // this ecosystem acquires from it, which it does not.
+    stages: [],
+    stagesNote:
+      'observes the same world and contributes nothing to the corpus. Acquisition INTO the corpus is the Data Acquisition Channel; this is a parallel surface, and conflating the two would credit the corpus with evidence it never received.',
     presence: 'PRESENT',
     presenceBasis: 'tree carries source; a separate browser application, not a service this OS reads',
     declares:
@@ -367,6 +382,57 @@ export const DIVERGENCES = Object.freeze([
   },
 ]);
 
+/** Presence counts, derived from the rows. One implementation, two callers. */
+function countPresence(apparatuses, lifecycle) {
+  return {
+    apparatuses: apparatuses.length,
+    observed: apparatuses.filter((a) => a.presence === 'OBSERVED').length,
+    present: apparatuses.filter((a) => a.presence === 'PRESENT').length,
+    declared: apparatuses.filter((a) => a.presence === 'DECLARED').length,
+    scaffold: apparatuses.filter((a) => a.presence === 'SCAFFOLD').length,
+    stagesUnowned: lifecycle
+      .filter((s) => !apparatuses.some((a) => a.stages.includes(s.id) && a.presence !== 'DECLARED'))
+      .map((s) => s.id),
+  };
+}
+
+/**
+ * Apply probe results to the register. Pure: the caller does the I/O and
+ * hands in {apparatusId: {reachable, latencyMs, at, detail}}.
+ *
+ * An apparatus that answered becomes OBSERVED and says when. One that
+ * was probed and did NOT answer stays PRESENT and says so — a failed
+ * probe is evidence about reachability, never about whether the tree
+ * exists, and collapsing those two would let a stopped service read as
+ * an unbuilt apparatus.
+ */
+export function applyProbes(register, results = {}) {
+  const apparatuses = register.apparatuses.map((a) => {
+      const r = results[a.id];
+      if (!r) return a;
+      if (r.reachable) {
+        return {
+          ...a,
+          presence: 'OBSERVED',
+          presenceBasis: `probed at ${r.at} and answered in ${r.latencyMs}ms`,
+          probedAt: r.at,
+          latencyMs: r.latencyMs,
+        };
+      }
+      return {
+        ...a,
+        presence: 'PRESENT',
+        presenceBasis: `${a.presenceBasis} — probed at ${r.at} and did not answer: ${r.detail}. The tree is still here; only reachability is in question.`,
+        probedAt: r.at,
+        latencyMs: null,
+      };
+  });
+  // The counts are DERIVED from the rows, never carried over: a headline
+  // that disagrees with the table under it is worse than no headline,
+  // because the headline is the part people quote.
+  return { ...register, apparatuses, counts: countPresence(apparatuses, register.lifecycle) };
+}
+
 /** The register as one object, with its own provenance attached. */
 export function ecosystemRegister() {
   return {
@@ -380,16 +446,7 @@ export function ecosystemRegister() {
     apparatuses: APPARATUSES,
     convergences: CONVERGENCES,
     divergences: DIVERGENCES,
-    counts: {
-      apparatuses: APPARATUSES.length,
-      observed: APPARATUSES.filter((a) => a.presence === 'OBSERVED').length,
-      present: APPARATUSES.filter((a) => a.presence === 'PRESENT').length,
-      declared: APPARATUSES.filter((a) => a.presence === 'DECLARED').length,
-      scaffold: APPARATUSES.filter((a) => a.presence === 'SCAFFOLD').length,
-      stagesUnowned: LIFECYCLE.filter(
-        (s) => !APPARATUSES.some((a) => a.stages.includes(s.id) && a.presence !== 'DECLARED')
-      ).map((s) => s.id),
-    },
+    counts: countPresence(APPARATUSES, LIFECYCLE),
     basis:
       'Read from each apparatus\'s own tree on 2026-09-03. Every row carries readFrom: the files the claim came from. This register is a map of apparatuses, never a mirror of their state — it holds no record belonging to any of them.',
   };

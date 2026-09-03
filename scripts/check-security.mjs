@@ -290,12 +290,25 @@ console.log('— security invariants —');
     unlisted.join(' · '),
     'add the capability to TOOL_CAPABILITY_ALLOWLIST in src/app/toolSurface.ts only if it is view-level — a tool must never reach authority the UI itself lacks'
   );
+  // SEC-011 is checked across the WHOLE renderer, not just the tool
+  // surface. `runCommand` is deliberately broad, so any module the
+  // command grammar reaches is inside an agent's blast radius — an
+  // allowlist that stopped at one file would be checking the door while
+  // leaving the corridor behind it unwatched.
+  const MUTATING = /^(dispatch|mutate|write|commit|approve|delete|rotate|sign)/i;
+  const everywhere = new Set();
+  for (const f of walk(join(ROOT, 'src'))) {
+    if (!/\.ts$/.test(f)) continue;
+    for (const m of read(f).matchAll(/\bapi\.([a-zA-Z_$][\w$]*)/g)) {
+      if (MUTATING.test(m[1])) everywhere.add(`${rel(f)}: api.${m[1]}`);
+    }
+  }
   check(
     'SEC-011',
-    'no tool reaches a mutating or dispatching capability',
-    ![...reached].some((c) => /^(dispatch|mutate|write|commit|approve|delete|rotate|sign)/i.test(c)),
-    [...reached].filter((c) => /^(dispatch|mutate|write|commit|approve|delete|rotate|sign)/i.test(c)).join(' · '),
-    'a dispatching capability needs an authenticated execution identity and an approval gate before any agent may reach it'
+    'no module anywhere reaches a mutating or dispatching capability',
+    everywhere.size === 0,
+    [...everywhere].join(' · '),
+    'a dispatching capability needs an authenticated execution identity and an approval gate before any agent may reach it — and because runCommand is broad, that holds for every module the command grammar can reach, not only the tool surface'
   );
 }
 
@@ -357,6 +370,27 @@ console.log('— security invariants —');
     /default-src 'none'/.test(policy) && /object-src 'none'/.test(policy) && /base-uri 'none'/.test(policy),
     policy.slice(0, 120),
     "set default-src 'none', object-src 'none' and base-uri 'none' — an allowlist that forgets a fetch type is an allowlist with a hole"
+  );
+}
+
+// The CSP's one relaxation is style-src, and the reason given is a
+// COUNT of render sites. A count in prose is the thing that drifts, so
+// it is checked: if the number stated in index.html stops matching the
+// tree, either new inline styles arrived unreviewed or the claim is
+// stale. Both are worth a failure.
+{
+  const stated = Number(/(\d+) render sites/.exec(read(join(ROOT, 'index.html')))?.[1] ?? -1);
+  let actual = 0;
+  for (const f of walk(join(ROOT, 'src'))) {
+    if (!/\.ts$/.test(f)) continue;
+    actual += [...read(f).matchAll(/style="/g)].length;
+  }
+  check(
+    'SEC-170',
+    `the stated inline-style count matches the tree (${actual})`,
+    stated === actual,
+    `index.html says ${stated}, the tree has ${actual}`,
+    'update the count in index.html and docs/SECURITY.md, and check the new site takes no wire text — style-src is relaxed on the strength of that claim, so the claim has to stay true'
   );
 }
 
