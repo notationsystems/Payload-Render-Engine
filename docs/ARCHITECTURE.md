@@ -1035,37 +1035,6 @@ structural, not incidental:
    list, and a toolchain upgrade to a version with a clean advisory
    surface (SEC-106/160).
 
-## 25. "Has it moved since I last looked?"
-
-The first question a commodities desk asks each morning, split into the
-half this projection can answer and the half it must refuse.
-
-**Answerable, and free.** The OS bookmarks the corpus build each operator
-last saw — id, Merkle root, timestamp — in `pe.workspace/v1`. The
-two-field comparison is the whole value: a build id contains its own
-generation time, so it changes on every recompile and on its own says
-nothing, while the root changes only when a committed record does. Same
-root with a new id is *rebuilt, nothing moved* — the normal morning, and
-the answer that saves an operator the walk. A different root is *records
-moved*, and it is the one of the four states that takes the alert tone,
-because colouring the normal case teaches people to ignore the colour.
-Missing roots on either side report *moved* rather than assuming
-unchanged: the safe direction.
-
-**Refused, with the reason.** *Which* records moved needs both builds'
-contents, and holding two builds so a surface could diff them would make
-this projection a store — the one thing it may never become. So it is
-ABSENT with what would unblock it: build history in the substrate,
-retaining prior builds and serving a diff. This engine would render it
-the day it is served; it cannot hold it.
-
-The bookmark is a deliberate, stated widening of `core/workspace.ts`,
-whose contract was "nothing here is state about the world". A build id
-is session memory — it names a build and reconstructs no record — but
-the boundary moved, and a quietly widened contract is how a view store
-becomes a database. The module says so in its own header, and a test
-asserts the bookmark carries id, root and time and nothing else.
-
 ---
 
 ## 24. The apparatus register and the notation:// resolver
@@ -1149,3 +1118,38 @@ Notation Substrate's `notation://` namespace contract: one canonical
 identity space, many representations — with service and agent identity
 deliberately **not** addressable, because a URI that can name a
 credential is a credential that will eventually be dereferenced.
+
+---
+
+## 25. "Has it moved since I last looked?"
+
+The first question a commodities desk asks each morning, split into the
+half this projection can answer and the half it must refuse.
+
+**Answerable, and free.** The OS bookmarks the corpus build each operator
+last saw — id, Merkle root, timestamp — in `pe.workspace/v1`. The
+two-field comparison is the whole value: a build id contains its own
+generation time, so it changes on every recompile and on its own says
+nothing, while the root changes only when a committed record does. Same
+root with a new id is *rebuilt, nothing moved* — the normal morning, and
+the answer that saves an operator the walk. A different root is *records
+moved*, and it is the one of the four states that takes the alert tone,
+because colouring the normal case teaches people to ignore the colour.
+Missing roots on either side report *moved* rather than assuming
+unchanged: the safe direction.
+
+**Refused, with the reason.** *Which* records moved needs both builds'
+contents, and holding two builds so a surface could diff them would make
+this projection a store — the one thing it may never become. So it is
+ABSENT with what would unblock it: build history in the substrate,
+retaining prior builds and serving a diff. This engine would render it
+the day it is served; it cannot hold it.
+
+The bookmark is a deliberate, stated widening of `core/workspace.ts`,
+whose contract was "nothing here is state about the world". A build id
+is session memory — it names a build and reconstructs no record — but
+the boundary moved, and a quietly widened contract is how a view store
+becomes a database. The module says so in its own header, and a test
+asserts the bookmark carries id, root and time and nothing else.
+
+---

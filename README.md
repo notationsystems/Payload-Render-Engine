@@ -140,6 +140,11 @@ Main verbs:
 | `rank chokepoints` / `criticality` | Rank every catalog frame by simulated queued delay without entering any — computed intelligence, never observation. Opens the SCENARIOS panel. |
 | `follow the load` | Cinematic multimodal demo scenario; `stop` / `exit` ends it. |
 | `help` | Print the verb summary. |
+| `security` / `posture` | The security posture: what is enforced, what the deployment must close, what is ABSENT with its reason — and the journal of refusals the gate has issued. |
+| `ecosystem` / `apparatus` | The Notation Systems apparatus register: the corpus lifecycle, who owns each stage, and the stage nobody owns. |
+| `notation` / `identity` | The `notation://` identity space — its kinds, which apparatus holds each, and the id shapes this corpus actually mints. |
+| `notation://<kind>/<id>` | An **address**. Resolves and navigates there, or refuses naming the apparatus that holds it. Every record shows its own address under its name, copyable in one click. |
+| `provenance` / `alignment` | Four apparatus vocabularies for how a value came to be known, the proposed alignment, and the measured cost of adopting it. |
 
 Counterfactuals run from the SCENARIOS panel (`scenarios`) or straight from the
 command bar (`what if suez closes`): pick a chokepoint closure and enter the
@@ -212,6 +217,19 @@ The **design language** — the semantic vocabulary (solid=observed,
 hollow=declared, dashed=hypothetical, absence stated), palette, z-bands,
 interaction grammar, and the honesty rule of every surface — lives in
 [`docs/DESIGN.md`](docs/DESIGN.md).
+
+The **security model** — the threat model, the trust boundaries, and an
+invariant ledger that is three-valued on purpose (enforced · deployment ·
+absent-with-a-reason) — lives in [`docs/SECURITY.md`](docs/SECURITY.md).
+It is served as data at `GET /api/security/posture` and rendered by the
+SECURITY instrument, so the model an operator reads is the one the gate
+is running rather than a copy of it that can drift.
+
+The **ecosystem** — Notation Systems as a set of apparatuses, which
+stage of the corpus lifecycle each owns, what each refuses, where the
+trees independently converged and where they disagree — lives in
+[`docs/ECOSYSTEM.md`](docs/ECOSYSTEM.md). It is checked against the
+actual sibling trees by `npm run ecosystem`, so it cannot quietly rot.
 
 ## License
 

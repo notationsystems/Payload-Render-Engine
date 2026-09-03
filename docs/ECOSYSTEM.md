@@ -333,6 +333,40 @@ projection layer that is forbidden to hold state.
 
 ---
 
+## 5. Where this OS sits
+
+The Render Engine owns PROJECTION and shares OPERATOR with the Terminal.
+Its standing constraint is that it must never become the database — it is
+a projection and navigation environment over a canonical substrate that
+lives elsewhere.
+
+**That rule applies to this register too.** It is a map of apparatuses,
+never a mirror of their state: it carries names, stages, boundaries and
+vocabularies, and holds no record belonging to any apparatus. Reading it
+gives you the shape of the ecosystem, never its data — and its served
+trust level is `PROVENANCE`, not `REPRODUCIBLE`, because it is a scan
+taken at a stated time rather than a probe taken now.
+
+## 6. Keeping it honest
+
+`scripts/check-ecosystem.mjs` (in `npm run check`) holds the register to
+the trees:
+
+- shape — every stage exists in the lifecycle; every `DECLARED`/`SCAFFOLD`
+  row carries its reason; every row names where its claims were read;
+  every convergence cites evidence; every divergence carries a proposal
+  **and an owner**; every unowned stage has a row stating the gap
+- against the trees — `PRESENT` must carry source, `DECLARED` must not
+  (understating what exists is the more dangerous direction: it hides a
+  plane other apparatuses may already depend on), `SCAFFOLD` must still
+  be small, and every cited `readFrom` path must exist
+
+When the sibling trees are not checked out beside this one — as in CI —
+the tree checks **refuse with a reason** rather than failing. A check that
+fails for being run in the wrong place teaches people to ignore it.
+
+---
+
 ## 7. The `notation://` resolver
 
 The identity space is specified in the substrate directive and, until
@@ -406,37 +440,3 @@ true it currently is — and the divergence turns out to run **inside** a
 single apparatus, not only between them. The resolver accepts both
 shapes and **reports which one answered** rather than normalising them,
 because an undocumented relabelling is exactly where provenance is lost.
-
----
-
-## 5. Where this OS sits
-
-The Render Engine owns PROJECTION and shares OPERATOR with the Terminal.
-Its standing constraint is that it must never become the database — it is
-a projection and navigation environment over a canonical substrate that
-lives elsewhere.
-
-**That rule applies to this register too.** It is a map of apparatuses,
-never a mirror of their state: it carries names, stages, boundaries and
-vocabularies, and holds no record belonging to any apparatus. Reading it
-gives you the shape of the ecosystem, never its data — and its served
-trust level is `PROVENANCE`, not `REPRODUCIBLE`, because it is a scan
-taken at a stated time rather than a probe taken now.
-
-## 6. Keeping it honest
-
-`scripts/check-ecosystem.mjs` (in `npm run check`) holds the register to
-the trees:
-
-- shape — every stage exists in the lifecycle; every `DECLARED`/`SCAFFOLD`
-  row carries its reason; every row names where its claims were read;
-  every convergence cites evidence; every divergence carries a proposal
-  **and an owner**; every unowned stage has a row stating the gap
-- against the trees — `PRESENT` must carry source, `DECLARED` must not
-  (understating what exists is the more dangerous direction: it hides a
-  plane other apparatuses may already depend on), `SCAFFOLD` must still
-  be small, and every cited `readFrom` path must exist
-
-When the sibling trees are not checked out beside this one — as in CI —
-the tree checks **refuse with a reason** rather than failing. A check that
-fails for being run in the wrong place teaches people to ignore it.

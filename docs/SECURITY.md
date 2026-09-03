@@ -243,48 +243,6 @@ not documentary.
 
 ---
 
-## 4b. The model as a surface
-
-`SECURITY_INVARIANTS` in `server/security.mjs` is the machine-readable
-twin of the list above, served at `GET /api/security/posture` and
-rendered by the SECURITY instrument in the OS (`security` in the
-command vocabulary). Three things follow from making the model
-readable, and all three are load-bearing:
-
-**The state is three-valued, not two.** `ENFORCED` means the code
-enforces it and a named check proves it. `DEPLOYMENT` means the control
-is real but belongs to whatever runs this, not to this process —
-stated so nobody assumes we did it. `ABSENT` means it does not exist
-here, with the reason and with what would unblock it. A check enforces
-this: an `ENFORCED` row that names no check fails, and a non-`ENFORCED`
-row without a reason fails. An unproven `ENFORCED` is a claim an
-operator will act on and be wrong about — worse than an honest absence.
-
-**The surface separates what it observed from what it was told.** The
-client half (the CSP that actually reached the document, the API base
-actually in force, every key actually in `localStorage` checked against
-the SEC-005 allowlist) is observed in the browser. The service half is
-read from the gate. Neither speaks for the other, and a green client
-half proves nothing about the service. The storage row is the sharper
-half of SEC-005: the static check proves the code writes nothing else;
-the surface proves nothing else is *there*.
-
-**The posture route is not trusted structurally.** SEC-110 admits any
-loopback backend, so a posture answer may come from a service this OS
-does not control. Every field is escaped at render and a missing or
-malformed field degrades one row rather than blanking the security
-surface — verified by an E2E that serves a poisoned posture, including
-a journal entry built to break out of an attribute.
-
-The tradeoff is stated rather than waved away: a reachable posture
-route tells a prober which of its probes were noticed. It is acceptable
-here because the route sits behind the same host and origin allowlist
-as everything else, it echoes no secret (SEC-013), and the alternative
-— a security model only its authors can see — is how a control silently
-stops working.
-
----
-
 ## 5. Identity separation — the security half of the substrate contract
 
 These are different things and are never collapsed into one identifier
@@ -351,3 +309,45 @@ Binding to a non-loopback interface without setting
 `PAYLOAD_ALLOWED_HOSTS` and `PAYLOAD_ALLOWED_ORIGINS` is refused at
 startup: a service holding operations authority does not silently
 become world-reachable.
+
+---
+
+## 7. The model as a surface
+
+`SECURITY_INVARIANTS` in `server/security.mjs` is the machine-readable
+twin of §4's list, served at `GET /api/security/posture` and
+rendered by the SECURITY instrument in the OS (`security` in the
+command vocabulary). Three things follow from making the model
+readable, and all three are load-bearing:
+
+**The state is three-valued, not two.** `ENFORCED` means the code
+enforces it and a named check proves it. `DEPLOYMENT` means the control
+is real but belongs to whatever runs this, not to this process —
+stated so nobody assumes we did it. `ABSENT` means it does not exist
+here, with the reason and with what would unblock it. A check enforces
+this: an `ENFORCED` row that names no check fails, and a non-`ENFORCED`
+row without a reason fails. An unproven `ENFORCED` is a claim an
+operator will act on and be wrong about — worse than an honest absence.
+
+**The surface separates what it observed from what it was told.** The
+client half (the CSP that actually reached the document, the API base
+actually in force, every key actually in `localStorage` checked against
+the SEC-005 allowlist) is observed in the browser. The service half is
+read from the gate. Neither speaks for the other, and a green client
+half proves nothing about the service. The storage row is the sharper
+half of SEC-005: the static check proves the code writes nothing else;
+the surface proves nothing else is *there*.
+
+**The posture route is not trusted structurally.** SEC-110 admits any
+loopback backend, so a posture answer may come from a service this OS
+does not control. Every field is escaped at render and a missing or
+malformed field degrades one row rather than blanking the security
+surface — verified by an E2E that serves a poisoned posture, including
+a journal entry built to break out of an attribute.
+
+The tradeoff is stated rather than waved away: a reachable posture
+route tells a prober which of its probes were noticed. It is acceptable
+here because the route sits behind the same host and origin allowlist
+as everything else, it echoes no secret (SEC-013), and the alternative
+— a security model only its authors can see — is how a control silently
+stops working.
