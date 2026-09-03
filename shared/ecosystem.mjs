@@ -103,7 +103,7 @@ export const APPARATUSES = Object.freeze([
       'The acquisition frontier and the evidence admission gate. Adapters for USGS, NOAA and EDGAR; method provenance and uncertainty carried on the observation; a class assigned at ingest that cannot later be reassigned.',
     holds: ['acquisition intent', 'evidence identity', 'admissibility', 'method provenance'],
     refuses: [
-      'canonical state — the evidence chain and the canonical chain do not import each other, confirmed by grep in both directions',
+      'canonical state — the evidence chain and the canonical chain do not import each other. That is DAF\'s own finding, confirmed by grep in both directions in its state-space reconnaissance; this register reports it rather than re-deriving it, which is why the row cites that document.',
     ],
     vocabulary: {
       name: 'evidence class, fixed at ingest',
@@ -129,7 +129,7 @@ export const APPARATUSES = Object.freeze([
       'Document perception. Transforms documents into structured observations with their warrant intact. Never into truth.',
     holds: ['artifact identity (content-addressed)', 'extraction', 'observation construction', 'conflict detection'],
     refuses: [
-      'canonical state — no canonical types, stores or writers exist in the package, audited by a test over its own source tree',
+      "canonical state — writing it is structurally forbidden: what leaves the agent is a CanonicalStateCandidate with adjudication fixed at 'pending', and the constructor throws CanonicalStateBreach rather than emit anything else. A source-tree audit in its own test suite holds the boundary.",
       'resolution — it emits candidates with adjudication pinned to pending',
       'verification — the observation constructor throws on RESOLVED and VERIFIED',
       'financial or freight execution',
@@ -164,7 +164,11 @@ export const APPARATUSES = Object.freeze([
       'operations authority (authorize, dispatch, tender)',
       'attestation and the notary',
     ],
-    refuses: ['nothing on this list — it is the authoritative writer; every other apparatus is downstream or upstream of it'],
+    refuses: [
+      'execution without authorization — the gate is deterministic and blocking, on the critical path, and nothing executes without it',
+      'the collapse of recommendation into authorization into execution — its own code states RECOMMENDATION != AUTHORIZATION != EXECUTION, and the three are separate objects',
+      'cryptography on the critical path — notarization produces evidence ABOUT an execution rather than gating one, so a prover never sits between a dispatcher and a booking',
+    ],
     vocabulary: {
       name: 'value kind',
       terms: ['reported', 'observed', 'estimated', 'derived', 'inferred', 'computed', 'unobserved'],
@@ -173,6 +177,7 @@ export const APPARATUSES = Object.freeze([
     readFrom: [
       'notationsystems/payload-terminal-v0/docs/MANUFACTURING_FRAME.md',
       'notationsystems/payload-terminal-v0/docs/ARCHITECTURE_LEDGER.md',
+      'notationsystems/payload-terminal-v0/src/lib/economy/authorization.ts',
       'notationsystems/payload-terminal-v0/src/lib/economy/',
     ],
   },
@@ -314,6 +319,14 @@ export const CONVERGENCES = Object.freeze([
     seenIn: ['daf', 'render-engine'],
     evidence:
       "DAF's cycle step 6: plant the violation and watch the check fail by name before trusting it. The Render Engine's security passes did exactly this, and one check failed to bite and had to be rewritten.",
+  },
+  {
+    id: 'propose-is-not-act',
+    statement:
+      'Proposing, authorizing and acting are three separate things, and a surface may never let one read as another.',
+    seenIn: ['terminal', 'render-engine', 'ocr'],
+    evidence:
+      "The Terminal's authorization gate states RECOMMENDATION != AUTHORIZATION != EXECUTION in its own source and keeps them as separate objects. The Render Engine's control plane runs the same ladder as observed -> proposed -> approved -> dispatched, where a cell lights only from a recorded fact and DISPATCHED needs a delivered tender, never an authorization. The OCR Agent draws the same line one stage earlier: it proposes candidates with adjudication pinned to pending and may not resolve or verify. Three trees, three vocabularies, one distinction — arrived at independently, which is the strongest evidence available that it is structural rather than stylistic.",
   },
   {
     id: 'generated-not-written',

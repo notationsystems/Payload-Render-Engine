@@ -109,7 +109,7 @@ USGS, NOAA and EDGAR; method provenance and uncertainty carried on the
 observation; a class assigned at ingest that cannot later be reassigned.
 
 - **Holds** acquisition intent · evidence identity · admissibility · method provenance
-- **Refuses** canonical state — the evidence chain and the canonical chain do not import each other, confirmed by grep in both directions and recorded in its own reconnaissance
+- **Refuses** canonical state — the evidence chain and the canonical chain do not import each other. That is DAF's own finding, confirmed by grep in both directions in its state-space reconnaissance; this register reports it rather than re-deriving it, which is why the row cites that document
 - **Speaks** *evidence class, fixed at ingest*: `asserted` `computed` `derived` `measured`. A fifth value, `unclassified`, marks the **absence** of a class and is inadmissible for canonical use; a computed object may not be labelled `measured` or `asserted`.
 
 Read from `epistemics/evidence_class.py`, `docs/STANDING_PLAN.md`,
@@ -122,7 +122,7 @@ Document perception. Transforms documents into structured observations
 with their warrant intact. Never into truth.
 
 - **Holds** artifact identity (content-addressed) · extraction · observation construction · conflict detection
-- **Refuses** canonical state (no canonical types, stores or writers exist in the package — audited by a test over its own source tree) · resolution (candidates are emitted with adjudication pinned to `pending`) · verification (the observation constructor throws on `RESOLVED` and `VERIFIED`) · financial and freight execution
+- **Refuses** canonical state — writing it is structurally forbidden: what leaves the agent is a `CanonicalStateCandidate` with `adjudication` fixed at `'pending'`, and the constructor throws `CanonicalStateBreach` rather than emit anything else, with a source-tree audit in its own suite holding the boundary · resolution (candidates are emitted with adjudication pinned to `pending`) · verification (the observation constructor throws on `RESOLVED` and `VERIFIED`) · financial and freight execution
 - **Speaks** *epistemic state*: `OBSERVED` `EXTRACTED` `INFERRED` `RESOLVED` `VERIFIED` — only the first three emittable here. Absence is typed with six reasons; a refusal carries code, detail, remedy and stage.
 
 Read from `docs/BOUNDARIES.md`, `docs/ARCHITECTURE.md`.
@@ -135,11 +135,11 @@ it. Freight modelled as discrete manufacturing: a load is a unit under
 process control, with a genealogy reconstructible afterwards.
 
 - **Holds** canonical entity + observation records · the `refused:*` queue · operations authority · attestation and the notary
-- **Refuses** nothing on this list — it is the authoritative writer, and every other apparatus is upstream or downstream of it
+- **Refuses** execution without authorization (the gate is deterministic and blocking, on the critical path, and nothing executes without it) · the collapse of recommendation into authorization into execution — its own source states `RECOMMENDATION != AUTHORIZATION != EXECUTION` and keeps the three as separate objects · cryptography on the critical path, because notarization produces evidence *about* an execution rather than gating one, so a prover never sits between a dispatcher and a booking
 - **Speaks** *value kind*: `reported` `observed` `estimated` `derived` `inferred` `computed` `unobserved`. Counted by frequency in `src/lib/economy`, `reported` dominates — the honest shape for a corpus assembled largely from what counterparties say.
 
 Read from `docs/MANUFACTURING_FRAME.md`, `docs/ARCHITECTURE_LEDGER.md`,
-`src/lib/economy/`.
+`src/lib/economy/authorization.ts`, `src/lib/economy/`.
 
 ### 2.4 Payload Corpus Graph — `DECLARED`
 `notation://node/apparatus/payload-corpus-graph` · stage: GRAPH PLANE
@@ -206,6 +206,7 @@ work keeps rediscovering.
 | **Confidence is not truth.** A model score is never promoted to a fact. | OCR · Render Engine | OCR carries `extractionConfidence`, `sourceReliability`, `evidenceStatus`, `verificationStatus` as four separate fields and pins the last two; the Render Engine keeps mined candidates gold and never renders them as observed |
 | **A projection may not mutate what it derives from.** | DAF · OCR · Render Engine | OCR: no canonical writer exists in the package, audited over its own source tree; Render Engine: INV-6, checked by `scripts/check-seam.mjs`; DAF: the projection chain and the evidence chain do not import each other |
 | **A check is not trusted until a planted violation makes it fail by name.** | DAF · Render Engine | DAF's cycle step 6 states it as doctrine; the Render Engine's security passes did exactly this, and one check failed to bite and had to be rewritten |
+| **Proposing, authorizing and acting are three things**, and a surface may never let one read as another. | Terminal · Render Engine · OCR | The Terminal's authorization gate states `RECOMMENDATION != AUTHORIZATION != EXECUTION` in its own source. The Render Engine's control plane runs the same ladder as observed → proposed → approved → dispatched, where DISPATCHED needs a *delivered* tender, never an authorization. The OCR Agent draws the line one stage earlier: candidates carry `adjudication: 'pending'` and it may not resolve or verify |
 | **Doctrine that restates code is generated from it**, so it cannot drift. | DAF · Render Engine | DAF generates `docs/generated/DOCTRINE.md` from `architecture/*.yaml` and diffs it as a gate; the Render Engine's invariant ledger is declared once in code, served, and checked for drift |
 
 That last pair is why this document exists in the shape it does: it is
