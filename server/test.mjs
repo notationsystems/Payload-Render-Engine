@@ -384,6 +384,37 @@ check(
   'unknown record → typed refusal with resolution remedy'
 );
 
+// control plane: the service declaring its own ecosystem, facts only
+console.log('\n— control plane topology —');
+const topo = (await call('GET', '/api/system/topology'))?.data;
+check(topo?.ecosystem?.id === 'payload' && Array.isArray(topo.nodes) && Array.isArray(topo.capabilities), 'topology serves the ecosystem model');
+const capRoutes = (await call('GET', '/api/capabilities'))?.data?.map((r) => r.pattern) ?? [];
+const declaredRoutes = topo.capabilities.flatMap((c) => c.routes);
+check(
+  declaredRoutes.every((route) => capRoutes.includes(route)),
+  'every route a capability declares actually exists — conservation against /api/capabilities'
+);
+check(
+  topo.capabilities.every((c) => capRoutes.includes(c.probe.split('?')[0])),
+  'every probe path exists'
+);
+check(
+  topo.capabilities.every((c) => !c.authority || typeof c.authority.present === 'boolean'),
+  'authority reported as PRESENT/ABSENT only — never a value'
+);
+check(
+  JSON.stringify(topo).includes(process.env.PAYLOAD_OPERATIONS_TOKEN ?? ' never') === false,
+  'the operations token value never appears in the topology'
+);
+check(
+  topo.capabilities.every((c) => c.ladder && c.ladder.dispatched !== true),
+  'no capability claims dispatched=true — this backend stops at approved'
+);
+check(/never imply/.test(topo.ladderRule ?? ''), 'the ladder rule is stated on the model');
+check(topo.cost?.status === 'ABSENT' && !!topo.cost.reason, 'cost is honestly ABSENT with its reason');
+const edgeIds = new Set(topo.nodes.map((n) => n.id));
+check(topo.edges.every((e) => edgeIds.has(e.from) && edgeIds.has(e.to)), 'every edge joins declared nodes');
+
 // corpus definition: the corpus as a manufactured, self-describing artifact
 console.log('\n— corpus definition —');
 const defEnv = await call('GET', '/api/corpus/definition');

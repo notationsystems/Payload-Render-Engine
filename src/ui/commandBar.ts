@@ -4,6 +4,7 @@
  */
 
 import type { AppApi, Suggestion, ViewPreset } from '../app/api';
+import { recordEvent } from '../core/journal';
 
 const PRESETS: { id: ViewPreset; label: string }[] = [
   { id: 'world', label: 'WORLD' },
@@ -162,6 +163,7 @@ export function createCommandBar(api: AppApi): { el: HTMLElement } {
     if (!trimmed) return;
     const res = api.runCommand(trimmed);
     showResult(res.message, res.ok);
+    recordEvent('operator', res.ok ? 'command' : 'command refused', `${trimmed} → ${res.message}`);
     // a command that ran hands the keyboard back to the scene: the
     // surface it opened (registry, sitrep, definition…) owns the next
     // Esc instead of the input silently swallowing it. A failed

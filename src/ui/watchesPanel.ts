@@ -11,6 +11,7 @@
 import type { AppApi } from '../app/api';
 import type { InjectionResult } from '../data/injection';
 import { feedHealth, onFeedHealth } from '../core/health';
+import { recordEvent } from '../core/journal';
 import {
   evalBuildWatch,
   evalEntityWatch,
@@ -41,6 +42,7 @@ export function createWatchesPanel(api: AppApi): { el: HTMLElement } {
     if (!fresh.length) return;
     for (const t of fresh) {
       seen.add(`${t.watchId}|${t.reason}`);
+      recordEvent('system', 'watch tripped', `${t.watchLabel}: ${t.reason} (basis: ${t.basis})`, 'nothing — condition evaluated');
       api.events.emit('toast', {
         title: `WATCH TRIPPED — ${t.watchLabel.toUpperCase()}`,
         body: `${t.reason} · BASIS: ${t.basis}`,

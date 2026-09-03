@@ -39,6 +39,8 @@ import { createWarrantPanel } from './ui/warrantPanel';
 import { createVocabPanel } from './ui/vocabPanel';
 import { createWatchesPanel } from './ui/watchesPanel';
 import { loadWorkspace, saveWorkspace } from './core/workspace';
+import { recordEvent } from './core/journal';
+import { createSystemPanel } from './ui/systemPanel';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -89,6 +91,7 @@ async function start(): Promise<void> {
   hud.appendChild(createWarrantPanel(app).el);
   hud.appendChild(createVocabPanel(app).el);
   hud.appendChild(createWatchesPanel(app).el);
+  hud.appendChild(createSystemPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
 
@@ -156,6 +159,9 @@ async function start(): Promise<void> {
     invokeTool: (name: string, args: Record<string, unknown> = {}) => {
       const tool = tools.find((t) => t.name === name);
       if (!tool) throw new Error(`unknown tool: ${name}`);
+      // an agent's request lands in the session journal with its
+      // source — and, like every entry, with what it dispatched: nothing
+      recordEvent('agent', `tool:${name}`, JSON.stringify(args).slice(0, 160));
       return tool.invoke(args);
     },
   };

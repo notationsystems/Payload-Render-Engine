@@ -333,6 +333,74 @@ export async function registerRoutes(corpus) {
     )
   );
 
+  // ---- control plane: this service declaring its OWN ecosystem -------
+  // Payload is the first deeply modeled node. The shape served here is
+  // the adapter contract: a future ecosystem seeds the same nodes /
+  // edges / capabilities / dataDomains and plugs into the same control
+  // plane. Facts only — authority is reported as PRESENT/ABSENT, never
+  // a value; hosts are the ones fixed in code; every capability names
+  // the probe the client uses to measure its health and latency; and
+  // the action ladder stops where this backend stops: nothing here
+  // dispatches, and the model says so per capability.
+  get('/api/system/topology', () => {
+    const upstreamBase = process.env.TERMINAL_URL ?? 'http://127.0.0.1:3000';
+    const present = (name) => !!process.env[name]?.trim();
+    const observeOnly = { observed: true, proposed: false, approved: false, dispatched: false, note: 'read-only projection — this capability never proposes, approves, or dispatches' };
+    const nodes = [
+      { id: 'spatial-api', kind: 'service', label: 'Payload Spatial API', role: 'projection service — read-only over canonical state', url: null },
+      { id: 'corpus', kind: 'store', label: `corpus · ${corpus.kind}`, role: 'canonical snapshot + build (fingerprint, merkle root)', url: null },
+      { id: 'terminal', kind: 'upstream', label: 'Payload Terminal', role: 'economy projections · scenario engine · refusals digest · freight desk', url: upstreamBase },
+      { id: 'src-comtrade', kind: 'source', label: 'UN Comtrade (preview)', role: 'trade flows, via the Terminal', url: null },
+      { id: 'src-fmcsa', kind: 'source', label: 'FMCSA QCMobile', role: 'carrier authority, via the Terminal', url: null },
+      { id: 'src-eia', kind: 'source', label: 'EIA weekly diesel', role: 'fuel benchmark, via the Terminal', url: null },
+      { id: 'src-adsb', kind: 'source', label: 'adsb.lol', role: 'live aircraft', url: 'https://api.adsb.lol' },
+      { id: 'src-celestrak', kind: 'source', label: 'CelesTrak', role: 'satellite TLEs', url: 'https://celestrak.org' },
+      { id: 'src-usgs', kind: 'source', label: 'USGS', role: 'live seismic', url: 'https://earthquake.usgs.gov' },
+      { id: 'src-firms', kind: 'source', label: 'NASA FIRMS', role: 'active fires', url: 'https://firms.modaps.eosdis.nasa.gov' },
+      { id: 'src-frankfurter', kind: 'source', label: 'frankfurter', role: 'FX reference rates', url: 'https://api.frankfurter.dev' },
+      { id: 'src-coinbase', kind: 'source', label: 'Coinbase Exchange', role: 'crypto spot', url: 'https://api.exchange.coinbase.com' },
+      { id: 'src-deribit', kind: 'source', label: 'Deribit', role: 'crypto derivatives', url: 'https://www.deribit.com' },
+      { id: 'ibkr', kind: 'upstream', label: 'IBKR Client Portal gateway', role: 'broker session (fail-closed)', url: process.env.IBKR_GATEWAY_URL ? 'configured' : null },
+    ];
+    const edges = [
+      { from: 'spatial-api', to: 'corpus', relation: 'projects' },
+      { from: 'corpus', to: 'terminal', relation: 'loaded-from', when: corpus.kind === 'terminal' ? 'active' : 'inactive (synthetic corpus loaded)' },
+      { from: 'terminal', to: 'src-comtrade', relation: 'ingests' },
+      { from: 'terminal', to: 'src-fmcsa', relation: 'pulls' },
+      { from: 'terminal', to: 'src-eia', relation: 'pulls' },
+      { from: 'spatial-api', to: 'terminal', relation: 'mirrors + forwards (operations, injection, refusals)' },
+      { from: 'spatial-api', to: 'src-adsb', relation: 'proxies' },
+      { from: 'spatial-api', to: 'src-celestrak', relation: 'proxies' },
+      { from: 'spatial-api', to: 'src-usgs', relation: 'proxies' },
+      { from: 'spatial-api', to: 'src-firms', relation: 'proxies' },
+      { from: 'spatial-api', to: 'src-frankfurter', relation: 'proxies' },
+      { from: 'spatial-api', to: 'src-coinbase', relation: 'proxies' },
+      { from: 'spatial-api', to: 'src-deribit', relation: 'proxies' },
+      { from: 'spatial-api', to: 'ibkr', relation: 'brokers (fail-closed)' },
+    ];
+    const capabilities = [
+      { id: 'corpus.read', family: 'ENTITIES', label: 'corpus snapshot + state reads', node: 'spatial-api', routes: ['/api/snapshot', '/api/entities', '/api/state/:entityId', '/api/states', '/api/search'], probe: '/api/health', provenance: corpus.metaDefaults?.sourceClass ?? 'unknown', ladder: observeOnly, dataDomains: ['facilities', 'routes', 'flows', 'commodities', 'events', 'observations'], instrument: 'compiler' },
+      { id: 'corpus.commitments', family: 'EVIDENCE', label: 'commitment manifest + inclusion proofs', node: 'spatial-api', routes: ['/api/corpus/commitments'], probe: '/api/corpus/commitments', provenance: 'content-addressed', ladder: observeOnly, dataDomains: ['build'], instrument: 'compiler' },
+      { id: 'corpus.definition', family: 'EVIDENCE', label: 'corpus definition', node: 'spatial-api', routes: ['/api/corpus/definition'], probe: '/api/corpus/definition', provenance: 'declared + derived', ladder: observeOnly, dataDomains: ['ontology'], instrument: 'corpus' },
+      { id: 'mining', family: 'INTELLIGENCE', label: 'payload miner (served run)', node: 'spatial-api', routes: ['/api/mining/patterns'], probe: '/api/mining/patterns', provenance: 'MINED candidates', ladder: observeOnly, dataDomains: ['patterns'], instrument: 'patterns' },
+      { id: 'scenarios.local', family: 'INTELLIGENCE', label: 'in-process counterfactuals', node: 'spatial-api', routes: ['/api/scenarios', '/api/scenarios/rank', '/api/scenarios/:scenarioId/impact'], probe: '/api/scenarios', provenance: 'COMPUTED, hypothetical', ladder: { observed: true, proposed: true, approved: false, dispatched: false, note: 'a frame is a proposal to think, never to act — nothing is approved or dispatched' }, dataDomains: ['scenarios'], instrument: 'scenarios' },
+      { id: 'scenarios.inject', family: 'INTELLIGENCE', label: 'what-if injection (upstream engine)', node: 'terminal', routes: ['/api/scenarios/inject'], probe: '/api/scenarios/inject', provenance: 'terminal:counterfactual', ladder: { observed: true, proposed: true, approved: false, dispatched: false, note: 'computed upstream and returned — nothing is approved or dispatched' }, dataDomains: ['scenarios'], instrument: 'scenarios' },
+      { id: 'refusals', family: 'EVIDENCE', label: 'refused:* work queue', node: 'terminal', routes: ['/api/refusals'], probe: '/api/refusals?commodity=copper', provenance: 'terminal:refusals', ladder: observeOnly, dataDomains: ['refusals'], instrument: 'refusals' },
+      { id: 'operations', family: 'OPERATIONS', label: 'brokerage control tower (mirror)', node: 'terminal', routes: ['/api/operations', '/api/operations/communications', '/api/operations/fuel'], probe: '/api/operations', provenance: 'terminal:operations', authority: { required: 'PAYLOAD_OPERATIONS_TOKEN', present: present('PAYLOAD_OPERATIONS_TOKEN') }, ladder: { observed: true, proposed: 'from journal', approved: 'from journal', dispatched: 'from journal', note: 'the desk proposes and authorizes IN THE TERMINAL; this mirror reads the journal — a cell lights only from a recorded fact' }, dataDomains: ['loads', 'carriers', 'communications'], instrument: 'operations' },
+      { id: 'live', family: 'LIVE', label: 'live feeds (aircraft · satellites · seismic · fires)', node: 'spatial-api', routes: ['/api/live/aircraft', '/api/live/satellites', '/api/live/quakes', '/api/live/fires'], probe: '/api/live/quakes', provenance: 'external:observed', ladder: observeOnly, dataDomains: ['contacts', 'hazards'], instrument: 'layers' },
+      { id: 'markets', family: 'MARKETS', label: 'FX · crypto · derivatives desks', node: 'spatial-api', routes: ['/api/markets/fx', '/api/markets/crypto', '/api/markets/derivatives'], probe: '/api/markets/fx', provenance: 'external:reported', ladder: observeOnly, dataDomains: ['prices'], instrument: 'markets' },
+      { id: 'markets.broker', family: 'MARKETS', label: 'broker session (IBKR)', node: 'ibkr', routes: ['/api/markets/broker'], probe: '/api/markets/broker', provenance: 'broker:session', authority: { required: 'IBKR_GATEWAY_URL', present: present('IBKR_GATEWAY_URL') }, ladder: { observed: true, proposed: false, approved: false, dispatched: false, note: 'no order path exists in this service — observe only, fail-closed' }, dataDomains: ['positions'], instrument: 'markets' },
+    ];
+    return ok({
+      ecosystem: { id: 'payload', label: 'Payload — physical economy', firstNode: 'spatial-api' },
+      ladderRule: 'observed → proposed → approved → dispatched: a cell lights only from a recorded fact; this backend stops at approved — nothing here dispatches, and the UI must never imply it did',
+      nodes,
+      edges,
+      capabilities,
+      cost: { status: 'ABSENT', reason: 'no cost meter exists in this projection service — corpus-platform work' },
+    });
+  });
+
   get('/api/snapshot', ({ query }) => {
     const t = resolveAsOf(query);
     if (t.refusal) return t.refusal;

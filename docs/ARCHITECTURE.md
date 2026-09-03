@@ -885,3 +885,54 @@ deterministic metrics, policy-sensitive transformations, historical
 snapshot commitments, external attestations, high-value API
 computations. Everything else carries ordinary provenance and
 deterministic lineage — which this service already serves.
+
+## 22. Control Plane v0 — Payload as the first ecosystem node
+
+Rather than a generic control room, the control plane models ONE real
+ecosystem deeply: this stack. `GET /api/system/topology` is the
+projection service declaring its own **EcosystemModel** — nodes
+(service · store · upstream · external sources, all of them things
+that actually run), edges (projects / loaded-from / mirrors / proxies
+/ brokers), and capabilities, each with its routes, a probe path, its
+provenance class, its authority requirement reported as
+PRESENT/ABSENT (never a value), its data domains, the instrument that
+opens it, and its **action ladder**. The renderer adds itself as the
+first column and consumes the rest through the public contract.
+
+The `system` command opens the SYSTEM panel:
+
+- **Operator strip** — healthy · stale feeds · awaiting authority ·
+  blocked, from live probes (every capability GET-probed, latency
+  measured, health classified from the TYPED answer, never inferred)
+  and the session feed ledger. Cost reads `ABSENT` with its reason:
+  no cost meter exists.
+- **Live topology** — a four-column SVG (renderer → spatial API and
+  corpus → upstreams → external sources); a node's color is its
+  capabilities' probed health.
+- **Capabilities** — the table, with the ladder
+  `observed → proposed → approved → dispatched` per capability.
+  **A cell lights only from a recorded fact.** Observe-only
+  capabilities light OBSERVED and nothing else; a what-if lights
+  PROPOSED ("a proposal to think, never to act"); the operations
+  mirror derives its counts from the control-tower journal — approved
+  = `authorization: authorized`, dispatched = **tender DELIVERED to
+  the carrier**, never a dispatch merely requested. This backend
+  stops at approved; the UI never implies an action happened when
+  only an authorization or a computation did.
+- **Timeline** — the session journal: operator commands, agent tool
+  calls, and system trips, each with its source and, always, what was
+  dispatched — `nothing`.
+
+The globe behind the panel remains the spatial/temporal dock; the
+panel controls the system that feeds it.
+
+### The adapter contract
+
+The EcosystemModel served here is the shape a future ecosystem seeds
+into the same control plane: `nodes`, `edges`, `capabilities`
+(routes, probe, provenance, authority presence, ladder, data domains,
+instrument), `dataDomains`, `cost`. Codex's next step — a Payload
+adapter seeding real capabilities, health signals, data domains, and
+spatial layers into the Control Plane service — fills this contract
+server-side; this panel then reads that instead of the projection
+service's self-declaration, with no UI redesign.

@@ -17,6 +17,7 @@ const SPECS = [
   '80-warrant.spec.mjs',
   '85-watches.spec.mjs',
   '90-ops.spec.mjs',
+  '95-system.spec.mjs',
 ];
 
 if (!(await reachable(`${VITE}/`))) {

@@ -176,6 +176,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'refusals', label: 'refusals — the refused:* work queue', hint: 'QUEUE' },
   { text: 'warrant', label: 'warrant — why do we believe this?', hint: 'WARRANT' },
   { text: 'watches', label: 'watches — standing conditions + trip log', hint: 'WATCH' },
+  { text: 'system', label: 'system — the control plane', hint: 'CONTROL' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -332,6 +333,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'warrant' || lower === 'why') {
     window.dispatchEvent(new CustomEvent('pe:warrant-toggle'));
     return ok('WARRANT GRAPH — claim → computation → records → sources → build; no score, a chain');
+  }
+
+  // -- control plane: the system that feeds the globe
+  if (lower === 'system' || lower === 'control' || lower === 'control plane') {
+    window.dispatchEvent(new CustomEvent('pe:system-toggle'));
+    return ok('CONTROL PLANE — live topology · capability ladder · session journal · operator view');
   }
 
   // -- watches: standing conditions with stated bases

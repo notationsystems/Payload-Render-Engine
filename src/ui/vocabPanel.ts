@@ -32,6 +32,8 @@ const GROUPS: { title: string; rows: [string, string][] }[] = [
       ['corpus', 'the CorpusDefinition — declared rules, derived censuses, stated absences'],
       ['compiler · build', 'the build + its conservation report and commitment manifest'],
       ['refusals', 'the refused:* work queue — one mechanism per group, one shared remedy'],
+      ['watches', 'standing conditions with stated bases; every trip logged'],
+      ['system · control', 'the control plane: live topology, capability ladder (observed → proposed → approved → dispatched), session journal'],
     ],
   },
   {
