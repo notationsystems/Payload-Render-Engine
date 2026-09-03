@@ -29,6 +29,7 @@ import {
   planeOf,
   countPresence,
 } from '../shared/planes.mjs';
+import { PLATFORM_LAYERS } from '../shared/platform.mjs';
 
 const failures = [];
 let checks = 0;
@@ -248,6 +249,50 @@ check(
     famPlanes.length === 0,
     famPlanes.map((f) => f.id).join(' - '),
     'the plane id must be one of the four declared in PLANES'
+  );
+}
+
+// ---------------------------------------------------------- PLANE-010
+// The platform position: a layer claimed before it exists is how an
+// architecture diagram stops describing a system.
+{
+  const noSeam = PLATFORM_LAYERS.filter((l) => !l.seam || l.seam.length < 10);
+  check(
+    'PLANE-010',
+    `every platform layer names the seam where it attaches (${PLATFORM_LAYERS.length} layers)`,
+    noSeam.length === 0,
+    noSeam.map((l) => l.id).join(' - '),
+    'a seam named with a file is a decision someone can act on; a seam described in prose is a wish. Name the file'
+  );
+  const absentNoReason = PLATFORM_LAYERS.filter(
+    (l) => l.presence !== 'PRESENT' && (!l.absent || !l.unblockedBy)
+  );
+  check(
+    'PLANE-010',
+    'every ABSENT or PARTIAL layer states what is missing AND what would unblock it',
+    absentNoReason.length === 0,
+    absentNoReason.map((l) => l.id).join(' - '),
+    'an absence without a reason is a gap; an absence with a reason is a decision'
+  );
+  const claimNoEvidence = PLATFORM_LAYERS.filter(
+    (l) => (l.here ?? []).length > 0 && (!l.evidence || l.evidence.length < 20)
+  );
+  check(
+    'PLANE-010',
+    'every layer claiming to hold something cites its evidence',
+    claimNoEvidence.length === 0,
+    claimNoEvidence.map((l) => l.id).join(' - '),
+    'a presence claim with no evidence behind it is an assertion. Say how it is known - which check holds it, or which measurement established it'
+  );
+  const emptyPresent = PLATFORM_LAYERS.filter(
+    (l) => (l.presence === 'PRESENT' || l.presence === 'PARTIAL') && (l.here ?? []).length === 0
+  );
+  check(
+    'PLANE-010',
+    'no layer is marked present while holding nothing',
+    emptyPresent.length === 0,
+    emptyPresent.map((l) => l.id).join(' - '),
+    'mark it ABSENT with its reason, which is the honest state, rather than PARTIAL with an empty list'
   );
 }
 

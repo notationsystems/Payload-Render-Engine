@@ -408,6 +408,17 @@ export const ROUTE_PLANES = Object.freeze({
     ],
   },
 
+  '/api/platform': {
+    plane: 'governance',
+    limb: 'OPERATIONAL',
+    upstream: 'this service, declaring its position in the data platform',
+    limitations: [
+      'A CLAIM BY THIS BUILD ABOUT THE PLATFORM AROUND IT - presence is the state of this tree, not a probe of any deployed infrastructure',
+      'layers below the serving projection are ABSENT here BY DESIGN, not by oversight: this service owns no canonical state and accepts no writes',
+      'the seams named are places in this repository, not provisioned endpoints - a seam is where a layer would attach, never evidence that it has',
+    ],
+  },
+
   // ---- Verification: the plane whose purpose IS the root
   '/api/corpus/commitments': { plane: 'verification', limb: 'CANONICAL' },
   '/api/notation/resolve': { plane: 'verification', limb: 'CANONICAL' },

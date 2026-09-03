@@ -174,7 +174,22 @@ export async function loadTerminalCorpus({
     return res.json();
   });
 
-  const now = fetchedAt ?? new Date().toISOString();
+  // THE CAPTURE INSTANT, not the wall clock.
+  //
+  // A corpus build must be a pure function of what it was built FROM,
+  // or "versioned corpus build" means nothing and the compiler console
+  // reports RECORDS_MOVED every time an unchanged corpus is rebuilt.
+  // Measured: pinning this one value is sufficient - three builds from
+  // one capture agree byte for byte, and three without it disagree
+  // while having identical record counts, because `knownAt` on the
+  // projected collections moved by milliseconds.
+  //
+  // Precedence: an explicit override, then the instant the TRANSPORT
+  // declares for the capture it is replaying, and only then the clock.
+  // The last case is a live fetch, which is genuinely not reproducible:
+  // two fetches at different times are different captures, and the
+  // honest thing is that the corpus says so rather than pretending.
+  const now = fetchedAt ?? fetchImpl?.capturedAt ?? new Date().toISOString();
 
   const perCommodity = [];
   for (const c of COMMODITIES) {
@@ -562,6 +577,23 @@ export async function loadTerminalCorpus({
   return {
     kind: 'terminal',
     snapshot,
+    // Whether THIS build can be reproduced, and from what. Measured at
+    // the seam rather than claimed: the build is a pure function of its
+    // capture, so it is reproducible exactly when the capture instant
+    // came from the capture instead of the clock. A live fetch is
+    // genuinely not reproducible - two fetches are two captures - and
+    // saying so is the honest answer, not a defect to hide.
+    capture: {
+      instant: now,
+      from: fetchedAt ? 'pinned' : fetchImpl?.capturedAt ? 'capture-manifest' : 'live-fetch',
+      reproducible: Boolean(fetchedAt ?? fetchImpl?.capturedAt),
+      reason: (fetchedAt ?? fetchImpl?.capturedAt)
+        ? 'the capture instant came from the capture, so rebuilding from the same capture yields the same merkle root'
+        : 'the capture instant came from this process clock, so every rebuild is a different capture and yields a different merkle root. This is not a corpus that changed - it is a corpus that was captured again.',
+      unblockedBy: (fetchedAt ?? fetchImpl?.capturedAt)
+        ? ''
+        : 'capture the upstream to an immutable artifact that records its own instant, then build from the artifact - the fixture path already does exactly this',
+    },
     scenarios: [],
     // no scenarioEngine: a corpus with no observed baseline cannot answer
     // counterfactuals; the API refuses rather than fabricating one
@@ -666,3 +698,13 @@ export async function fixtureFetch(path) {
   if (!file) throw new Error(`no fixture for ${path}`);
   return JSON.parse(await readFile(resolve(HERE, '../fixtures/terminal', file), 'utf8'));
 }
+
+// The instant this capture was taken, read from the capture's own
+// manifest rather than restated here - capture.json is the artifact's
+// metadata (content, source, capture instant) and the single place that
+// fact is allowed to live. A transport that replays a capture declares
+// its instant; the loader prefers it over the clock, which is what makes
+// a fixture-backed build reproducible.
+fixtureFetch.capturedAt = JSON.parse(
+  await readFile(resolve(HERE, '../fixtures/terminal/capture.json'), 'utf8')
+).capturedAt;

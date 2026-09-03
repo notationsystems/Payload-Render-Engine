@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { registerRoutes } from './api.mjs';
 import { loadTerminalCorpus, fixtureFetch } from './loaders/terminal.mjs';
 
@@ -999,6 +1000,67 @@ console.log('\n— vocabulary alignment —');
 // instead of quietly opting out of it. Five routes were added in one
 // pass recently; that is exactly when an envelope contract drifts.
 // --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// REPRODUCIBLE CORPUS BUILDS - measured, never assumed.
+//
+// A serving projection is rebuildable only if a build is a pure
+// function of what it was built FROM. This was not true: three builds
+// of the terminal corpus a second apart produced three different merkle
+// roots while having identical record counts, because `knownAt` on the
+// four PROJECTED collections (nodes, routes, flows, commodities) was
+// stamped from the wall clock at load. The three collections carrying
+// real upstream timestamps were byte-identical throughout.
+//
+// The operator-facing harm was on the compiler console: it distinguishes
+// REBUILT_UNCHANGED from RECORDS_MOVED by comparing roots, so rebuilding
+// an unchanged corpus reported RECORDS_MOVED - a false alarm on the one
+// feature whose entire job is answering "has anything changed?".
+//
+// One value governs it. Pinning the capture instant makes even a live
+// build reproducible; the loader now prefers the instant the transport
+// declares for the capture it replays over the clock.
+// --------------------------------------------------------------------
+console.log('\n— reproducible corpus builds —');
+{
+  const sig = (snap) =>
+    createHash('sha256')
+      .update(
+        JSON.stringify(
+          ['nodes', 'routes', 'flows', 'commodities', 'events', 'assertions', 'observations'].map(
+            (k) => snap[k] ?? []
+          )
+        )
+      )
+      .digest('hex');
+
+  const a = await loadTerminalCorpus({ fetchImpl: fixtureFetch });
+  const b = await loadTerminalCorpus({ fetchImpl: fixtureFetch });
+  check(
+    sig(a.snapshot) === sig(b.snapshot),
+    'two builds from one capture are byte-identical - the build is a pure function of the capture'
+  );
+  check(
+    typeof fixtureFetch.capturedAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(fixtureFetch.capturedAt),
+    `the capture declares the instant it was taken (${fixtureFetch.capturedAt})`
+  );
+
+  // the instant must come FROM the capture, not be re-decided per build
+  const stamped = new Set();
+  for (const n of a.snapshot.nodes) if (n.provenance?.knownAt) stamped.add(n.provenance.knownAt);
+  check(
+    stamped.has(fixtureFetch.capturedAt),
+    'projected records carry the capture instant, not the build clock'
+  );
+
+  // and an explicit override still wins, which is what lets a rebuild
+  // of a historical capture reproduce that capture's build exactly
+  const pinned = '2020-01-01T00:00:00.000Z';
+  const c = await loadTerminalCorpus({ fetchImpl: fixtureFetch, fetchedAt: pinned });
+  check(sig(c.snapshot) !== sig(a.snapshot), 'a different capture instant yields a different build - the instant is load-bearing');
+  const d = await loadTerminalCorpus({ fetchImpl: fixtureFetch, fetchedAt: pinned });
+  check(sig(c.snapshot) === sig(d.snapshot), 'and pinning it reproduces that build exactly');
+}
+
 console.log('\n— answer envelope, whole surface —');
 {
   const { PROXIED_PREFIXES } = await import('./security.mjs');

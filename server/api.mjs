@@ -18,6 +18,7 @@ import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { canonicalBasis, operationalBasis } from '../shared/envelope.mjs';
 import { apiConstitution, planeCoverage, planeOf } from '../shared/planes.mjs';
+import { platformPosition } from '../shared/platform.mjs';
 import { registerMarketRoutes } from './markets.mjs';
 import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
 import { applyProbes, ecosystemRegister } from '../shared/ecosystem.mjs';
@@ -114,6 +115,11 @@ export async function registerRoutes(corpus, runtime = {}) {
     generatedAt: snapshot.meta.generatedAt,
     merkleRoot,
     commitment: { algorithm: COMMIT_ALGORITHM, leaves: commitLeaves.length },
+    // whether this build can be reproduced, and from what. Without it
+    // the compiler console reports RECORDS_MOVED after a restart and
+    // the operator cannot tell a corpus that CHANGED from a corpus that
+    // was merely CAPTURED AGAIN - which are different facts.
+    ...(corpus.capture ? { capture: corpus.capture } : {}),
   };
   // the build identity rides on RESPONSES, never on the canonical
   // object itself — the loader stays a pure projection (byte-identical
@@ -397,6 +403,11 @@ export async function registerRoutes(corpus, runtime = {}) {
       ...(corpus.mappingReport ? { mappingReport: corpus.mappingReport } : {}),
     })
   );
+
+  // Where this service sits in the data platform, and what is not built
+  // yet. A layer claimed before it exists is how an architecture diagram
+  // stops describing a system.
+  get('/api/platform', () => ok(platformPosition()));
 
   // The API's own constitution, served. A system that declares four
   // planes in a document and cannot answer which plane a route belongs
