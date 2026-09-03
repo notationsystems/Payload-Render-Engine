@@ -37,6 +37,7 @@ import {
   redactError,
   safeRequestLine,
   securityHeaders,
+  SecurityJournal,
   securityRefusal,
 } from './security.mjs';
 
@@ -51,8 +52,10 @@ if (bindingRefusal) {
   process.exit(2);
 }
 
-const routes = await registerRoutes();
 const limiter = new RateLimiter();
+// SEC-152 - a control that fires silently cannot be operated
+const journal = new SecurityJournal();
+const routes = await registerRoutes(null, { limiter, journal });
 
 const server = createServer(async (req, res) => {
   const started = Date.now();
@@ -82,6 +85,20 @@ const server = createServer(async (req, res) => {
   });
   if (refusal) {
     const { httpStatus, ...body } = refusal;
+    // SEC-152 - what was refused, and what arrived claiming to be allowed.
+    // The detail is attacker-controlled text: stored scrubbed and bounded,
+    // escaped again at render, and never read back into a decision.
+    journal.record({
+      kind: body.refusal.kind,
+      pathname: url.pathname,
+      client: clientKey(req),
+      detail:
+        body.refusal.kind === 'HOST_NOT_ALLOWED'
+          ? `host=${req.headers.host ?? '(none)'}`
+          : body.refusal.kind === 'ORIGIN_NOT_ALLOWED'
+            ? `origin=${req.headers.origin ?? '(none)'}`
+            : `method=${req.method}`,
+    });
     send(httpStatus, body, corsHeaders);
     return;
   }
@@ -99,6 +116,12 @@ const server = createServer(async (req, res) => {
       `retry in ~${rl.retryAfterSec}s — proxied routes are limited because they spend an upstream's quota`,
       429
     );
+    journal.record({
+      kind: 'RATE_LIMITED',
+      pathname: url.pathname,
+      client: clientKey(req),
+      detail: `class=${isProxied(url.pathname) ? 'proxied' : 'local'} retryAfter=${rl.retryAfterSec}s`,
+    });
     res.setHeader('Retry-After', String(rl.retryAfterSec));
     send(httpStatus, body, corsHeaders);
     return;
@@ -130,6 +153,13 @@ const server = createServer(async (req, res) => {
     // the operator's log, scrubbed of every configured secret
     const { logLine, body } = redactError(err);
     console.error(logLine);
+    journal.record({
+      kind: 'HANDLER_FAULT',
+      pathname: url.pathname,
+      client: clientKey(req),
+      // the correlation id, never the message - the detail stays in the log
+      detail: `correlation=${body.error?.correlationId ?? 'unknown'}`,
+    });
     send(500, body, corsHeaders);
   }
 });

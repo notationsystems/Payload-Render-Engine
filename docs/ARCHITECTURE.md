@@ -973,14 +973,39 @@ the full invariant list. The engineering shape:
   no execution identity here to dispatch *with*; the check exists so
   that the day one lands, the tool surface fails loudly instead of
   inheriting authority by accident.
-- **`scripts/check-security.mjs`** — 14 invariants in `npm run check`:
+- **`SecurityJournal` + `SECURITY_INVARIANTS`** (`server/security.mjs`)
+  — the security model as data. The journal is a bounded ring of gate
+  refusals that counts what it dropped and states its own window; the
+  ledger is the machine-readable twin of docs/SECURITY.md, with each
+  row ENFORCED (a named check proves it), DEPLOYMENT (real, but not
+  this process's to enforce) or ABSENT (with the reason and what would
+  unblock it). Both are served at `GET /api/security/posture`.
+- **`src/ui/securityPanel.ts`** — the operator surface for that model,
+  reached by `security` in the command vocabulary or from its row in
+  the control plane. It separates what the browser OBSERVED (the CSP
+  that actually arrived, the API base in force, every key actually in
+  storage) from what the gate REPORTED, and it shows the ABSENT rows
+  with equal weight — a security surface that renders only what works
+  is a marketing page. Because SEC-110 admits any loopback backend, the
+  panel treats the posture as untrusted input: escaped throughout, and
+  a malformed field degrades one row rather than blanking the surface.
+- **`index.html`** — SEC-170: `script-src 'self'`, `default-src`,
+  `object-src` and `base-uri` at `'none'`, `connect-src` mirroring the
+  SEC-110 allowlist as a *policy* (loopback, any port) rather than as
+  the two ports in use. Defence in depth behind the escaper.
+- **`scripts/check-security.mjs`** — 21 invariants in `npm run check`:
   no committed secret, one escaper, quote coverage, no wildcard CORS,
   TLS never disabled, no user-steerable egress, storage allowlist,
   API-base validation, GET-only routing, error redaction, pinned
   lockfile, tool-capability allowlist, no self-granted capability,
-  bounded upstream reads. Each failure names its invariant and its
-  remedy — and each was proven to bite by injecting a real violation
-  before being trusted.
+  bounded upstream reads, CSP present + strict + closed by default, and
+  a served ledger that cannot drift (an ENFORCED row naming no check,
+  or an absence carrying no reason, fails the build). Each failure names
+  its invariant and its remedy — and each was proven to bite by
+  injecting a real violation before being trusted. One of them did not:
+  the ledger's reason check matched the NEXT row's `reason:` across a
+  lazy span and reported a missing one as present. It was rewritten to
+  parse each row's own body and re-attacked before being trusted.
 - **`tests/e2e/05-security.spec.mjs`** — attacks, not assertions: a
   hostile loopback backend serves XSS payloads through the real render
   chain, and a foreign `?api=` is checked to be refused *and never

@@ -18,14 +18,17 @@ import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { registerMarketRoutes } from './markets.mjs';
 import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
-import { readCappedJson, UPSTREAM_CAPS } from './security.mjs';
+import { readCappedJson, securityPosture, UPSTREAM_CAPS } from './security.mjs';
 
 /** Version of the entity/observation/relationship/event schema this
  *  projection serves — part of every corpus build's identity. */
 const SCHEMA_VERSION = '0.1';
 
-export async function registerRoutes(corpus) {
+export async function registerRoutes(corpus, runtime = {}) {
   corpus = corpus ?? (await selectCorpus(process.env));
+  // the live security substrate, so the posture route reports the policy
+  // actually in force rather than a copy of it that can drift
+  const { limiter = null, journal = null } = runtime;
 
   const snapshot = corpus.snapshot;
   const scenarios = corpus.scenarios;
@@ -390,6 +393,7 @@ export async function registerRoutes(corpus) {
       { id: 'operations', family: 'OPERATIONS', label: 'brokerage control tower (mirror)', node: 'terminal', routes: ['/api/operations', '/api/operations/communications', '/api/operations/fuel'], probe: '/api/operations', provenance: 'terminal:operations', authority: { required: 'PAYLOAD_OPERATIONS_TOKEN', present: present('PAYLOAD_OPERATIONS_TOKEN') }, ladder: { observed: true, proposed: 'from journal', approved: 'from journal', dispatched: 'from journal', note: 'the desk proposes and authorizes IN THE TERMINAL; this mirror reads the journal — a cell lights only from a recorded fact' }, dataDomains: ['loads', 'carriers', 'communications'], instrument: 'operations' },
       { id: 'live', family: 'LIVE', label: 'live feeds (aircraft · satellites · seismic · fires)', node: 'spatial-api', routes: ['/api/live/aircraft', '/api/live/satellites', '/api/live/quakes', '/api/live/fires'], probe: '/api/live/quakes', provenance: 'external:observed', ladder: observeOnly, dataDomains: ['contacts', 'hazards'], instrument: 'layers' },
       { id: 'markets', family: 'MARKETS', label: 'FX · crypto · derivatives desks', node: 'spatial-api', routes: ['/api/markets/fx', '/api/markets/crypto', '/api/markets/derivatives'], probe: '/api/markets/fx', provenance: 'external:reported', ladder: observeOnly, dataDomains: ['prices'], instrument: 'markets' },
+      { id: 'security', family: 'CONTROL', label: 'security posture + refusal journal', node: 'spatial-api', routes: ['/api/security/posture'], probe: '/api/security/posture', provenance: 'read from the live gate', ladder: observeOnly, dataDomains: ['policy', 'invariants', 'refusals'], instrument: 'security' },
       { id: 'markets.broker', family: 'MARKETS', label: 'broker session (IBKR)', node: 'ibkr', routes: ['/api/markets/broker'], probe: '/api/markets/broker', provenance: 'broker:session', authority: { required: 'IBKR_GATEWAY_URL', present: present('IBKR_GATEWAY_URL') }, ladder: { observed: true, proposed: false, approved: false, dispatched: false, note: 'no order path exists in this service — observe only, fail-closed' }, dataDomains: ['positions'], instrument: 'markets' },
     ];
     return ok({
@@ -400,6 +404,38 @@ export async function registerRoutes(corpus) {
       capabilities,
       cost: { status: 'ABSENT', reason: 'no cost meter exists in this projection service — corpus-platform work' },
     });
+  });
+
+  // ---- SEC-152: the security model as a served surface --------------
+  // The substrate is only operable if the operator can see it. This
+  // route reports the policy actually in force (read from the live
+  // gate, never a second copy that can drift), authority as
+  // PRESENT/ABSENT, the invariant ledger including the rows that are
+  // ABSENT with their reason, and the bounded refusal journal.
+  //
+  // The tradeoff is stated rather than waved away: a reachable posture
+  // route tells a prober which of its probes were noticed. It is
+  // acceptable here because the surface is already behind the same
+  // host and origin allowlist as everything else, it echoes no secret
+  // (SEC-013), and the alternative - a security model only its authors
+  // can see - is how a control silently stops working.
+  get('/api/security/posture', ({ query }) => {
+    const limit = Number(query.get('events') ?? 50);
+    const env = ok({
+      ...securityPosture(process.env, limiter),
+      events: journal
+        ? journal.read(limit)
+        : {
+            status: 'ABSENT',
+            reason:
+              'this process was started without a security journal - refusals are still enforced and logged, but no in-memory window is retained',
+          },
+    });
+    env.meta.verification = verification(
+      'PROVENANCE',
+      'read from the live gate and this process journal - it describes THIS process only, never the deployment around it'
+    );
+    return env;
   });
 
   get('/api/snapshot', ({ query }) => {

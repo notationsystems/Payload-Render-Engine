@@ -9,6 +9,10 @@
  *    be REFUSED and stated, and the OS must never fetch from it
  *    (SEC-110).
  * 3. Browser storage holds no credential-shaped value (SEC-005).
+ * 4. The delivered document carries a strict CSP (SEC-170).
+ * 5. The security posture surface: the ledger shows what is ABSENT with
+ *    its reason, not a wall of green, and a hostile journal detail from
+ *    an untrusted service renders as text (SEC-152 + SEC-120/121).
  */
 
 import { createServer } from 'node:http';
@@ -17,6 +21,8 @@ import { API, VITE, makeRecorder } from './harness.mjs';
 /** Payloads that break naive escaping in element and attribute position. */
 const ELEMENT_PAYLOAD = '<img src=x onerror="window.__xss_element=1">EscondidaX';
 const ATTRIBUTE_PAYLOAD = 'Antofagasta" onmouseover="window.__xss_attribute=1" data-x="';
+/** A refusal journal is BUILT from attacker-controlled text. Prove it. */
+const JOURNAL_PAYLOAD = 'origin=<img src=x onerror="window.__xss_journal=1">https://evil.example';
 
 /** A hostile-but-loopback backend: mirrors the real API, poisons names. */
 async function startHostileBackend(port) {
@@ -26,12 +32,55 @@ async function startHostileBackend(port) {
     poison.data.nodes[0].name = ELEMENT_PAYLOAD;
     poison.data.nodes[1].name = ATTRIBUTE_PAYLOAD;
   }
+  // a hostile posture: the journal is the one surface built entirely
+  // from attacker-controlled text, so it is the one worth poisoning
+  const hostilePosture = {
+    status: 'ok',
+    meta: {},
+    data: {
+      model: 'payload-security/0.1',
+      threatModel: 'docs/SECURITY.md',
+      policy: {
+        methodsServed: ['GET', 'OPTIONS'],
+        originPolicy: 'allowlist',
+        allowedOrigins: [ATTRIBUTE_PAYLOAD],
+        hostPolicy: 'allowlist',
+        allowedHosts: ['127.0.0.1'],
+        wildcardCors: false,
+        tlsVerification: 'enforced',
+        privilegedPrefixes: ['/api/operations'],
+        proxiedPrefixes: ['/api/live/'],
+      },
+      authority: [{ id: 'operations', variable: 'PAYLOAD_OPERATIONS_TOKEN', purpose: ELEMENT_PAYLOAD, state: 'ABSENT', scope: 'server-side only' }],
+      limits: { local: { capacity: 240, refillPerSec: 4 } },
+      upstreamCaps: { json: 8388608 },
+      invariants: [
+        { id: 'SEC-101', domain: 'transport', state: 'ENFORCED', check: 'origin-allowlist', statement: 'Cross-origin reads are allowlisted.' },
+        { id: 'SEC-999', domain: 'integrity', state: 'ABSENT', check: null, statement: ELEMENT_PAYLOAD, reason: 'a poisoned reason', unblockedBy: 'a poisoned remedy' },
+      ],
+      counts: { enforced: 1, deployment: 0, absent: 1 },
+      events: {
+        since: '2026-01-01T00:00:00.000Z',
+        recorded: 1,
+        retained: 1,
+        dropped: 0,
+        capacity: 256,
+        byKind: { ORIGIN_NOT_ALLOWED: 1 },
+        entries: [{ seq: 1, at: '2026-01-01T00:00:00.000Z', kind: 'ORIGIN_NOT_ALLOWED', path: '/api/operations', client: 'aa', detail: JOURNAL_PAYLOAD }],
+      },
+    },
+  };
   const server = createServer((req, res) => {
     res.writeHead(200, {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*', // hostile server is permissive on purpose
     });
-    res.end(JSON.stringify(req.url.startsWith('/api/snapshot') ? poison : { status: 'ok', data: {}, meta: {} }));
+    const body = req.url.startsWith('/api/snapshot')
+      ? poison
+      : req.url.startsWith('/api/security/posture')
+        ? hostilePosture
+        : { status: 'ok', data: {}, meta: {} };
+    res.end(JSON.stringify(body));
   });
   await new Promise((r) => server.listen(port, '127.0.0.1', r));
   return server;
@@ -81,6 +130,7 @@ export async function run(browser) {
       // the payload must be present as TEXT somewhere it was rendered
       renderedAsText: document.body.innerText.includes('EscondidaX'),
       strayHandlers: document.querySelectorAll('[onmouseover],[onerror],[onload]').length,
+      journalFired: !!window.__xss_journal,
     }));
     r.ok(verdict.elementFired === false, 'SEC-120 element-position payload did not execute');
     r.ok(verdict.attributeFired === false, 'SEC-121 attribute-breakout payload did not execute');
@@ -88,6 +138,29 @@ export async function run(browser) {
     r.ok(verdict.strayHandlers === 0, 'SEC-121 no inline event handler was injected');
     r.ok(verdict.renderedAsText, 'the hostile name still renders — as text, not markup');
     r.ok(dialogs.length === 0, 'no dialog was raised by injected script');
+
+    // the security surface is itself built from attacker-controlled
+    // text — a panel that shows refusals must not be an injection sink
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => window.payloadEarth.api.runCommand('security'));
+    await page.waitForTimeout(1200);
+    const sec = await page.evaluate(() => {
+      const el = document.querySelector('.pe-security');
+      return {
+        open: !!el && !el.hidden,
+        journalFired: !!window.__xss_journal,
+        detailAsText: (el?.innerText ?? '').includes('evil.example'),
+        injectedInPanel: (el?.querySelectorAll('img,script,[onerror],[onmouseover]') ?? []).length,
+        absentShown: (el?.innerText ?? '').includes('ABSENT'),
+      };
+    });
+    r.ok(sec.open, 'the security posture surface opens from the command vocabulary');
+    r.ok(sec.journalFired === false, 'SEC-152 a poisoned journal detail did not execute');
+    r.ok(sec.injectedInPanel === 0, 'SEC-152 nothing was injected into the posture surface');
+    r.ok(sec.detailAsText, 'the refused origin is still shown to the operator — as text');
+    r.ok(sec.absentShown, 'the ledger states what is ABSENT, it does not hide it');
+    await page.keyboard.press('Escape');
+
     await page.close();
     await new Promise((res) => hostile.close(res));
   }
@@ -141,6 +214,54 @@ export async function run(browser) {
       /token|secret|bearer|password|api[_-]?key/i.test(`${k} ${v}`)
     );
     r.ok(suspicious.length === 0, `SEC-005 no credential-shaped value in browser storage (${Object.keys(stored).length} keys)`);
+    await page.close();
+  }
+
+  // ---- 4. the delivered document carries a strict CSP ---------------
+  {
+    const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+    await page.goto(`${VITE}/`, { waitUntil: 'domcontentloaded' });
+    const csp = await page.evaluate(() => {
+      const meta = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+      const raw = (meta?.getAttribute('content') ?? '').replace(/\s+/g, ' ');
+      const dir = (n) => raw.split(';').map((d) => d.trim()).find((d) => d.startsWith(n + ' ')) ?? '';
+      return { present: !!meta, scriptSrc: dir('script-src'), defaultSrc: dir('default-src'), objectSrc: dir('object-src') };
+    });
+    r.ok(csp.present, 'SEC-170 a Content-Security-Policy reached the delivered document');
+    r.ok(!/unsafe-inline|unsafe-eval/.test(csp.scriptSrc), `SEC-170 script-src is strict (${csp.scriptSrc})`);
+    r.ok(/default-src 'none'/.test(csp.defaultSrc), 'SEC-170 the policy denies by default');
+    r.ok(/object-src 'none'/.test(csp.objectSrc), 'SEC-170 plugin content is denied');
+    await page.close();
+  }
+
+  // ---- 5. the honest posture, against the real gate -----------------
+  {
+    const page = await browser.newPage({ viewport: { width: 1600, height: 950 } });
+    await page.goto(`${VITE}/?api=${encodeURIComponent(API)}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !!window.payloadEarth, null, { timeout: 30000 });
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => window.payloadEarth.api.runCommand('security'));
+    await page.waitForTimeout(1500);
+    const view = await page.evaluate(() => {
+      const el = document.querySelector('.pe-security');
+      const text = el?.innerText ?? '';
+      return {
+        open: !!el && !el.hidden,
+        text,
+        enforcedPills: el?.querySelectorAll('.pe-sec-pill.enforced').length ?? 0,
+        absentRows: el?.querySelectorAll('.pe-sec-inv.absent').length ?? 0,
+        deploymentRows: el?.querySelectorAll('.pe-sec-inv.deployment').length ?? 0,
+        unblocked: el?.querySelectorAll('.pe-corpus-remedy').length ?? 0,
+      };
+    });
+    r.ok(view.open, 'the posture surface reads the live gate');
+    r.ok(view.absentRows >= 1, `the ledger shows ABSENT rows (${view.absentRows}) — not a wall of green`);
+    r.ok(view.deploymentRows >= 1, `the ledger separates what the DEPLOYMENT must close (${view.deploymentRows})`);
+    r.ok(view.unblocked >= view.absentRows, 'every ABSENT row carries what would unblock it');
+    r.ok(/OBSERVED HERE/.test(view.text), 'the client half is labelled as observed HERE, not inferred');
+    r.ok(/IN FORCE AT THE GATE/.test(view.text), 'the service half is labelled as read from the gate');
+    r.ok(/PAYLOAD_OPERATIONS_TOKEN/.test(view.text) && !/canary|Bearer /.test(view.text), 'SEC-013 authority is named, its value never shown');
+    r.ok(/an observed zero|refusal|REFUSAL JOURNAL/i.test(view.text), 'the refusal journal states its window');
     await page.close();
   }
 

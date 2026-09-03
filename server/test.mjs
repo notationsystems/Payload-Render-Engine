@@ -613,5 +613,79 @@ check(
   else process.env.PAYLOAD_OPERATIONS_TOKEN = savedTok;
 }
 
+// --------------------------------------------------------------------
+// SEC-152 — the security journal and the served posture
+// --------------------------------------------------------------------
+console.log('\n— security posture —');
+{
+  const { SecurityJournal, securityPosture, safeDetail, RateLimiter } = await import('./security.mjs');
+
+  // the journal is BOUNDED, and it counts what it dropped rather than
+  // silently forgetting: an unbounded incident log is an amplifier
+  const j = new SecurityJournal();
+  for (let i = 0; i < 300; i += 1) j.record({ kind: 'HOST_NOT_ALLOWED', pathname: '/api/health', client: 'k', detail: `n=${i}` });
+  const w = j.read(10);
+  check(w.recorded === 300, 'SEC-152 the journal counts every event it was given');
+  check(w.retained === w.capacity, 'SEC-152 retention is capped at the ring capacity');
+  check(w.dropped === 300 - w.capacity, 'SEC-152 what fell out of the ring is counted, not forgotten');
+  check(w.entries.length === 10 && w.entries[0].seq === 300, 'SEC-152 the read is bounded and newest-first');
+  check(typeof w.since === 'string' && w.since.length > 0, 'SEC-152 the journal states its own window');
+
+  // an empty journal must not read as "nothing has ever happened"
+  const empty = new SecurityJournal().read();
+  check(empty.recorded === 0 && typeof empty.since === 'string', 'SEC-152 an empty window is still a stated window, never a bare zero');
+
+  // detail fields carry attacker-controlled text: bounded, control
+  // characters neutralised, and never used to make a decision
+  const hostile = `${String.fromCharCode(27)}[2J${'A'.repeat(400)}`;
+  const safe = safeDetail(hostile, {});
+  check(safe.length <= 100, 'SEC-152 a hostile detail is bounded before it is stored');
+  check(!safe.includes(String.fromCharCode(27)), 'SEC-152 control characters never survive into the journal');
+
+  // SEC-141 — a configured secret must never reach the journal either
+  const canary = `canary-${randomUUID()}`;
+  const scrubbed = safeDetail(`origin=${canary}`, { PAYLOAD_OPERATIONS_TOKEN: canary });
+  check(!scrubbed.includes(canary), 'SEC-141 a configured secret is scrubbed out of a journal detail');
+
+  // the posture reports presence, never a value
+  const tok = `canary-${randomUUID()}`;
+  const posture = securityPosture({ PAYLOAD_OPERATIONS_TOKEN: tok }, new RateLimiter());
+  const serialized = JSON.stringify(posture);
+  check(!serialized.includes(tok), 'SEC-013 the posture never carries a credential value');
+  check(
+    posture.authority.find((a) => a.id === 'operations')?.state === 'PRESENT',
+    'SEC-013 the posture reports the credential as PRESENT'
+  );
+  check(posture.policy.wildcardCors === false, 'SEC-103 the posture reports no wildcard CORS');
+  check(posture.counts.absent >= 1, 'the ledger carries at least one ABSENT row — a model with no absences is a model that is not being honest');
+  check(
+    posture.invariants.filter((i) => i.state !== 'ENFORCED').every((i) => typeof i.reason === 'string' && i.reason.length > 20),
+    'every non-ENFORCED row carries its reason'
+  );
+  check(
+    posture.invariants.filter((i) => i.state === 'ENFORCED').every((i) => typeof i.check === 'string'),
+    'every ENFORCED row names the check that proves it'
+  );
+
+  // the served route: posture + journal in one answer
+  const jj = new SecurityJournal();
+  jj.record({ kind: 'ORIGIN_NOT_ALLOWED', pathname: '/api/operations', client: 'k', detail: 'origin=https://evil.example' });
+  const secRoutes = await registerRoutes(null, { limiter: new RateLimiter(), journal: jj });
+  const answer = await makeCall(secRoutes)('GET', '/api/security/posture');
+  check(answer.status === 'ok', 'GET /api/security/posture answers');
+  check(answer.data.events.recorded === 1, 'the served answer carries the live journal, not a copy');
+  check(
+    answer.data.events.entries[0].detail.includes('evil.example'),
+    'a refused origin is shown to the operator — escaped at render, never re-read into a decision'
+  );
+
+  // a process without a journal must say so rather than imply an empty one
+  const noJournal = await makeCall(await registerRoutes(null, {}))('GET', '/api/security/posture');
+  check(
+    noJournal.data.events.status === 'ABSENT' && typeof noJournal.data.events.reason === 'string',
+    'SEC-152 a missing journal is ABSENT with a reason, never an empty list'
+  );
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');
 process.exit(failures ? 1 : 0);

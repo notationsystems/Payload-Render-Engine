@@ -177,6 +177,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'warrant', label: 'warrant — why do we believe this?', hint: 'WARRANT' },
   { text: 'watches', label: 'watches — standing conditions + trip log', hint: 'WATCH' },
   { text: 'system', label: 'system — the control plane', hint: 'CONTROL' },
+  { text: 'security', label: 'security — posture, invariant ledger, refusal journal', hint: 'CONTROL' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -357,6 +358,11 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'refusals' || lower === 'refused' || lower === 'queue') {
     window.dispatchEvent(new CustomEvent('pe:refusals-toggle'));
     return ok('REFUSALS WORK QUEUE — one mechanism per group, one shared remedy, ranked');
+  }
+  // -- security posture: the model as facts, including what is ABSENT
+  if (lower === 'security' || lower === 'posture' || lower === 'invariants') {
+    window.dispatchEvent(new CustomEvent('pe:security-toggle'));
+    return ok('SECURITY POSTURE — enforced · deployment · absent, with the refusal journal');
   }
   if (lower === 'clear pattern' || lower === 'exit pattern') {
     api.clearMinedPattern();

@@ -152,6 +152,22 @@ is given so a failure names its own invariant.
   so**. An attacker-chosen backend would otherwise control everything
   the OS renders, including its own verification claims.
   **[checked: api-base-validation]**
+- **SEC-170** *The delivered app carries a Content-Security-Policy.*
+  `script-src 'self'` — no inline script, no eval; `default-src`,
+  `object-src` and `base-uri` are `'none'`; `connect-src` mirrors the
+  SEC-110 allowlist (loopback, any port). This is defence in depth
+  BEHIND the escaper: the escaper stops the injection, the CSP stops
+  what an injection that got through could do with itself. `style-src`
+  keeps `'unsafe-inline'` and the reason is stated rather than hidden —
+  thirteen render sites write a computed width or palette colour into a
+  style attribute, none of them from wire text. The mirror is written
+  as the *policy*, not as the two ports we happen to use: a CSP
+  narrower than the documented policy breaks a legitimate deployment
+  with no visible error. **[checked: csp-policy]**
+- **SEC-171** *Framing is denied for the delivered app.* **DEPLOYMENT** —
+  `frame-ancestors` is ignored in a `<meta>` CSP and must arrive as a
+  response header from whatever serves the built bundle. The API sends
+  `X-Frame-Options: DENY` for its own responses.
 
 ### Agent and tool authority
 
@@ -189,6 +205,16 @@ not documentary.
   the moment the cap is crossed. Caps: 8 MiB for JSON, 24 MiB for feed
   payloads. A cap that buffers first and measures afterwards is not a
   control — the memory is already spent. **[checked: bounded-reads]**
+- **SEC-152** *Every gate refusal is recorded in a bounded journal that
+  states its own window.* A control that fires silently cannot be
+  operated. The journal is a 256-entry ring that counts what it dropped
+  — an unbounded incident log is an attacker's amplifier — and it
+  reports `since`, so an empty list reads as "an observed zero for this
+  window", never "nothing has ever happened". Detail fields carry
+  attacker-controlled text by construction (a rejected Host, a rejected
+  Origin): they are scrubbed, stripped of control characters, bounded,
+  escaped again at render, and never read back into a decision.
+  **[checked: security-journal]**
 - **SEC-160** *Dependencies are pinned and minimal.* `package-lock.json`
   is committed; the runtime dependency set is four packages, and the
   advisory surface is checked, not assumed. The build toolchain is held
@@ -201,6 +227,48 @@ not documentary.
   fails offline verification. **[checked: existing commitment tests]**
 - **SEC-014** *Verification failure fails closed* — a proof that does
   not fold to the root is reported as a failure, never softened.
+
+---
+
+## 4b. The model as a surface
+
+`SECURITY_INVARIANTS` in `server/security.mjs` is the machine-readable
+twin of the list above, served at `GET /api/security/posture` and
+rendered by the SECURITY instrument in the OS (`security` in the
+command vocabulary). Three things follow from making the model
+readable, and all three are load-bearing:
+
+**The state is three-valued, not two.** `ENFORCED` means the code
+enforces it and a named check proves it. `DEPLOYMENT` means the control
+is real but belongs to whatever runs this, not to this process —
+stated so nobody assumes we did it. `ABSENT` means it does not exist
+here, with the reason and with what would unblock it. A check enforces
+this: an `ENFORCED` row that names no check fails, and a non-`ENFORCED`
+row without a reason fails. An unproven `ENFORCED` is a claim an
+operator will act on and be wrong about — worse than an honest absence.
+
+**The surface separates what it observed from what it was told.** The
+client half (the CSP that actually reached the document, the API base
+actually in force, every key actually in `localStorage` checked against
+the SEC-005 allowlist) is observed in the browser. The service half is
+read from the gate. Neither speaks for the other, and a green client
+half proves nothing about the service. The storage row is the sharper
+half of SEC-005: the static check proves the code writes nothing else;
+the surface proves nothing else is *there*.
+
+**The posture route is not trusted structurally.** SEC-110 admits any
+loopback backend, so a posture answer may come from a service this OS
+does not control. Every field is escaped at render and a missing or
+malformed field degrades one row rather than blanking the security
+surface — verified by an E2E that serves a poisoned posture, including
+a journal entry built to break out of an attribute.
+
+The tradeoff is stated rather than waved away: a reachable posture
+route tells a prober which of its probes were noticed. It is acceptable
+here because the route sits behind the same host and origin allowlist
+as everything else, it echoes no secret (SEC-013), and the alternative
+— a security model only its authors can see — is how a control silently
+stops working.
 
 ---
 

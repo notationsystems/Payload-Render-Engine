@@ -2012,3 +2012,186 @@ input {
 .pe-sys-cell.dim { opacity: 0.6; }
 .pe-sys-detail { font-family: var(--font-mono); font-size: 8.5px; color: var(--warn); margin-top: 3px; }
 .pe-sys-disp { font-family: var(--font-mono); font-size: 7.5px; letter-spacing: 0.08em; color: var(--text-dim); margin-left: 6px; }
+
+/* ------------------------------------------------------------------ */
+/* SECURITY POSTURE — a ledger, not an alarm.                          */
+/* Steel header: the surface's job is to be READ, and a green banner   */
+/* on a security panel is the wall-of-green this design refuses.       */
+/* The three states carry the semantics:                               */
+/*   ENFORCED    green   we enforce it and a named check proves it     */
+/*   DEPLOYMENT  amber   real, but somebody else must close it — an    */
+/*                       action item for whoever runs this             */
+/*   ABSENT      grey    deliberately not a control, with the reason   */
+.pe-security { border-top-color: var(--line-strong); }
+.pe-sec-kicker {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  color: var(--text-hi);
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  padding: 1px 5px;
+}
+.pe-sec-banner {
+  margin: 0 12px 4px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line-strong);
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  line-height: 1.55;
+  color: var(--text-mid);
+}
+.pe-sec-split {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.pe-sec-split b { font-weight: 500; }
+.pe-sec-split b.enforced { color: var(--ok); }
+.pe-sec-split b.deployment { color: var(--warn); }
+.pe-sec-split b.absent { color: var(--text-dim); }
+
+.pe-sec-note {
+  margin: 3px 0 6px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+}
+.pe-sec-hint {
+  color: var(--text-dim);
+  font-size: 8px;
+  letter-spacing: 0.03em;
+}
+
+/* state pills — the one place colour carries meaning on this surface */
+.pe-sec-pill {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.12em;
+  border-radius: 2px;
+  padding: 1px 4px;
+  margin-right: 5px;
+  white-space: nowrap;
+}
+.pe-sec-pill.enforced { color: var(--ok); border: 1px solid rgba(67, 209, 124, 0.5); }
+.pe-sec-pill.deployment { color: var(--warn); border: 1px solid rgba(255, 180, 84, 0.5); }
+.pe-sec-pill.absent { color: var(--text-dim); border: 1px dashed var(--line-strong); }
+
+/* invariant rows — a left rule states the row's class at a glance */
+.pe-sec-inv {
+  margin: 4px 0;
+  padding: 4px 0 4px 8px;
+  border-left: 2px solid var(--line);
+}
+.pe-sec-inv.enforced { border-left-color: rgba(67, 209, 124, 0.45); }
+.pe-sec-inv.deployment { border-left-color: rgba(255, 180, 84, 0.5); }
+.pe-sec-inv.absent { border-left-color: var(--line-strong); border-left-style: dashed; }
+.pe-sec-invhead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pe-sec-id {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-hi);
+  font-variant-numeric: tabular-nums;
+}
+.pe-sec-check {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.pe-sec-statement {
+  margin-top: 2px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-mid);
+  max-width: 78ch;
+}
+.pe-sec-reason {
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  line-height: 1.55;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  max-width: 82ch;
+}
+
+/* authority — presence only, three columns of fixed rhythm */
+.pe-sec-auth {
+  display: grid;
+  grid-template-columns: 84px 210px 1fr;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-mid);
+}
+
+/* browser storage — a rogue key must be impossible to miss */
+.pe-sec-storage {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 1px 0 1px 10px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.pe-sec-storage.rogue { color: var(--alert); }
+
+/* the refusal journal */
+.pe-sec-kinds { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.pe-sec-kind {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.1em;
+  color: var(--text-mid);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 1px 5px;
+  font-variant-numeric: tabular-nums;
+}
+.pe-sec-kind.probe { color: var(--alert); border-color: rgba(255, 93, 110, 0.42); }
+.pe-sec-event {
+  display: grid;
+  grid-template-columns: 40px 150px 150px 1fr 58px;
+  gap: 8px;
+  align-items: baseline;
+  padding: 2px 0 2px 8px;
+  border-left: 2px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.pe-sec-event.probe { border-left-color: rgba(255, 93, 110, 0.45); }
+.pe-sec-eseq { color: var(--text-dim); }
+.pe-sec-ekind { color: var(--text-mid); }
+.pe-sec-event.probe .pe-sec-ekind { color: var(--alert); }
+.pe-sec-epath { color: var(--text-mid); overflow: hidden; text-overflow: ellipsis; }
+/* attacker-controlled text: escaped at render, and never allowed to
+   break the row's geometry no matter what arrived */
+.pe-sec-edetail { color: var(--text-hi); overflow-wrap: anywhere; }
+.pe-sec-eat { color: var(--text-dim); text-align: right; }
+
+@media (max-width: 900px) {
+  .pe-sec-auth { grid-template-columns: 78px 1fr; }
+  .pe-sec-event { grid-template-columns: 34px 1fr; }
+  .pe-sec-epath, .pe-sec-eat { display: none; }
+}

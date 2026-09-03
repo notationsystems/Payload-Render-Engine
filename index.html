@@ -3,6 +3,50 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      SEC-170 — Content-Security-Policy for the delivered app.
+
+      This is defence in depth BEHIND the escaper (SEC-120/121), not
+      instead of it: the escaper stops the injection, the CSP stops what
+      an injection that got through could do with itself.
+
+      script-src is strict — 'self' only, no 'unsafe-inline', no
+      'unsafe-eval'. The app has no inline script, no eval, no
+      new Function and no worker, so strictness costs nothing here and
+      is the control that actually stops XSS from executing.
+
+      style-src carries 'unsafe-inline' and the reason is stated rather
+      than hidden: thirteen render sites write a computed width or a
+      palette colour into a style attribute. None of them takes wire
+      text — but CSP cannot know that, so the honest label is that
+      style-src is relaxed and script-src is not.
+
+      connect-src is a second, browser-enforced copy of the SEC-110 API
+      allowlist — loopback on any port, which is exactly what SEC-110
+      admits. Even if the API-base validation were bypassed, the browser
+      refuses the connection to an attacker-chosen remote backend.
+
+      It mirrors the policy rather than the two ports we happen to use:
+      a CSP narrower than the documented policy is a footgun, breaking a
+      legitimate deployment on a different port with no visible error.
+
+      frame-ancestors is absent because a meta CSP ignores it; it has to
+      arrive as a response header from whatever serves the bundle. The
+      ledger carries that as SEC-171/DEPLOYMENT rather than pretending.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none';
+               script-src 'self';
+               style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+               font-src 'self' https://fonts.gstatic.com;
+               img-src 'self' data: blob:;
+               connect-src 'self' http://127.0.0.1:* http://localhost:*;
+               worker-src 'self' blob:;
+               object-src 'none';
+               base-uri 'none';
+               form-action 'none'"
+    />
     <title>PayLoad OS</title>
     <link
       rel="icon"

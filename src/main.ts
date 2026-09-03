@@ -35,6 +35,7 @@ import { createCorpusPanel } from './ui/corpusPanel';
 import { createCompilerPanel } from './ui/compilerPanel';
 import { createInjectionCard } from './ui/injectionCard';
 import { createRefusalsPanel } from './ui/refusalsPanel';
+import { createSecurityPanel } from './ui/securityPanel';
 import { createWarrantPanel } from './ui/warrantPanel';
 import { createVocabPanel } from './ui/vocabPanel';
 import { createWatchesPanel } from './ui/watchesPanel';
@@ -88,6 +89,7 @@ async function start(): Promise<void> {
   hud.appendChild(createCompilerPanel(app).el);
   hud.appendChild(createInjectionCard(app).el);
   hud.appendChild(createRefusalsPanel(app).el);
+  hud.appendChild(createSecurityPanel(app).el);
   hud.appendChild(createWarrantPanel(app).el);
   hud.appendChild(createVocabPanel(app).el);
   hud.appendChild(createWatchesPanel(app).el);

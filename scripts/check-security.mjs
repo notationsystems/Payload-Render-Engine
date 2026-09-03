@@ -319,6 +319,96 @@ console.log('— security invariants —');
   );
 }
 
+// ---------------------------------------------------------------- SEC-170
+// The delivered app carries a CSP, and script-src is strict. This is
+// defence in depth behind the escaper, and it is only defence if the
+// one directive that stops execution is not quietly relaxed.
+{
+  const html = read(join(ROOT, 'index.html'));
+  // the policy value itself contains single quotes ('none', 'self'), so
+  // the attribute delimiter must be matched exactly, not as a class
+  const meta = /http-equiv="Content-Security-Policy"[\s\S]*?content="([^"]*)"/i.exec(html);
+  const policy = (meta?.[1] ?? '').replace(/\s+/g, ' ').trim();
+  const directive = (name) =>
+    policy
+      .split(';')
+      .map((d) => d.trim())
+      .find((d) => d.startsWith(`${name} `))
+      ?.slice(name.length + 1)
+      .trim() ?? null;
+  const scriptSrc = directive('script-src');
+  check(
+    'SEC-170',
+    'the delivered app carries a Content-Security-Policy',
+    policy.length > 0,
+    policy ? '' : 'no Content-Security-Policy meta in index.html',
+    'add a <meta http-equiv="Content-Security-Policy"> to index.html — the escaper stops the injection, the CSP stops what an injection that got through could do'
+  );
+  check(
+    'SEC-170',
+    'script-src admits no inline script and no eval',
+    Boolean(scriptSrc) && !/unsafe-inline|unsafe-eval/.test(scriptSrc ?? ''),
+    scriptSrc ?? '(script-src absent)',
+    "keep script-src at 'self' — this app has no inline script, no eval and no worker, so strictness costs nothing and is the control that actually stops XSS from executing"
+  );
+  check(
+    'SEC-170',
+    'default-src denies by default and object/base are closed',
+    /default-src 'none'/.test(policy) && /object-src 'none'/.test(policy) && /base-uri 'none'/.test(policy),
+    policy.slice(0, 120),
+    "set default-src 'none', object-src 'none' and base-uri 'none' — an allowlist that forgets a fetch type is an allowlist with a hole"
+  );
+}
+
+// ---------------------------------------------------------------- SEC-152
+// The served invariant ledger is the security model an operator reads.
+// A row claiming ENFORCED with no check named, or a check named that no
+// check function answers to, is a claim the operator can act on and be
+// wrong about — which is worse than an honest ABSENT.
+{
+  const src = read(join(ROOT, 'server/security.mjs'));
+  const ledger = /SECURITY_INVARIANTS = Object\.freeze\(\[([\s\S]*?)\n\]\);/.exec(src)?.[1] ?? '';
+  // parse each row's OWN body: a span-based match would find the NEXT
+  // row's `reason:` and report a missing one as present. These rows are
+  // flat objects, so [^{}]* is exact where a lazy [\s\S]*? is not.
+  const rows = [...ledger.matchAll(/\{[^{}]*\}/g)].map((m) => ({
+    id: /id: '([^']+)'/.exec(m[0])?.[1] ?? '(unnamed)',
+    state: /state: '([A-Z]+)'/.exec(m[0])?.[1] ?? '',
+    check: /check: (null|'[^']*')/.exec(m[0])?.[1] ?? 'null',
+    hasReason: /\breason:/.test(m[0]),
+  }));
+  check(
+    'SEC-152',
+    'the served invariant ledger is non-empty and parseable',
+    rows.length >= 20,
+    `parsed ${rows.length} rows`,
+    'SECURITY_INVARIANTS in server/security.mjs is what the operator surface renders — it must stay the machine-readable twin of docs/SECURITY.md'
+  );
+  const claimed = rows.filter((r) => r.state === 'ENFORCED' && r.check === 'null');
+  check(
+    'SEC-152',
+    'every ENFORCED row names the check that proves it',
+    claimed.length === 0,
+    claimed.map((r) => r.id).join(' · '),
+    'name the check, or mark the row DEPLOYMENT / ABSENT with its reason — an unproven ENFORCED is a claim an operator will act on and be wrong about'
+  );
+  const unexplained = rows.filter((r) => r.state !== 'ENFORCED' && !r.hasReason);
+  check(
+    'SEC-152',
+    'every DEPLOYMENT or ABSENT row carries its reason',
+    unexplained.length === 0,
+    unexplained.map((r) => r.id).join(' · '),
+    'an absence without a reason is a gap; an absence with a reason is a decision — state it, the same way every refusal in this system carries a remedy'
+  );
+  check(
+    'SEC-152',
+    'the refusal journal is bounded and states its window',
+    /RING_CAPACITY/.test(src) && /this\.dropped \+= 1/.test(src) && /since: this\.since/.test(src),
+    '',
+    'the journal must be a bounded ring that counts what it dropped and reports `since` — an unbounded incident log is an attacker amplifier, and an empty one that hides its window reads as "nothing ever happened"'
+  );
+}
+
 // ------------------------------------------------------------------ verdict
 console.log('');
 if (failures.length) {

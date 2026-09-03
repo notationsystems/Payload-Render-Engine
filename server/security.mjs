@@ -221,6 +221,20 @@ export class RateLimiter {
     }
     return { ok: true };
   }
+
+  /**
+   * The limit policy as the operator surface reads it. Classes and rates
+   * only: bucket state is per-client and would let one caller infer
+   * another's traffic.
+   */
+  describe() {
+    return Object.fromEntries(
+      Object.entries(this.#classes).map(([cls, conf]) => [
+        cls,
+        { capacity: conf.capacity, refillPerSec: conf.refillPerSec },
+      ])
+    );
+  }
 }
 
 /** Client key: the socket address, hashed — a log should not carry raw IPs. */
@@ -376,4 +390,235 @@ export async function readCapped(res, maxBytes = UPSTREAM_CAPS.json, label = 'up
 /** Read a capped JSON body. Parse errors stay the caller's to type. */
 export async function readCappedJson(res, maxBytes = UPSTREAM_CAPS.json, label = 'upstream') {
   return JSON.parse(await readCapped(res, maxBytes, label));
+}
+
+// ---------------------------------------------------------------------------
+// SECURITY JOURNAL - incident observability (SEC-152)
+//
+// A control that fires silently cannot be operated. Every refusal the
+// gate issues is recorded here so the operator surface can answer
+// "what has been refused, and why?" without reading a log file.
+//
+// Two disciplines apply, both already load-bearing elsewhere in this
+// system:
+//
+//   The journal is BOUNDED. It is a ring of RING_CAPACITY entries and it
+//   counts what it dropped, so a flood of refusals cannot become the
+//   memory-exhaustion vector the refusals were defending against. An
+//   unbounded incident log is an attacker's amplifier.
+//
+//   The journal states its own WINDOW. It knows nothing before service
+//   start, so it reports `since` and never lets an empty list read as
+//   "nothing has ever happened" - absence is not zero.
+//
+// Detail fields carry attacker-controlled text (a rejected Host, a
+// rejected Origin). They are scrubbed, stripped of control characters,
+// bounded to DETAIL_MAX, and escaped again at render. They are never
+// used to make a decision - only to tell the operator what arrived.
+
+const RING_CAPACITY = 256;
+const DETAIL_MAX = 96;
+
+/** Attacker-controlled text, made safe to store and to show. */
+export function safeDetail(value, env = process.env) {
+  if (value == null) return null;
+  // control characters would corrupt a log line or an operator terminal
+  const text = [...scrubSecrets(String(value), env)]
+    .map((ch) => {
+      const code = ch.codePointAt(0);
+      return code < 0x20 || code === 0x7f ? '�' : ch;
+    })
+    .join('');
+  return text.length > DETAIL_MAX ? `${text.slice(0, DETAIL_MAX)}...` : text;
+}
+
+export class SecurityJournal {
+  constructor(startedAt) {
+    this.entries = [];
+    this.seq = 0;
+    this.dropped = 0;
+    this.since = startedAt ?? new Date().toISOString();
+    this.byKind = new Map();
+  }
+
+  /**
+   * Record one security event. `kind` is the typed refusal code, so the
+   * journal shares its vocabulary with the refusal the client was given.
+   */
+  record({ kind, pathname, client, detail, env = process.env }) {
+    this.seq += 1;
+    this.byKind.set(kind, (this.byKind.get(kind) ?? 0) + 1);
+    this.entries.push({
+      seq: this.seq,
+      at: new Date().toISOString(),
+      kind,
+      path: typeof pathname === 'string' ? pathname.slice(0, 128) : null,
+      client: client ?? null,
+      detail: safeDetail(detail, env),
+    });
+    while (this.entries.length > RING_CAPACITY) {
+      this.entries.shift();
+      this.dropped += 1;
+    }
+  }
+
+  /** Newest first, bounded - the shape the operator surface reads. */
+  read(limit = 50) {
+    const n = Math.max(1, Math.min(RING_CAPACITY, Number(limit) || 50));
+    return {
+      since: this.since,
+      recorded: this.seq,
+      retained: this.entries.length,
+      dropped: this.dropped,
+      capacity: RING_CAPACITY,
+      byKind: Object.fromEntries([...this.byKind].sort((a, b) => b[1] - a[1])),
+      entries: this.entries.slice(-n).reverse(),
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// THE INVARIANT LEDGER - the security model, declared once
+//
+// docs/SECURITY.md is the prose; this is its machine-readable twin. The
+// operator surface renders it, so a control claimed here and absent in
+// the code is a claim an operator can act on and be wrong about.
+//
+// `state` is deliberately three-valued, not two:
+//   ENFORCED    the code enforces it and a named check proves it
+//   DEPLOYMENT  the control is real but belongs to the deployment, not
+//               to this process - stated so nobody assumes we did it
+//   ABSENT      the control does not exist here, WITH the reason
+//
+// ABSENT is not a gap in the model. A control that would secure nothing
+// is worse than no control: it reads as protection and buys none. Every
+// ABSENT row carries what would have to become true for it to stop
+// being ABSENT - the same shape as a refusal carrying its remedy.
+
+export const SECURITY_INVARIANTS = Object.freeze([
+  { id: 'SEC-101', domain: 'transport', state: 'ENFORCED', check: 'origin-allowlist',
+    statement: 'Cross-origin reads are allowlisted; the API answers CORS only to declared origins.' },
+  { id: 'SEC-102', domain: 'transport', state: 'ENFORCED', check: 'host-guard',
+    statement: 'The Host header is validated - DNS-rebinding defence.' },
+  { id: 'SEC-103', domain: 'transport', state: 'ENFORCED', check: 'no-wildcard-cors',
+    statement: 'No wildcard CORS. A service holding authority never answers "*".' },
+  { id: 'SEC-104', domain: 'transport', state: 'ENFORCED', check: 'privileged-origin',
+    statement: 'Privileged routes fail closed on an unrecognised origin, before spending authority.' },
+  { id: 'SEC-105', domain: 'transport', state: 'ENFORCED', check: 'no-dynamic-egress',
+    statement: 'Proxy destinations are fixed in code; no input selects an outbound host.' },
+  { id: 'SEC-106', domain: 'transport', state: 'ENFORCED', check: 'bind-guard',
+    statement: 'The service refuses to bind off-loopback without an explicit host and origin policy.' },
+  { id: 'SEC-130', domain: 'transport', state: 'ENFORCED', check: 'tls-verify',
+    statement: 'TLS verification is never disabled anywhere in the tree.' },
+  { id: 'SEC-018', domain: 'transport', state: 'ENFORCED', check: 'method-guard',
+    statement: 'Only GET and OPTIONS are served; every other method is refused at the transport layer.' },
+
+  { id: 'SEC-004', domain: 'authority', state: 'ENFORCED', check: 'secret-scan',
+    statement: 'No secret is committed to source control.' },
+  { id: 'SEC-013', domain: 'authority', state: 'ENFORCED', check: 'no-credential-echo',
+    statement: 'No credential value appears in any response; authority is reported PRESENT/ABSENT only.' },
+  { id: 'SEC-141', domain: 'authority', state: 'ENFORCED', check: 'error-redaction',
+    statement: 'Secrets and internals are scrubbed from logs and errors; the client gets a correlation id.' },
+  { id: 'SEC-005', domain: 'authority', state: 'ENFORCED', check: 'storage-scan',
+    statement: 'No long-lived secret in browser storage - view conveniences only.' },
+  { id: 'SEC-015', domain: 'authority', state: 'ENFORCED', check: 'operations-mirror',
+    statement: 'Authorization failure fails closed: an unconfigured authority yields a typed refusal, never a degraded answer.' },
+
+  { id: 'SEC-011', domain: 'agent', state: 'ENFORCED', check: 'tool-capability',
+    statement: 'An agent may not grant itself capabilities; no tool reaches a dispatching or mutating member.' },
+  { id: 'SEC-012', domain: 'agent', state: 'ENFORCED', check: 'tool-capability',
+    statement: 'Tool invocation is allowlisted; a tool never reaches authority the operator UI itself lacks.' },
+
+  { id: 'SEC-120', domain: 'rendering', state: 'ENFORCED', check: 'single-escaper',
+    statement: 'One escaper for the whole UI; no module defines its own.' },
+  { id: 'SEC-121', domain: 'rendering', state: 'ENFORCED', check: 'escaper-covers-quotes',
+    statement: 'The escaper is safe in attribute position as well as element position.' },
+  { id: 'SEC-110', domain: 'rendering', state: 'ENFORCED', check: 'api-base-validation',
+    statement: 'The API base is allowlisted; a refused base falls back to the in-browser corpus and says so.' },
+  { id: 'SEC-170', domain: 'rendering', state: 'ENFORCED', check: 'csp-policy',
+    statement: 'The delivered app carries a CSP: no inline script, no eval, connect-src mirroring the API allowlist.' },
+  { id: 'SEC-017', domain: 'rendering', state: 'ENFORCED', check: 'check-seam',
+    statement: 'A derived representation cannot mutate canonical state; the renderer holds no write authority (INV-6).' },
+
+  { id: 'SEC-150', domain: 'integrity', state: 'ENFORCED', check: 'rate-limit',
+    statement: 'Metered and proxied routes are rate limited per client with a typed refusal.' },
+  { id: 'SEC-151', domain: 'integrity', state: 'ENFORCED', check: 'bounded-reads',
+    statement: 'Every upstream body read is size-bounded and cancelled at the cap.' },
+  { id: 'SEC-152', domain: 'integrity', state: 'ENFORCED', check: 'security-journal',
+    statement: 'Every gate refusal is recorded in a bounded journal that states its own window.' },
+  { id: 'SEC-160', domain: 'integrity', state: 'ENFORCED', check: 'lockfile',
+    statement: 'Dependencies are pinned and minimal; the advisory surface is checked, not assumed.' },
+  { id: 'SEC-009', domain: 'integrity', state: 'ENFORCED', check: 'commitment',
+    statement: 'Provenance stays cryptographically bound; a tampered record fails offline verification.' },
+  { id: 'SEC-014', domain: 'integrity', state: 'ENFORCED', check: 'commitment',
+    statement: 'Verification failure fails closed; a proof that does not fold to the root is reported as a failure.' },
+
+  // ---- real, but not this process's to enforce ---------------------------
+  { id: 'SEC-018-TLS', domain: 'transport', state: 'DEPLOYMENT', check: null,
+    statement: 'Plaintext transport is admissible only at documented local termination.',
+    reason: 'TLS is terminated by the deployment, not by this process. Binding off-loopback without an explicit host and origin policy is refused at startup, so the gap cannot be reached by accident.' },
+  { id: 'SEC-171', domain: 'rendering', state: 'DEPLOYMENT', check: null,
+    statement: 'Framing is denied for the delivered app.',
+    reason: 'frame-ancestors is ignored in a meta CSP; it has to arrive as a response header from whatever serves the built bundle. The API already sends X-Frame-Options: DENY for its own responses.' },
+
+  // ---- absent, with the reason -------------------------------------------
+  { id: 'SEC-002', domain: 'authority', state: 'ABSENT', check: null,
+    statement: 'Subjects are authenticated and requests authorized per subject.',
+    reason: 'There are no accounts and no write path. An auth stack here would gate a read-only projection of data the operator already holds, while creating the session and credential surface it claims to protect.',
+    unblockedBy: 'a write boundary, or a multi-tenant read - either introduces a subject worth authenticating' },
+  { id: 'SEC-016', domain: 'integrity', state: 'ABSENT', check: null,
+    statement: 'Confidential data is encrypted at rest.',
+    reason: 'This service persists no confidential data. The corpus is a projection recompiled from upstreams and the cache holds public feed payloads; encrypting it would protect nothing and would mint a key with no rotation story.',
+    unblockedBy: 'the first confidential record that is written here rather than recompiled' },
+  { id: 'SEC-190', domain: 'authority', state: 'ABSENT', check: null,
+    statement: 'Keys are managed with a defined rotation and revocation path.',
+    reason: 'No key is minted by this process. The credentials it reads are issued and rotated by their own systems - the Terminal, the broker gateway, NASA FIRMS - so a rotation path claimed here would describe a control that lives elsewhere.',
+    unblockedBy: 'signing the commitment root: an ATTESTED build needs a signing key, and that key is what makes this row real' },
+]);
+
+/**
+ * The machine-readable security posture: the policy actually in force,
+ * authority PRESENT/ABSENT (never a value), limits, and the ledger.
+ */
+export function securityPosture(env = process.env, limiter = null) {
+  const authority = [
+    { id: 'operations', variable: 'PAYLOAD_OPERATIONS_TOKEN', purpose: 'Terminal operations mirror' },
+    { id: 'firms', variable: 'FIRMS_MAP_KEY', purpose: 'NASA FIRMS thermal feed' },
+    { id: 'broker', variable: 'IBKR_GATEWAY_URL', purpose: 'broker gateway location' },
+  ].map((a) => ({
+    ...a,
+    // SEC-013 - presence, never the value. Nothing downstream can widen this.
+    state: env[a.variable] ? 'PRESENT' : 'ABSENT',
+    scope: 'server-side only - never returned to a client or an agent',
+  }));
+
+  const configuredHosts = allowedHosts(env);
+
+  return {
+    model: 'payload-security/0.1',
+    threatModel: 'docs/SECURITY.md',
+    policy: {
+      methodsServed: ['GET', 'OPTIONS'],
+      originPolicy: 'allowlist',
+      allowedOrigins: allowedOrigins(env),
+      // loopback-only is a POLICY, not an empty list. Reporting the
+      // gate's null as a blank would tell an operator "no hosts are
+      // allowed" when the truth is "only the loopback names are".
+      hostPolicy: configuredHosts ? 'allowlist' : 'loopback-only',
+      allowedHosts: configuredHosts ?? [...LOOPBACK_HOSTNAMES],
+      wildcardCors: false,
+      tlsVerification: 'enforced',
+      privilegedPrefixes: PRIVILEGED_PREFIXES,
+      proxiedPrefixes: PROXIED_PREFIXES,
+    },
+    authority,
+    limits: limiter?.describe ? limiter.describe() : null,
+    upstreamCaps: UPSTREAM_CAPS,
+    invariants: SECURITY_INVARIANTS,
+    counts: {
+      enforced: SECURITY_INVARIANTS.filter((i) => i.state === 'ENFORCED').length,
+      deployment: SECURITY_INVARIANTS.filter((i) => i.state === 'DEPLOYMENT').length,
+      absent: SECURITY_INVARIANTS.filter((i) => i.state === 'ABSENT').length,
+    },
+  };
 }
