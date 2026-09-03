@@ -351,3 +351,29 @@ here because the route sits behind the same host and origin allowlist
 as everything else, it echoes no secret (SEC-013), and the alternative
 — a security model only its authors can see — is how a control silently
 stops working.
+
+---
+
+## 8. Verified by attack, and when
+
+Invariants are claims until something tries them. The substrate is
+re-attacked whenever it changes, and the last sweep — after the pass
+that added five routes, the identity resolver and the bounded client
+read — found:
+
+| attack | result |
+| --- | --- |
+| `Host: attacker.example` (DNS rebinding) | 403, journalled `HOST_NOT_ALLOWED` |
+| `Origin: https://evil.example` on a privileged route | 403 before authority was spent, journalled `ORIGIN_NOT_ALLOWED` |
+| `POST /api/snapshot` | 405, journalled `METHOD_NOT_ALLOWED` |
+| wildcard CORS in any served header | absent |
+| credential sweep across every route added that pass | 0 appearances |
+| probe pointed at `169.254.169.254` | refused, and reported as a *reachability* fact rather than an existence one |
+| a service that accepts and never answers | refused after 10s with the wait stated, rather than hanging the surface |
+
+The dates matter more than the table. A security claim with no date is a
+claim about the past pretending to be about the present, so the sweep
+runs again on every pass that touches the substrate, and what it finds
+goes in the commit that made the change.
+
+---
