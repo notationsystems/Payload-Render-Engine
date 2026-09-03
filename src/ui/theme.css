@@ -1574,6 +1574,9 @@ input {
   display: inline-block;
 }
 
+/* the vocabulary overlay — wider keys column for command templates */
+.pe-vocab .pe-vocab-k { width: 300px; color: var(--text-mid); }
+
 /* the refusals work queue — warn/amber identity: it is a work order */
 .pe-refusals { border-top-color: var(--warn); }
 .pe-refusals-kicker {

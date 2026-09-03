@@ -333,6 +333,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
     return ok('WARRANT GRAPH — claim → computation → records → sources → build; no score, a chain');
   }
 
+  // -- vocabulary overlay: the OS learnable in thirty seconds
+  if (lower === 'keys' || lower === 'vocabulary' || lower === 'vocab') {
+    window.dispatchEvent(new CustomEvent('pe:vocab-toggle'));
+    return ok('VOCABULARY — the command and keyboard surface, grouped by what it does');
+  }
+
   // -- refusals work queue: what the upstream declined, with remedies
   if (lower === 'refusals' || lower === 'refused' || lower === 'queue') {
     window.dispatchEvent(new CustomEvent('pe:refusals-toggle'));

@@ -36,6 +36,8 @@ import { createCompilerPanel } from './ui/compilerPanel';
 import { createInjectionCard } from './ui/injectionCard';
 import { createRefusalsPanel } from './ui/refusalsPanel';
 import { createWarrantPanel } from './ui/warrantPanel';
+import { createVocabPanel } from './ui/vocabPanel';
+import { loadWorkspace, saveWorkspace } from './core/workspace';
 import { createSensorStyles } from './ui/sensorStyles';
 import { createDetectionOverlay } from './ui/detectionOverlay';
 
@@ -84,8 +86,35 @@ async function start(): Promise<void> {
   hud.appendChild(createInjectionCard(app).el);
   hud.appendChild(createRefusalsPanel(app).el);
   hud.appendChild(createWarrantPanel(app).el);
+  hud.appendChild(createVocabPanel(app).el);
   hud.appendChild(createDetectionOverlay(app).el);
   hud.appendChild(createSensorStyles(app).el);
+
+  // ---- workspace: the OS remembers how you left it (view-level only)
+  const PRESETS = new Set([
+    'world', 'freight', 'trade', 'commodities', 'network', 'intelligence',
+    'agents', 'scenarios', 'operations', 'markets',
+  ]);
+  const ws = loadWorkspace();
+  if (typeof ws.preset === 'string' && PRESETS.has(ws.preset) && ws.preset !== 'world') {
+    app.setPreset(ws.preset as Parameters<typeof app.setPreset>[0]);
+  }
+  if (ws.sensorMode !== undefined && ws.sensorMode >= 0 && ws.sensorMode <= 4) {
+    app.setSensorMode(ws.sensorMode);
+  }
+  if (ws.flowMode) app.setFlowMode(true);
+  app.events.on('preset', ({ preset }) => saveWorkspace({ preset }));
+  app.events.on('sensor', ({ mode }) => saveWorkspace({ sensorMode: mode }));
+  app.events.on('flowMode', ({ enabled }) => saveWorkspace({ flowMode: enabled }));
+
+  // '?' opens the vocabulary overlay — never while typing
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== '?') return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent('pe:vocab-toggle'));
+  });
 
   // escape: exit demo, else clear selection — but never while typing
   // (the search box owns Escape for its own dropdown/blur)
