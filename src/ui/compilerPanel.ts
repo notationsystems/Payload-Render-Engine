@@ -18,7 +18,7 @@
 import { esc } from '../core/escape';
 import { compareBuild, markBuildSeen, type BuildDelta } from '../core/workspace';
 import type { AppApi } from '../app/api';
-import { resolveApiBase } from '../data/sources';
+import { fetchBounded, resolveApiBase } from '../data/sources';
 
 
 interface HealthDoc {
@@ -68,7 +68,12 @@ interface CorpusBuildMeta {
  * has to interpret.
  */
 function deltaHtml(delta: BuildDelta): string {
-  const since = (at: string): string => `since your last session (${esc(at.slice(0, 16))}Z)`;
+  // "since you last OPENED THIS CONSOLE", not "since your last session".
+  // The bookmark moves when this section renders, which is the correct
+  // behaviour — a delta consumed without being shown is a delta the
+  // operator never got — but it means the window is this surface's, not
+  // the session's, and the copy has to say which.
+  const since = (at: string): string => `since you last opened this console (${esc(at.slice(0, 16))}Z)`;
   const body = (() => {
     switch (delta.kind) {
       case 'FIRST_SESSION':
@@ -247,7 +252,7 @@ export function createCompilerPanel(api: AppApi): { el: HTMLElement } {
       return;
     }
     try {
-      const res = await fetch(`${resolveApiBase()}/api/health`);
+      const res = await fetchBounded(`${resolveApiBase()}/api/health`);
       const body = (await res.json()) as {
         status?: string;
         data?: HealthDoc;

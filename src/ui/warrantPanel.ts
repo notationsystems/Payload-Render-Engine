@@ -15,7 +15,7 @@
 import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { EntityId } from '../data/contracts';
-import { resolveApiBase } from '../data/sources';
+import { fetchBounded, resolveApiBase } from '../data/sources';
 import { addressOf } from '../intel/notation';
 import type { InjectionResult } from '../data/injection';
 import type { MinedPattern } from '../intel/miner';
@@ -212,8 +212,20 @@ export function createWarrantPanel(api: AppApi): { el: HTMLElement } {
     // is the cross-apparatus way to say the same identity — which is
     // what makes this object portable rather than only verifiable.
     const addresses: Record<string, string> = {};
+    const snapshot = api.store.snapshot;
     for (const node of doc.nodes) {
       if (!node.entityRef) continue;
+      // Verify at THIS boundary rather than inherit correctness from the
+      // graph builder. addressOf types every id as an entity, so an id
+      // that is not one would produce an address that resolves to
+      // nothing — and a wrong address in an export is worse than none,
+      // because the reader trusts it. Today the graph only refs
+      // entities; the export should not depend on that staying true.
+      const isEntity =
+        snapshot.nodes.some((n) => n.id === node.entityRef) ||
+        snapshot.routes.some((n) => n.id === node.entityRef) ||
+        snapshot.flows.some((n) => n.id === node.entityRef);
+      if (!isEntity) continue;
       const a = addressOf(node.entityRef);
       if (a) addresses[node.entityRef] = a.uri;
     }
@@ -227,7 +239,7 @@ export function createWarrantPanel(api: AppApi): { el: HTMLElement } {
       const ids = [...new Set(doc.nodes.map((n) => n.entityRef).filter((x): x is EntityId => !!x))].slice(0, 12);
       for (const id of ids) {
         try {
-          const res = await fetch(`${resolveApiBase()}/api/corpus/commitments?record=${encodeURIComponent(id)}`);
+          const res = await fetchBounded(`${resolveApiBase()}/api/corpus/commitments?record=${encodeURIComponent(id)}`);
           const body = (await res.json()) as { status?: string; data?: unknown };
           if (body.status === 'ok' && body.data) proofs[id] = body.data;
         } catch {

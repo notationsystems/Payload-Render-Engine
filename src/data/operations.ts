@@ -12,6 +12,7 @@
  */
 
 import type { LonLat, Timestamp } from './contracts';
+import { fetchBounded } from './sources';
 
 export type OpsSeverity = 'critical' | 'high' | 'medium' | 'low' | 'none';
 
@@ -185,7 +186,7 @@ export async function fetchOperations(apiBase: string): Promise<OpsReadResult> {
     meta?: { knownAt?: string };
   };
   try {
-    const res = await fetch(`${apiBase}/api/operations`, {
+    const res = await fetchBounded(`${apiBase}/api/operations`, {
       headers: { Accept: 'application/json' },
     });
     body = await res.json();
@@ -272,7 +273,7 @@ export async function fetchOpsCommunication(
     refusal?: OpsRefusal;
   };
   try {
-    const res = await fetch(
+    const res = await fetchBounded(
       `${apiBase}/api/operations/communications?operationId=${encodeURIComponent(operationId)}`,
       { headers: { Accept: 'application/json' } }
     );
@@ -321,7 +322,7 @@ export type OpsFuelResult =
 export async function fetchOpsFuel(apiBase: string): Promise<OpsFuelResult> {
   let body: { status?: string; data?: OpsFuelBenchmark; refusal?: OpsRefusal };
   try {
-    const res = await fetch(`${apiBase}/api/operations/fuel`, {
+    const res = await fetchBounded(`${apiBase}/api/operations/fuel`, {
       headers: { Accept: 'application/json' },
     });
     body = await res.json();

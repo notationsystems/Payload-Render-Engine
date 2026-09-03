@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { fetchBounded } from '../data/sources';
 import { feature } from 'topojson-client';
 import type { LonLat } from '../data/contracts';
 
@@ -53,7 +54,7 @@ export async function generateEarthTextures(
   landTopoUrl: string,
   cityLights: [number, number, number][]
 ): Promise<EarthTextures> {
-  const topo = await (await fetch(landTopoUrl)).json();
+  const topo = await (await fetchBounded(landTopoUrl)).json();
   const land = feature(topo, topo.objects.land) as any;
   const polys: LonLat[][][] =
     land.features?.flatMap((f: any) =>

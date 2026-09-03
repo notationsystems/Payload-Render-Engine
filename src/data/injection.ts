@@ -13,6 +13,7 @@
  */
 
 import type { Timestamp } from './contracts';
+import { fetchBounded } from './sources';
 
 export interface InjectionAffected {
   entityId: string;
@@ -91,7 +92,7 @@ export async function fetchInjection(
       ...(p.asOf ? { asOf: p.asOf } : {}),
       ...(p.knowledge ? { knowledge: p.knowledge } : {}),
     });
-    const res = await fetch(`${apiBase}/api/scenarios/inject?${q}`, {
+    const res = await fetchBounded(`${apiBase}/api/scenarios/inject?${q}`, {
       headers: { Accept: 'application/json' },
     });
     body = await res.json();

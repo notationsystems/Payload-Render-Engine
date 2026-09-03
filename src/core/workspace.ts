@@ -8,7 +8,10 @@
  * defaults silently.
  *
  * ONE DELIBERATE WIDENING, stated rather than slipped in. `lastBuild`
- * remembers the corpus build this operator last SAW. That is session
+ * remembers the corpus build this operator was last SHOWN — the caller
+ * marks it when the comparison is rendered, never when the build is
+ * merely fetched, because a delta consumed without being displayed is a
+ * delta the operator never got. That is session
  * memory — a bookmark — not state about the world: it names a build, it
  * reconstructs no record, and losing it costs one notice. It earns its
  * place because "has the corpus moved since I last looked?" is the first

@@ -394,6 +394,35 @@ console.log('— security invariants —');
   );
 }
 
+// ---------------------------------------------------------------- SEC-153
+// Every client fetch is bounded. SEC-151 stops the service being hung by
+// an upstream; this stops the OS being hung by the service. A surface
+// waiting forever on a connection that was accepted and never answered
+// neither works nor refuses, and an operator cannot tell it from a slow
+// query — which is the one state this system does not allow.
+{
+  const offenders = [];
+  for (const f of walk(join(ROOT, 'src'))) {
+    if (!/\.ts$/.test(f)) continue;
+    if (/sources\.ts$/.test(f)) continue; // defines the bounded reader
+    // strip comments first: prose that mentions a call is not a call, and
+    // a checker that cannot tell the difference gets ignored
+    const code = read(f)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    for (const m of code.matchAll(/(?<![\w.])fetch\s*\(/g)) {
+      offenders.push(`${rel(f)}: bare fetch(`);
+    }
+  }
+  check(
+    'SEC-153',
+    'every client fetch is bounded',
+    offenders.length === 0,
+    [...new Set(offenders)].join(' · '),
+    'use fetchBounded from src/data/sources — a fetch with no timeout can leave a surface on "reading…" forever, which reads to an operator as working rather than as refused'
+  );
+}
+
 // ---------------------------------------------------------------- SEC-152
 // The served invariant ledger is the security model an operator reads.
 // A row claiming ENFORCED with no check named, or a check named that no

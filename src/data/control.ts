@@ -14,6 +14,7 @@
  */
 
 import type { Timestamp } from './contracts';
+import { fetchBounded } from './sources';
 
 export interface EcosystemNode {
   id: string;
@@ -73,7 +74,7 @@ export interface Probe {
 
 export async function fetchTopology(apiBase: string): Promise<EcosystemModel | null> {
   try {
-    const res = await fetch(`${apiBase}/api/system/topology`);
+    const res = await fetchBounded(`${apiBase}/api/system/topology`);
     const body = (await res.json()) as { status?: string; data?: EcosystemModel };
     return body.status === 'ok' && body.data ? body.data : null;
   } catch {
@@ -90,7 +91,7 @@ export async function probeCapability(apiBase: string, cap: Capability): Promise
   const t0 = performance.now();
   const at = new Date().toISOString();
   try {
-    const res = await fetch(`${apiBase}${cap.probe}`, { headers: { Accept: 'application/json' } });
+    const res = await fetchBounded(`${apiBase}${cap.probe}`, { headers: { Accept: 'application/json' } });
     const body = (await res.json()) as { status?: string; refusal?: { kind: string; message: string } };
     const latencyMs = Math.round(performance.now() - t0);
     if (body.status === 'ok') return { capabilityId: cap.id, health: 'healthy', latencyMs, detail: 'ok envelope', at };

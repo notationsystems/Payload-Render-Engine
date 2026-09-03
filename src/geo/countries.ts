@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { fetchBounded } from '../data/sources';
 import { feature, mesh } from 'topojson-client';
 import { latLonToVec3 } from './projection';
 import type { LonLat } from '../data/contracts';
@@ -44,7 +45,7 @@ export class Countries {
   private topology: any;
 
   static async load(url: string): Promise<Countries> {
-    const res = await fetch(url);
+    const res = await fetchBounded(url);
     if (!res.ok) throw new Error(`countries topology fetch failed: ${res.status}`);
     const topo = await res.json();
     const c = new Countries();

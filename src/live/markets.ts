@@ -16,6 +16,7 @@
  */
 
 import type { Timestamp } from '../data/contracts';
+import { fetchBounded } from '../data/sources';
 import { recordFeed } from '../core/health';
 
 export interface FxSet {
@@ -112,7 +113,7 @@ interface Envelope {
 async function getEnvelope(apiBase: string, path: string): Promise<MarketResult<{ data: unknown; meta?: Envelope['meta'] }>> {
   let body: Envelope;
   try {
-    const res = await fetch(`${apiBase}${path}`, { headers: { Accept: 'application/json' } });
+    const res = await fetchBounded(`${apiBase}${path}`, { headers: { Accept: 'application/json' } });
     body = (await res.json()) as Envelope;
   } catch (err) {
     return {

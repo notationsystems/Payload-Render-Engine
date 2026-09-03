@@ -11,6 +11,7 @@
  */
 
 import * as satellite from 'satellite.js';
+import { fetchBounded } from '../data/sources';
 import type { LonLat, Timestamp } from '../data/contracts';
 import { recordFeed } from '../core/health';
 
@@ -52,7 +53,7 @@ export type LiveResult<T> =
 async function getEnvelope(apiBase: string, path: string): Promise<LiveResult<unknown>> {
   let body: { status?: string; data?: unknown; refusal?: { kind: string; message: string; remedy: string }; meta?: { upstream?: string } };
   try {
-    const res = await fetch(`${apiBase}${path}`, { headers: { Accept: 'application/json' } });
+    const res = await fetchBounded(`${apiBase}${path}`, { headers: { Accept: 'application/json' } });
     body = await res.json();
   } catch (err) {
     return { kind: 'unreachable', note: `spatial API unreachable at ${apiBase} — live feeds need the server (${err instanceof Error ? err.message : err})` };

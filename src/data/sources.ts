@@ -52,6 +52,49 @@ export function isAllowedApiBase(raw: string): boolean {
 }
 
 /** ?api=<base> (or bare ?api) selects the Spatial API; default local dev port. */
+/**
+ * SEC-153 — the bounded read.
+ *
+ * A fetch with no timeout can leave a surface waiting forever on a
+ * service that accepted the connection and then said nothing. The
+ * operator cannot distinguish that from a slow query, so the surface
+ * neither works nor refuses — the one state this OS does not allow.
+ *
+ * This is the client-side twin of the service's own bounded upstream
+ * reads: the service refuses to be hung by an upstream, and the OS
+ * refuses to be hung by the service. The timeout is carried on the
+ * error so a surface can SAY how long it waited rather than reporting a
+ * bare failure.
+ */
+export class RequestTimeout extends Error {
+  readonly timeoutMs: number;
+  constructor(timeoutMs: number, url: string) {
+    super(`no answer within ${timeoutMs}ms from ${url}`);
+    this.name = 'RequestTimeout';
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+/** Default budget. Long enough for a mining run, short enough to notice. */
+export const DEFAULT_TIMEOUT_MS = 10_000;
+
+export async function fetchBounded(
+  url: string,
+  init: RequestInit & { timeoutMs?: number } = {}
+): Promise<Response> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...rest } = init;
+  try {
+    return await fetch(url, { ...rest, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (err) {
+    // AbortSignal.timeout raises TimeoutError; anything else is the
+    // network failing in its own way and keeps its own message
+    if (err instanceof DOMException && err.name === 'TimeoutError') {
+      throw new RequestTimeout(timeoutMs, url);
+    }
+    throw err;
+  }
+}
+
 export function resolveApiBase(): string {
   if (typeof location !== 'undefined') {
     const p = new URLSearchParams(location.search).get('api');

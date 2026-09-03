@@ -20,7 +20,7 @@
  * says nothing about the service, and vice versa.
  */
 
-import { apiBaseRefusal, resolveApiBase } from './sources';
+import { apiBaseRefusal, fetchBounded, resolveApiBase } from './sources';
 
 export type InvariantState = 'ENFORCED' | 'DEPLOYMENT' | 'ABSENT';
 
@@ -81,7 +81,7 @@ export type PostureResult =
 
 export async function fetchPosture(events = 40): Promise<PostureResult> {
   try {
-    const res = await fetch(`${resolveApiBase()}/api/security/posture?events=${events}`, {
+    const res = await fetchBounded(`${resolveApiBase()}/api/security/posture?events=${events}`, {
       headers: { Accept: 'application/json' },
     });
     const body = (await res.json()) as {

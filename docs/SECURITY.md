@@ -210,6 +210,14 @@ not documentary.
   the moment the cap is crossed. Caps: 8 MiB for JSON, 24 MiB for feed
   payloads. A cap that buffers first and measures afterwards is not a
   control — the memory is already spent. **[checked: bounded-reads]**
+- **SEC-153** *Every client fetch is bounded.* SEC-151 stops the service
+  being hung by an upstream; this stops the OS being hung by the
+  service. A surface waiting forever on a connection that was accepted
+  and never answered neither works nor refuses — and an operator cannot
+  tell that from a slow query, which is the one state this system does
+  not allow. All reads go through `fetchBounded` (10s default), and the
+  refusal states how long it waited, because a bare failure is not
+  actionable. **[checked: bounded-client-reads]**
 - **SEC-152** *Every gate refusal is recorded in a bounded journal that
   states its own window.* A control that fires silently cannot be
   operated. The journal is a 256-entry ring that counts what it dropped

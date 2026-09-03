@@ -30,7 +30,7 @@ import { esc, pick } from '../core/escape';
 import type { AppApi } from '../app/api';
 import { vocabularyAlignment } from '../../shared/vocabulary.mjs';
 import type { VocabularyAlignment } from '../../shared/vocabulary.mjs';
-import { resolveApiBase } from '../data/sources';
+import { fetchBounded, resolveApiBase } from '../data/sources';
 
 const RELATION_TONE: Record<string, string> = {
   SAME: 'same',
@@ -48,7 +48,7 @@ export function createVocabularyPanel(_api: AppApi): { el: HTMLElement } {
   /** Prefer the service: only it carries the measurement. */
   const read = async (): Promise<{ a: VocabularyAlignment; source: 'service' | 'bundle' }> => {
     try {
-      const res = await fetch(`${resolveApiBase()}/api/vocabulary/alignment`, { headers: { Accept: 'application/json' } });
+      const res = await fetchBounded(`${resolveApiBase()}/api/vocabulary/alignment`, { headers: { Accept: 'application/json' } });
       const body = (await res.json()) as { status?: string; data?: VocabularyAlignment };
       if (body.status === 'ok' && body.data) return { a: body.data, source: 'service' };
     } catch {

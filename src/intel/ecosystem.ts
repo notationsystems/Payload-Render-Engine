@@ -21,7 +21,7 @@
 
 import { ecosystemRegister } from '../../shared/ecosystem.mjs';
 import type { EcosystemRegister } from '../../shared/ecosystem.mjs';
-import { resolveApiBase } from '../data/sources';
+import { fetchBounded, resolveApiBase } from '../data/sources';
 
 export type { Apparatus, Convergence, Divergence, EcosystemRegister, LifecycleStage, Presence } from '../../shared/ecosystem.mjs';
 
@@ -39,7 +39,7 @@ export async function readRegister(): Promise<RegisterRead> {
     note: 'read from this bundle, not from the service — the register you are seeing is as of this build',
   };
   try {
-    const res = await fetch(`${resolveApiBase()}/api/ecosystem/register`, {
+    const res = await fetchBounded(`${resolveApiBase()}/api/ecosystem/register`, {
       headers: { Accept: 'application/json' },
     });
     const body = (await res.json()) as { status?: string; data?: EcosystemRegister };

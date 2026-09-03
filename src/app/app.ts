@@ -16,7 +16,7 @@ import type {
   TemporalState,
 } from '../data/contracts';
 import { WorldStore, type SearchResult } from '../data/store';
-import { sourceRegistry } from '../data/sources';
+import { fetchBounded, sourceRegistry } from '../data/sources';
 import {
   buildScenarioCatalog,
   computeScenarioImpact,
@@ -1361,7 +1361,7 @@ export class App implements AppApi {
   private async mine(): Promise<MinerResult> {
     if (this.dataSourceId === 'payload-spatial-api') {
       try {
-        const res = await fetch(`${resolveApiBase()}/api/mining/patterns`);
+        const res = await fetchBounded(`${resolveApiBase()}/api/mining/patterns`);
         const body = (await res.json()) as {
           status?: string;
           data?: { run: MiningRun; patterns: MinedPattern[] };

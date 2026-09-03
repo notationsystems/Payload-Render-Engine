@@ -10,7 +10,9 @@
  *    (SEC-110).
  * 3. Browser storage holds no credential-shaped value (SEC-005).
  * 4. The delivered document carries a strict CSP (SEC-170).
- * 5. The security posture surface: the ledger shows what is ABSENT with
+ * 5. SEC-153: a service that accepts and never answers must produce a
+ *    stated refusal, not a surface that waits forever.
+ * 6. The security posture surface: the ledger shows what is ABSENT with
  *    its reason, not a wall of green, and a hostile journal detail from
  *    an untrusted service renders as text (SEC-152 + SEC-120/121).
  */
@@ -263,6 +265,63 @@ export async function run(browser) {
     r.ok(/PAYLOAD_OPERATIONS_TOKEN/.test(view.text) && !/canary|Bearer /.test(view.text), 'SEC-013 authority is named, its value never shown');
     r.ok(/an observed zero|refusal|REFUSAL JOURNAL/i.test(view.text), 'the refusal journal states its window');
     await page.close();
+  }
+
+  // ---- 6. SEC-153: bounded reads ------------------------------------
+  // A service that accepts the connection and says nothing is the worst
+  // failure for an operator, because the surface neither works nor
+  // refuses and they cannot tell it from a slow query. Stand one up.
+  {
+    const HUNG_PORT = 8796;
+    let hung;
+    try {
+      hung = createServer(() => {
+        /* accept, and never answer */
+      });
+      await new Promise((res, rej) => {
+        hung.once('error', rej);
+        hung.listen(HUNG_PORT, '127.0.0.1', res);
+      });
+    } catch (err) {
+      await r.skip(`could not stand up the hung backend — ${err?.message ?? err}`);
+    }
+    if (hung) {
+      const page = await browser.newPage({ viewport: { width: 1500, height: 900 } });
+      await page.goto(`${VITE}/?api=${encodeURIComponent(`http://127.0.0.1:${HUNG_PORT}`)}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      await page.waitForFunction(() => !!window.payloadEarth, null, { timeout: 40000 });
+      await page.waitForTimeout(1200);
+      const t0 = Date.now();
+      await page.evaluate(() => window.payloadEarth.api.runCommand('security'));
+      let stated = true;
+      try {
+        await page.waitForFunction(
+          () => /IN FORCE AT THE GATE|REMEDY:|UNREACHABLE/.test(document.querySelector('.pe-security')?.innerText ?? ''),
+          null,
+          { timeout: 25000 }
+        );
+      } catch {
+        stated = false;
+      }
+      const elapsed = Date.now() - t0;
+      const text = await page.evaluate(() => document.querySelector('.pe-security')?.innerText ?? '');
+      r.ok(stated, `SEC-153 a hung service yields a stated outcome, not an endless wait (${elapsed}ms)`);
+      r.ok(
+        elapsed < 20000,
+        `SEC-153 the wait is bounded rather than open-ended (${elapsed}ms)`
+      );
+      r.ok(
+        /no answer within \d+ms/.test(text),
+        'the refusal states how long it waited — a bare failure is not actionable'
+      );
+      r.ok(
+        /REMEDY:/.test(text),
+        'and carries a remedy, like every other refusal in this system'
+      );
+      await page.close();
+      await new Promise((res) => hung.close(res));
+    }
   }
 
   return r.done();

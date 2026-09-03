@@ -14,7 +14,7 @@
 
 import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
-import { resolveApiBase } from '../data/sources';
+import { fetchBounded, resolveApiBase } from '../data/sources';
 
 
 interface DefinitionDoc {
@@ -170,7 +170,7 @@ export function createCorpusPanel(api: AppApi): { el: HTMLElement } {
       return;
     }
     try {
-      const res = await fetch(`${resolveApiBase()}/api/corpus/definition`);
+      const res = await fetchBounded(`${resolveApiBase()}/api/corpus/definition`);
       const body = (await res.json()) as { status?: string; data?: DefinitionDoc };
       if (!res.ok || body.status !== 'ok' || !body.data) throw new Error('bad envelope');
       if (el.hidden) return;

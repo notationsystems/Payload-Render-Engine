@@ -16,6 +16,7 @@
  */
 
 import type { EntityId, EntityState, Timestamp, WorldSnapshot } from '../contracts';
+import { fetchBounded } from '../sources';
 import type { SpatialDataProvider, ViewportQuery } from '../provider';
 import { createStateResolver } from '../synthetic/provider.ts';
 
@@ -48,7 +49,7 @@ export class RemoteSpatialProvider implements SpatialDataProvider {
   constructor(private baseUrl: string) {}
 
   private async getJson<T>(path: string): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await fetchBounded(`${this.baseUrl}${path}`, {
       headers: { Accept: 'application/json' },
     });
     const env = (await res.json()) as ApiEnvelope<T>;

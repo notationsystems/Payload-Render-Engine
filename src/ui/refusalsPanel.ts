@@ -15,7 +15,7 @@
 
 import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
-import { resolveApiBase } from '../data/sources';
+import { fetchBounded, resolveApiBase } from '../data/sources';
 
 
 interface RefusalsDigest {
@@ -84,7 +84,7 @@ export function createRefusalsPanel(api: AppApi): { el: HTMLElement } {
     const sections: string[] = [];
     for (const slug of commodities.length ? commodities : ['copper']) {
       try {
-        const res = await fetch(`${resolveApiBase()}/api/refusals?commodity=${encodeURIComponent(slug)}`);
+        const res = await fetchBounded(`${resolveApiBase()}/api/refusals?commodity=${encodeURIComponent(slug)}`);
         const body = (await res.json()) as {
           status?: string;
           data?: RefusalsDigest;

@@ -31,7 +31,7 @@ import { esc, pick } from '../core/escape';
 import type { AppApi } from '../app/api';
 import { notationSpace } from '../intel/notation';
 import type { NotationSpace } from '../../shared/notation.mjs';
-import { resolveApiBase } from '../data/sources';
+import { fetchBounded, resolveApiBase } from '../data/sources';
 
 const EXAMPLES = [
   'notation://node/apparatus/payload-ocr-agent',
@@ -50,7 +50,7 @@ export function createNotationPanel(api: AppApi): { el: HTMLElement } {
   /** The space, preferring the service's reading (it carries the measurement). */
   const read = async (): Promise<{ space: NotationSpace; source: 'service' | 'bundle' }> => {
     try {
-      const res = await fetch(`${resolveApiBase()}/api/notation/space`, { headers: { Accept: 'application/json' } });
+      const res = await fetchBounded(`${resolveApiBase()}/api/notation/space`, { headers: { Accept: 'application/json' } });
       const body = (await res.json()) as { status?: string; data?: NotationSpace };
       if (body.status === 'ok' && body.data) return { space: body.data, source: 'service' };
     } catch {
