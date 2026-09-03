@@ -1152,5 +1152,28 @@ console.log('\n— build delta —');
   delete globalThis.localStorage;
 }
 
+// --------------------------------------------------------------------
+// One answer to "what is this part of"
+// --------------------------------------------------------------------
+console.log('\n— scope —');
+{
+  const topo = await call('GET', '/api/system/topology');
+  const reg = await call('GET', '/api/ecosystem/register');
+  const eco = topo.data.ecosystem;
+  check(Boolean(eco.organization), 'the control plane names the organization its program belongs to');
+  check(
+    eco.organization.id === reg.data.organization.id,
+    `the topology and the register agree on the organization (${eco.organization.id} vs ${reg.data.organization.id})`
+  );
+  check(
+    eco.id !== eco.organization.id,
+    'the program and the organization are distinct — collapsing them answers the question at only one scale'
+  );
+  check(
+    typeof eco.scopeNote === 'string' && /register/i.test(eco.scopeNote),
+    'and the topology points at the wider frame rather than implying it is the whole ecosystem'
+  );
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');
 process.exit(failures ? 1 : 0);

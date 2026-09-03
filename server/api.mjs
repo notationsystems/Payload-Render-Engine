@@ -403,7 +403,20 @@ export async function registerRoutes(corpus, runtime = {}) {
       { id: 'markets.broker', family: 'MARKETS', label: 'broker session (IBKR)', node: 'ibkr', routes: ['/api/markets/broker'], probe: '/api/markets/broker', provenance: 'broker:session', authority: { required: 'IBKR_GATEWAY_URL', present: present('IBKR_GATEWAY_URL') }, ladder: { observed: true, proposed: false, approved: false, dispatched: false, note: 'no order path exists in this service — observe only, fail-closed' }, dataDomains: ['positions'], instrument: 'markets' },
     ];
     return ok({
-      ecosystem: { id: 'payload', label: 'Payload — physical economy', firstNode: 'spatial-api' },
+      // The control plane and the apparatus register were answering
+      // "what is this part of" differently — one said Payload, the other
+      // Notation Systems. Both are true at different scales, and a
+      // system that gives two answers to that question has neither.
+      // Payload is a PROGRAM; Notation Systems is the organization the
+      // apparatuses belong to (GET /api/ecosystem/register).
+      ecosystem: {
+        id: 'payload',
+        label: 'Payload — physical economy',
+        organization: { id: 'notation-systems', label: 'Notation Systems', register: '/api/ecosystem/register' },
+        scopeNote:
+          'Payload is a program within Notation Systems, and this topology is the program: the nodes and capabilities THIS OS reaches. The apparatus register is the wider frame — every apparatus in the ecosystem, the corpus lifecycle stage each owns, and the one stage nobody owns.',
+        firstNode: 'spatial-api',
+      },
       ladderRule: 'observed → proposed → approved → dispatched: a cell lights only from a recorded fact; this backend stops at approved — nothing here dispatches, and the UI must never imply it did',
       nodes,
       edges,

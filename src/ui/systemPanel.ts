@@ -190,6 +190,11 @@ export function createSystemPanel(api: AppApi): { el: HTMLElement } {
       <div class="pe-patterns-head">
         <span class="pe-corpus-kicker">SYSTEM</span>
         <span class="pe-patterns-title">CONTROL PLANE · ${esc(model?.ecosystem.label.toUpperCase() ?? 'PAYLOAD')}</span>
+        ${
+          model?.ecosystem.organization
+            ? `<span class="pe-sys-org" title="${esc(model.ecosystem.scopeNote ?? '')}">${esc(model.ecosystem.organization.label.toUpperCase())} · <button type="button" class="pe-sys-openreg">REGISTER</button></span>`
+            : ''
+        }
         <span class="pe-patterns-count">${probedAt ? `PROBED ${Math.round((Date.now() - probedAt) / 1000)}S AGO` : 'PROBING…'}</span>
         <button type="button" class="pe-query-chip pe-sys-reprobe" title="probe every capability again">RE-PROBE</button>
         <button type="button" class="pe-patterns-x" title="close (Esc)">×</button>
@@ -272,6 +277,9 @@ export function createSystemPanel(api: AppApi): { el: HTMLElement } {
     el.querySelector('.pe-sys-reprobe')?.addEventListener('click', () => void refresh());
     for (const b of el.querySelectorAll('.pe-sys-open')) {
       b.addEventListener('click', () => openInstrument((b as HTMLElement).dataset.instrument ?? ''));
+    }
+    for (const b of el.querySelectorAll('.pe-sys-openreg')) {
+      b.addEventListener('click', () => openInstrument('ecosystem'));
     }
   };
 

@@ -48,7 +48,16 @@ export interface Capability {
 }
 
 export interface EcosystemModel {
-  ecosystem: { id: string; label: string; firstNode: string };
+  ecosystem: {
+    id: string;
+    label: string;
+    firstNode: string;
+    /** the organization the apparatuses belong to — Payload is a PROGRAM
+     *  within it, and a system that answers "what is this part of" two
+     *  different ways has answered it neither time */
+    organization?: { id: string; label: string; register: string };
+    scopeNote?: string;
+  };
   ladderRule: string;
   nodes: EcosystemNode[];
   edges: EcosystemEdge[];
