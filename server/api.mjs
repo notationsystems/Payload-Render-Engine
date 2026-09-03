@@ -748,6 +748,17 @@ export async function registerRoutes(corpus) {
     if (!/^[a-z][a-z-]{0,31}$/.test(commodity)) {
       return refuse('INJECTION_REQUEST_INVALID', 'commodity must be a lowercase slug (e.g. copper, aluminium)', 'pass the commodity slug the corpus lists');
     }
+    // the backtest lens: evaluate AS OF a date, optionally with only
+    // what was knowable then (as_known_then) — the upstream engine's
+    // own epistemic controls, passed through validated, never invented
+    const asOf = query.get('asOf');
+    if (asOf !== null && !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+      return refuse('INJECTION_REQUEST_INVALID', 'asOf must be YYYY-MM-DD', 'pass a calendar date, or omit for the latest upstream state');
+    }
+    const knowledge = query.get('knowledge') ?? 'best_known';
+    if (knowledge !== 'best_known' && knowledge !== 'as_known_then') {
+      return refuse('INJECTION_REQUEST_INVALID', `knowledge '${knowledge}' is not a mode`, 'use best_known, or as_known_then for the backtest (only what was knowable on asOf)');
+    }
     const upstreamBase = process.env.TERMINAL_URL ?? 'http://127.0.0.1:3000';
     const title = `${severity} ${type} at ${entityId} (what-if)`;
     let res;
@@ -758,8 +769,12 @@ export async function registerRoutes(corpus) {
         body: JSON.stringify({
           commodity,
           label: title,
+          ...(asOf ? { asOf } : {}),
+          knowledge,
           events: [
-            { entityId, type, title, start: RANGE.now.slice(0, 10), severity },
+            // the event starts on the evaluation date so the window
+            // covers it — a backtest injects into ITS present
+            { entityId, type, title, start: asOf ?? RANGE.now.slice(0, 10), severity },
           ],
         }),
       });

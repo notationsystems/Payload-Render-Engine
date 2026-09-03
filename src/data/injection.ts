@@ -58,6 +58,10 @@ export interface InjectionParams {
   type: string;
   severity: string;
   commodity: string;
+  /** backtest lens: evaluate as of this date (YYYY-MM-DD); omit = latest */
+  asOf?: string;
+  /** best_known, or as_known_then — only what was knowable on asOf */
+  knowledge?: 'best_known' | 'as_known_then';
 }
 
 export type InjectionOutcome =
@@ -84,6 +88,8 @@ export async function fetchInjection(
       type: p.type,
       severity: p.severity,
       commodity: p.commodity,
+      ...(p.asOf ? { asOf: p.asOf } : {}),
+      ...(p.knowledge ? { knowledge: p.knowledge } : {}),
     });
     const res = await fetch(`${apiBase}/api/scenarios/inject?${q}`, {
       headers: { Accept: 'application/json' },

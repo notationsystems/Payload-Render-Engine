@@ -155,6 +155,8 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
   let injSeverity = 'high';
   let injCommodity = 'copper';
   let injEntity = ''; // survives control rebuilds on chip clicks
+  let injKnowledge: 'best_known' | 'as_known_then' = 'best_known';
+  let injAsOf = ''; // YYYY-MM-DD; empty = latest upstream state
 
   const injStatus = document.createElement('div');
   injStatus.className = 'sc-inject-status';
@@ -231,12 +233,26 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
         return;
       }
       injStatus.textContent = `INJECTING ${injSeverity.toUpperCase()} ${injType.toUpperCase()} AT ${hit.name.toUpperCase()} — asking the upstream engine…`;
+      if (injAsOf && !/^\d{4}-\d{2}-\d{2}$/.test(injAsOf)) {
+        injStatus.textContent = 'AS-OF must be YYYY-MM-DD (or blank for the latest upstream state).';
+        return;
+      }
       void api
-        .runInjection({ entityId: hit.id, type: injType, severity: injSeverity, commodity: injCommodity })
+        .runInjection({
+          entityId: hit.id,
+          type: injType,
+          severity: injSeverity,
+          commodity: injCommodity,
+          ...(injAsOf ? { asOf: injAsOf } : {}),
+          knowledge: injKnowledge,
+        })
         .then((out) => {
           if (out.kind === 'ok') {
             const n = out.result.scenarioImpacts[0]?.affected.length ?? 0;
             injStatus.textContent = `HYPOTHETICAL ENTERED — ${n} downstream entities affected (violet). EXIT with Esc or the card.`;
+            // the globe is the point — step out of its way so the
+            // violet frame and its card are what the operator sees
+            api.setPreset(api.getLastLayerPreset());
           } else if (out.kind === 'refused') {
             injStatus.textContent = `${out.refusal.kind.replace(/_/g, ' ')} — ${out.refusal.message} · REMEDY: ${out.refusal.remedy}`;
           } else {
@@ -245,11 +261,42 @@ export function createScenariosPanel(api: AppApi): { el: HTMLElement } {
         });
     });
 
+    // the backtest lens: evaluate AS OF a date, optionally with only
+    // what was knowable then — the upstream engine's own controls
+    const lensRow = document.createElement('div');
+    lensRow.className = 'sc-inject-row';
+    const lensLabel = document.createElement('span');
+    lensLabel.className = 'sc-inject-label';
+    lensLabel.textContent = 'LENS';
+    const asOfInput = document.createElement('input');
+    asOfInput.className = 'sc-inject-input sc-inject-date';
+    asOfInput.type = 'text';
+    asOfInput.placeholder = 'as of YYYY-MM-DD (blank = latest)';
+    asOfInput.value = injAsOf;
+    asOfInput.addEventListener('input', () => (injAsOf = asOfInput.value.trim()));
+    lensRow.append(lensLabel, asOfInput);
+    for (const mode of ['best_known', 'as_known_then'] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `sc-inject-chip ${injKnowledge === mode ? 'on' : ''}`;
+      b.textContent = mode === 'best_known' ? 'BEST KNOWN' : 'AS KNOWN THEN';
+      b.title =
+        mode === 'best_known'
+          ? 'Evaluate with everything the corpus knows now'
+          : 'BACKTEST — evaluate with only what was knowable on the as-of date; hindsight cannot leak backward';
+      b.addEventListener('click', () => {
+        injKnowledge = mode;
+        buildInjectControls();
+      });
+      lensRow.appendChild(b);
+    }
+
     injectBox.append(
       entityRow,
       chipRow('TYPE', ['strike', 'closure', 'outage', 'disruption', 'sanction'], () => injType, (v) => (injType = v)),
       chipRow('SEVERITY', ['low', 'medium', 'high'], () => injSeverity, (v) => (injSeverity = v)),
       chipRow('COMMODITY', commoditySlugs.length ? commoditySlugs : ['copper'], () => injCommodity, (v) => (injCommodity = v)),
+      lensRow,
       run,
       injStatus
     );

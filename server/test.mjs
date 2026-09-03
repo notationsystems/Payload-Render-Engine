@@ -318,6 +318,16 @@ check(
   injBadType?.status === 'refused' && /vocabulary/.test(injBadType.refusal.message),
   'event type outside the upstream vocabulary refused, vocabulary named'
 );
+const injBadAsOf = await tcall('GET', '/api/scenarios/inject?entityId=ent:mine:escondida&asOf=yesterday');
+check(
+  injBadAsOf?.status === 'refused' && /YYYY-MM-DD/.test(injBadAsOf.refusal.message),
+  'malformed asOf refused before any upstream call'
+);
+const injBadKnow = await tcall('GET', '/api/scenarios/inject?entityId=ent:mine:escondida&knowledge=hindsight');
+check(
+  injBadKnow?.status === 'refused' && /as_known_then/.test(injBadKnow.refusal.remedy),
+  'unknown knowledge mode refused, backtest mode named in the remedy'
+);
 const savedTermUrl = process.env.TERMINAL_URL;
 process.env.TERMINAL_URL = 'http://127.0.0.1:1'; // nothing listens here
 const injDown = await tcall('GET', '/api/scenarios/inject?entityId=ent:mine:escondida&type=strike');

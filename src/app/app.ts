@@ -1724,6 +1724,15 @@ export class App implements AppApi {
   // this corpus's states are unobserved and stay that way.
 
   private injectionActive = false;
+  private injectionFrame: 'baseline' | 'counterfactual' = 'counterfactual';
+  /** retained so the frame toggle can re-apply the violet roles */
+  private injectionRoleIds: { perturbed: EntityId | null; affected: EntityId[] } | null = null;
+
+  private applyInjectionRoles(): void {
+    if (!this.injectionRoleIds) return;
+    if (this.injectionRoleIds.perturbed) this.nodesLayer.setScenarioRole(this.injectionRoleIds.perturbed, 1);
+    for (const id of this.injectionRoleIds.affected) this.nodesLayer.setScenarioRole(id, 2);
+  }
 
   async runInjection(p: InjectionParams): Promise<InjectionOutcome> {
     const outcome = await fetchInjection(resolveApiBase(), p);
@@ -1735,10 +1744,12 @@ export class App implements AppApi {
     if (this.activeScenario) this.clearScenario();
     const impact = outcome.result.scenarioImpacts[0];
     if (impact) {
-      if (this.store.node(impact.entityId)) this.nodesLayer.setScenarioRole(impact.entityId, 1);
-      for (const a of impact.affected) {
-        if (this.store.node(a.entityId)) this.nodesLayer.setScenarioRole(a.entityId, 2);
-      }
+      this.injectionRoleIds = {
+        perturbed: this.store.node(impact.entityId) ? impact.entityId : null,
+        affected: impact.affected.map((a) => a.entityId).filter((id) => this.store.node(id)),
+      };
+      this.injectionFrame = 'counterfactual';
+      this.applyInjectionRoles();
       const n = this.store.node(impact.entityId);
       if (n) {
         void this.cameraCtl.flyToLatLon(n.geometry.coordinates[1], n.geometry.coordinates[0], {
@@ -1760,6 +1771,8 @@ export class App implements AppApi {
   clearInjection(): void {
     if (!this.injectionActive) return;
     this.injectionActive = false;
+    this.injectionRoleIds = null;
+    this.injectionFrame = 'counterfactual';
     // roles are shared with in-process scenarios; only safe to wipe
     // because entering either path clears the other first
     this.nodesLayer.clearScenarioRoles();
@@ -1769,6 +1782,22 @@ export class App implements AppApi {
 
   isInjectionActive(): boolean {
     return this.injectionActive;
+  }
+
+  setInjectionFrame(frame: 'baseline' | 'counterfactual'): void {
+    if (!this.injectionActive || frame === this.injectionFrame) return;
+    this.injectionFrame = frame;
+    if (frame === 'baseline') {
+      // the mirror: hypothetical roles come off, nothing else changes
+      this.nodesLayer.clearScenarioRoles();
+      this.routesLayer.clearScenarioRoles();
+    } else {
+      this.applyInjectionRoles();
+    }
+  }
+
+  getInjectionFrame(): 'baseline' | 'counterfactual' {
+    return this.injectionFrame;
   }
 
   getDataSourceId(): string {

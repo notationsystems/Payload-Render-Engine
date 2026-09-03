@@ -78,16 +78,38 @@ export function createInjectionCard(api: AppApi): { el: HTMLElement } {
         <div class="pe-inject-sec">ENGINE REASONING — VERBATIM</div>
         ${impact.explanation.map((line) => `<div class="pe-inject-line">${esc(line)}</div>`).join('')}
       </div>
-      <div class="pe-query-basis">FRAME ${esc(result.counterfactualFrame.kind)} · KNOWLEDGE ${esc(result.counterfactualFrame.knowledge)} · SCENARIO ${esc(result.counterfactualFrame.scenarioId)} · COMMODITY ${esc(result.commodity)}</div>
+      <div class="pe-query-basis">FRAME ${esc(result.counterfactualFrame.kind)} · KNOWLEDGE ${esc(result.counterfactualFrame.knowledge)}${result.counterfactualFrame.knowledge === 'as_known_then' ? ' — BACKTEST: only what was knowable then' : ''} · SCENARIO ${esc(result.counterfactualFrame.scenarioId)} · COMMODITY ${esc(result.commodity)}</div>
+      <div class="pe-inject-wears"></div>
       <div class="pe-query-chips"></div>`;
     const chips = el.querySelector('.pe-query-chips')!;
-    const exit = document.createElement('button');
-    exit.type = 'button';
-    exit.className = 'pe-query-chip';
-    exit.textContent = 'EXIT · ESC';
-    exit.title = 'Release the hypothetical — the globe returns to the mirror';
-    exit.addEventListener('click', () => api.clearInjection());
-    chips.appendChild(exit);
+    const wears = el.querySelector('.pe-inject-wears')!;
+    const renderChips = (): void => {
+      const frame = api.getInjectionFrame();
+      wears.textContent =
+        frame === 'counterfactual'
+          ? 'GLOBE WEARS: COUNTERFACTUAL — violet hypothetical roles applied'
+          : 'GLOBE WEARS: BASELINE — the mirror; no hypothetical roles drawn';
+      chips.replaceChildren();
+      const chip = (label: string, title: string, on: boolean, fn: () => void): void => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = `pe-query-chip ${on ? 'on' : ''}`;
+        b.textContent = label;
+        b.title = title;
+        b.addEventListener('click', fn);
+        chips.appendChild(b);
+      };
+      chip('COUNTERFACTUAL', 'Wear the hypothetical frame on the globe', frame === 'counterfactual', () => {
+        api.setInjectionFrame('counterfactual');
+        renderChips();
+      });
+      chip('BASELINE', 'Flip back to the mirror — same corpus, no injected event', frame === 'baseline', () => {
+        api.setInjectionFrame('baseline');
+        renderChips();
+      });
+      chip('EXIT · ESC', 'Release the hypothetical entirely', false, () => api.clearInjection());
+    };
+    renderChips();
   };
 
   api.events.on('injection', (ev) => {

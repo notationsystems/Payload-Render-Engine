@@ -1926,3 +1926,11 @@ input {
   }
 }
 .pe-inject-statebasis { color: #6b7688; } /* unobserved grey — absence is not zero */
+.pe-inject-wears {
+  margin-top: 5px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: #d98cff;
+  opacity: 0.85;
+}

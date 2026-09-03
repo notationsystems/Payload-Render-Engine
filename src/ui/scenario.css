@@ -484,3 +484,4 @@
   line-height: 1.55;
   color: var(--text-dim);
 }
+.sc-inject-date { flex: 0 1 220px; min-width: 150px; }

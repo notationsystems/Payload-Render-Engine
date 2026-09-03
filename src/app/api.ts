@@ -302,4 +302,9 @@ export interface AppApi {
   ): Promise<import('../data/injection').InjectionOutcome>;
   clearInjection(): void;
   isInjectionActive(): boolean;
+  /** Which frame the globe wears while an injection is active:
+   *  'counterfactual' = violet roles applied; 'baseline' = the mirror,
+   *  no hypothetical roles. The card states which is showing. */
+  setInjectionFrame(frame: 'baseline' | 'counterfactual'): void;
+  getInjectionFrame(): 'baseline' | 'counterfactual';
 }
