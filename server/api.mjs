@@ -16,7 +16,7 @@
 import { createHash } from 'node:crypto';
 import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
-import { canonicalBasis, operationalBasis } from '../shared/envelope.mjs';
+import { canonicalBasis, derivedBasis, operationalBasis } from '../shared/envelope.mjs';
 import { apiConstitution, planeCoverage, planeOf } from '../shared/planes.mjs';
 import { platformPosition } from '../shared/platform.mjs';
 import { registerMarketRoutes } from './markets.mjs';
@@ -260,6 +260,31 @@ export async function registerRoutes(corpus, runtime = {}) {
     },
   });
 
+  /**
+   * A VERIFIED DERIVATION - limb 2.
+   *
+   * A mined pattern, a ranked scenario, a corpus definition and a
+   * vocabulary census were all carrying the canonical limb, whose text
+   * claims membership of the committed build and an inclusion proof for
+   * every record. None of them is a member; each was computed FROM the
+   * build. The root still binds the inputs, which is a real guarantee -
+   * just a different one from membership, and the difference is exactly
+   * "this is in the corpus" versus "this is what we computed from it".
+   */
+  const derived = (envelope, { method } = {}) => ({
+    ...envelope,
+    meta: {
+      ...envelope.meta,
+      reference: undefined,
+      ...derivedBasis({
+        corpusBuildId: corpusBuild.id,
+        proofRoot: merkleRoot,
+        method,
+        reproducible: envelope.meta?.verification?.level === 'REPRODUCIBLE',
+      }),
+    },
+  });
+
   // Unanswerable is not a protocol error: refusals travel as HTTP 200
   // with a typed SCREAMING_SNAKE code naming the observable, plus a
   // remedy. 404 is reserved for capabilities that do not exist at all.
@@ -363,7 +388,7 @@ export async function registerRoutes(corpus, runtime = {}) {
     // only acts where a handler said nothing.
     const declared = planeOf(pattern.source.replace(/^\^|\$$/g, '').replace(/\\\//g, '/'));
     const wrapped =
-      declared?.limb !== 'OPERATIONAL'
+      declared?.limb !== 'OPERATIONAL_OBSERVATION' && declared?.limb !== 'VERIFIED_DERIVATION'
         ? handler
         : (ctx) => {
             // sync-preserving on purpose. Making the wrapper async would
@@ -372,10 +397,14 @@ export async function registerRoutes(corpus, runtime = {}) {
             // which is exactly what it did, and what the contract tests
             // caught. A wrapper must not change the shape of the thing
             // it wraps.
-            const finish = (out) =>
-              !out || out.status !== 'ok' || out.meta?.observation
-                ? out
+            const finish = (out) => {
+              if (!out || out.status !== 'ok') return out;
+              // a handler that already declared its own limb keeps it
+              if (out.meta?.observation || out.meta?.derivation) return out;
+              return declared.limb === 'VERIFIED_DERIVATION'
+                ? derived(out, { method: declared.method })
                 : observed(out, { upstream: declared.upstream, limitations: declared.limitations });
+            };
             const out = handler(ctx);
             return out && typeof out.then === 'function' ? out.then(finish) : finish(out);
           };

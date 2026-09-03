@@ -73,7 +73,7 @@ check(
 // ---------------------------------------------------------- PLANE-003
 // the internal-operator plane is declared and MUST stay empty here
 {
-  const assignedInternal = Object.entries(ROUTE_PLANES).filter(([, v]) => v.plane === 'internal-operator');
+  const assignedInternal = Object.entries(ROUTE_PLANES).filter(([, v]) => v.plane === 'internal_operator');
   check(
     'PLANE-003',
     'the internal ingestion / operator plane is empty',
@@ -96,8 +96,8 @@ check(
   };
   const PROXIED = ['/api/live/', '/api/markets/', '/api/operations', '/api/scenarios/inject', '/api/refusals'];
 
-  const bothLimbs = [];
-  const neitherLimb = [];
+  const multiLimb = [];
+  const noLimb = [];
   const incomplete = [];
   const undeclaredLimits = [];
   let answered = 0;
@@ -117,24 +117,24 @@ check(
     if (!out || out.status !== 'ok') continue;
     answered += 1;
     const verdict = limbOf(out.meta);
-    if (verdict.violation === 'BOTH_LIMBS') bothLimbs.push(path);
-    else if (verdict.violation === 'NEITHER_LIMB') neitherLimb.push(path);
+    if (verdict.violation === 'MULTIPLE_LIMBS') multiLimb.push(path);
+    else if (verdict.violation === 'NO_LIMB') noLimb.push(path);
     else if (verdict.violation === 'CANONICAL_INCOMPLETE') incomplete.push(path);
     else if (verdict.violation === 'LIMITATIONS_UNDECLARED') undeclaredLimits.push(path);
   }
 
   check(
     'PLANE-004',
-    `no answer claims BOTH limbs (${answered} answers read)`,
-    bothLimbs.length === 0,
-    bothLimbs.join(' - '),
+    `no answer claims MORE THAN ONE limb (${answered} answers read)`,
+    multiLimb.length === 0,
+    multiLimb.join(' - '),
     'an answer carrying meta.reference AND meta.observation declares an operational reading to be canonical. Strip the canonical limb on the operational path - live.mjs and markets.mjs do this with `reference: undefined`'
   );
   check(
     'PLANE-004',
-    'no answer carries NEITHER limb',
-    neitherLimb.length === 0,
-    neitherLimb.join(' - '),
+    'no answer carries NO limb',
+    noLimb.length === 0,
+    noLimb.join(' - '),
     'this is the defect the invariant exists for: an answer with a verification level but no root and no declaration reads as canonical to every client that does not already know better. Use canonicalBasis() or declare the route OPERATIONAL in ROUTE_PLANES'
   );
   check(
@@ -177,10 +177,10 @@ check(
   for (const r of crossChecked) {
     const limb = planeOf(r).limb;
     const { role, family } = roleOf.get(r);
-    if (limb === 'CANONICAL' && role !== 'PROOF_VERIFIABLE') {
+    if (limb === 'CANONICAL_PROOF' && role !== 'proof_verifiable') {
       disagree.push(`${r}: limb CANONICAL but family '${family}' holds role ${role}`);
     }
-    if (limb === 'OPERATIONAL' && role === 'PROOF_VERIFIABLE') {
+    if (limb === 'OPERATIONAL_OBSERVATION' && role === 'proof_verifiable') {
       disagree.push(`${r}: limb OPERATIONAL but family '${family}' holds role PROOF_VERIFIABLE`);
     }
   }
@@ -360,6 +360,41 @@ check(
     'the apparatus register makes every row carry its readFrom for the same reason: a claim about another team work is worth exactly what its source is'
   );
 }
+
+  // A canonical record is READ, not produced. A route that names a method
+  // is describing something it computed, which is a derivation.
+  //
+  // This exists because PLANE-007 cannot tell the two proof-bearing limbs
+  // apart: both admit a proof_verifiable family, so a derivation
+  // misdeclared as CANONICAL_PROOF passed the cross-table check. That is
+  // a regression of the exact over-claim this class was added to fix -
+  // mined candidates, scenarios and censuses all carried the canonical
+  // limb, whose text promises membership of the committed build and an
+  // inclusion proof that will never exist for them.
+  //
+  // A stronger check is available and not built: verify that a canonical
+  // route's record ids are IN the build's commitment index and a derived
+  // route's are not. It needs both sides reading the same corpus, which
+  // this checker does not currently arrange.
+  const methodOnCanonical = Object.entries(ROUTE_PLANES).filter(
+    ([, v]) => v.limb === 'CANONICAL_PROOF' && v.method
+  );
+  check(
+    'PLANE-012',
+    'no route declared CANONICAL_PROOF names a production method',
+    methodOnCanonical.length === 0,
+    methodOnCanonical.map(([k]) => k).join(' - '),
+    'a canonical answer is read from the committed build, not computed from it. If it has a method it is a VERIFIED_DERIVATION - the root binds its inputs rather than certifying its membership'
+  );
+
+  const noMethod = Object.entries(ROUTE_PLANES).filter(([, v]) => v.limb === 'VERIFIED_DERIVATION' && !v.method);
+  check(
+    'PLANE-012',
+    'every declared derivation names the method that produced it',
+    noMethod.length === 0,
+    noMethod.map(([k]) => k).join(' - '),
+    'a derivation whose method is unnamed cannot be reproduced or argued with, which is the only thing that makes it VERIFIED rather than merely computed'
+  );
 
 // -------------------------------------------------------------- verdict
 console.log('');

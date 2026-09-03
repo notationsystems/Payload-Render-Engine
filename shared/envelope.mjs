@@ -29,9 +29,29 @@
  */
 
 /** The kinds an answer can be. Exhaustive, and closed. */
-export const LIMB_KINDS = Object.freeze(['CANONICAL', 'OPERATIONAL']);
+export const LIMB_KINDS = Object.freeze([
+  'CANONICAL_PROOF',
+  'VERIFIED_DERIVATION',
+  'OPERATIONAL_OBSERVATION',
+]);
 
-export const LIMB_FIELDS = Object.freeze({ CANONICAL: 'reference', OPERATIONAL: 'observation' });
+export const LIMB_FIELDS = Object.freeze({
+  CANONICAL_PROOF: 'reference',
+  VERIFIED_DERIVATION: 'derivation',
+  OPERATIONAL_OBSERVATION: 'observation',
+});
+
+/**
+ * Typed non-success states. A view must keep these VISIBLE rather than
+ * replacing them with a zero, a blank that looks complete, or green
+ * health. They are answers, not gaps in one.
+ */
+export const NON_SUCCESS_STATES = Object.freeze([
+  { id: 'UNOBSERVED', means: 'no observation exists for this subject in the corpus served' },
+  { id: 'UNRESOLVED', means: 'an identity was named but could not be resolved to a record' },
+  { id: 'CONFLICTING', means: 'two or more readings disagree, and every reading is retained rather than one being picked' },
+  { id: 'NOT_EVIDENCED', means: 'a value is asserted somewhere upstream but carries no evidence this service can show' },
+]);
 
 /**
  * Limb 1 - a canonical answer, bound to a proof root.
@@ -58,7 +78,7 @@ export function canonicalBasis({ corpusBuildId, proofRoot, verifyWith }) {
   }
   return {
     reference: {
-      limb: 'CANONICAL',
+      limb: 'CANONICAL_PROOF',
       // the dataset this answer was drawn from, in the one identity space
       canonical: `notation://dataset/corpus/${corpusBuildId}`,
       proofRoot,
@@ -71,7 +91,59 @@ export function canonicalBasis({ corpusBuildId, proofRoot, verifyWith }) {
 }
 
 /**
- * Limb 2 - an operational observation.
+ * Limb 2 - a VERIFIED DERIVATION.
+ *
+ * The class that was missing, and whose absence made this service
+ * over-claim. A mined pattern, a derived census, a ranked scenario and
+ * a vocabulary measurement were all carrying the canonical limb, whose
+ * own text reads: "every record in this answer belongs to the committed
+ * build named above; an inclusion proof for any one of them folds to
+ * proofRoot". That is FALSE for all four. A mined candidate was derived
+ * FROM the build; it is not a member of it, and no inclusion proof will
+ * ever be produced for it.
+ *
+ * The distinction is not pedantic. It is the difference between "this
+ * is in the corpus" and "this is what we computed from the corpus" -
+ * and a desk that cannot tell those apart cannot tell a fact from a
+ * candidate, which is the whole discipline of this system.
+ *
+ * The root here binds the INPUTS, not the output. That is still a real
+ * guarantee: given the same build and the same named method, the same
+ * output follows. It is simply a different guarantee from membership.
+ */
+export function derivedBasis({ corpusBuildId, proofRoot, method, reproducible = true, note }) {
+  if (!proofRoot) {
+    return operationalBasis({
+      upstream: 'this service, deriving from a corpus it did not compile',
+      observedAt: new Date().toISOString(),
+      limitations: [
+        'NO PROOF ROOT ON THE INPUTS - the corpus this was derived from carries no commitment, so the derivation cannot be tied to a verifiable input set',
+        'the method is stated and deterministic, but a derivation is only as checkable as the inputs it names',
+      ],
+      notCanonical:
+        'a derivation whose inputs cannot be pinned is not a verified derivation; it is a reading, and is declared as one',
+      unblockedBy: 'derive from a corpus compiled by this service, which stamps the commitment the derivation would cite',
+    });
+  }
+  return {
+    derivation: {
+      limb: 'VERIFIED_DERIVATION',
+      // derivedFrom, not canonical: this answer is not IN the dataset
+      derivedFrom: `notation://dataset/corpus/${corpusBuildId}`,
+      proofRoot,
+      method: method ?? 'UNDECLARED',
+      methodDeclared: Boolean(method),
+      reproducible,
+      means:
+        'this answer was COMPUTED FROM the committed build named above by the stated method; it is not a record in that build and no inclusion proof exists for it. The root binds the inputs, so the same build and the same method reproduce this output.',
+      notCanonical:
+        'a derived value is not a member of the corpus it was derived from. Treating it as one is how a candidate becomes a fact by accident.',
+    },
+  };
+}
+
+/**
+ * Limb 3 - an operational observation.
  *
  * `limitations` is required and must be non-empty: an operational
  * answer whose limitations are unstated is indistinguishable from a
@@ -91,7 +163,7 @@ export function operationalBasis({
   const stated = (limitations ?? []).filter((l) => typeof l === 'string' && l.trim().length > 0);
   return {
     observation: {
-      limb: 'OPERATIONAL',
+      limb: 'OPERATIONAL_OBSERVATION',
       operational: true,
       upstream: upstream ?? 'UNDECLARED',
       observedAt: observedAt ?? null,
@@ -118,41 +190,59 @@ export function operationalBasis({
  * envelopes would be a worse defect than the one it caught.
  */
 export function limbOf(meta) {
-  const hasRef = Boolean(meta?.reference);
-  const hasObs = Boolean(meta?.observation);
-  if (hasRef && hasObs) {
+  const present = [
+    meta?.reference ? 'CANONICAL_PROOF' : null,
+    meta?.derivation ? 'VERIFIED_DERIVATION' : null,
+    meta?.observation ? 'OPERATIONAL_OBSERVATION' : null,
+  ].filter(Boolean);
+
+  if (present.length > 1) {
     return {
       limb: null,
-      violation: 'BOTH_LIMBS',
-      detail: 'carries meta.reference AND meta.observation - an operational reading declared canonical',
+      violation: 'MULTIPLE_LIMBS',
+      detail: `carries ${present.join(' AND ')} - an answer has exactly one kind`,
     };
   }
-  if (!hasRef && !hasObs) {
+  if (present.length === 0) {
     return {
       limb: null,
-      violation: 'NEITHER_LIMB',
-      detail: 'carries neither meta.reference nor meta.observation - the reader cannot tell a canonical answer from a live reading',
+      violation: 'NO_LIMB',
+      detail:
+        'carries none of meta.reference, meta.derivation or meta.observation - the reader cannot tell a canonical record from a derived value from a live reading',
     };
   }
-  if (hasRef) {
+  const limb = present[0];
+
+  if (limb === 'CANONICAL_PROOF') {
     if (!meta.reference.canonical || !meta.reference.proofRoot) {
+      return { limb, violation: 'CANONICAL_INCOMPLETE', detail: 'meta.reference must carry both canonical and proofRoot' };
+    }
+    return { limb, violation: null };
+  }
+
+  if (limb === 'VERIFIED_DERIVATION') {
+    if (!meta.derivation.derivedFrom || !meta.derivation.proofRoot) {
+      return { limb, violation: 'DERIVATION_INCOMPLETE', detail: 'meta.derivation must carry both derivedFrom and proofRoot' };
+    }
+    if (!meta.derivation.methodDeclared) {
       return {
-        limb: 'CANONICAL',
-        violation: 'CANONICAL_INCOMPLETE',
-        detail: 'meta.reference must carry both canonical and proofRoot',
+        limb,
+        violation: 'METHOD_UNDECLARED',
+        detail: 'a derivation whose method is unnamed cannot be reproduced or argued with, which is the only thing that makes it verified',
       };
     }
-    return { limb: 'CANONICAL', violation: null };
+    return { limb, violation: null };
   }
+
   if (meta.observation.operational !== true) {
-    return { limb: 'OPERATIONAL', violation: 'OPERATIONAL_UNFLAGGED', detail: 'meta.observation.operational must be exactly true' };
+    return { limb, violation: 'OPERATIONAL_UNFLAGGED', detail: 'meta.observation.operational must be exactly true' };
   }
   if (!meta.observation.limitationsDeclared) {
     return {
-      limb: 'OPERATIONAL',
+      limb,
       violation: 'LIMITATIONS_UNDECLARED',
       detail: 'an operational reading with no stated limitations reads as canonical to anyone who does not already know better',
     };
   }
-  return { limb: 'OPERATIONAL', violation: null };
+  return { limb, violation: null };
 }

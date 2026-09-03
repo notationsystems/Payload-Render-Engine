@@ -32,7 +32,7 @@
 /** The four planes. A route belongs to exactly one. */
 export const PLANES = Object.freeze([
   {
-    id: 'tenant-read',
+    id: 'tenant_read',
     ordinal: 1,
     label: 'Tenant Read API',
     serves: 'corpus, projection, search, releases, timelines, proof navigation',
@@ -49,7 +49,7 @@ export const PLANES = Object.freeze([
     ordinal: 2,
     label: 'Verification API',
     serves: 'any supported VerificationEnvelope, closure, checks, Warrant Graph',
-    limb: 'CANONICAL',
+    limb: 'CANONICAL_PROOF',
     limbNote:
       'the plane whose whole purpose is the proof root; an answer here without one would be self-defeating',
     refuses: [
@@ -72,11 +72,11 @@ export const PLANES = Object.freeze([
     ],
   },
   {
-    id: 'internal-operator',
+    id: 'internal_operator',
     ordinal: 4,
     label: 'Internal Ingestion / Operator API',
     serves: 'signed federation packets and controlled operational actions',
-    limb: 'CANONICAL',
+    limb: 'CANONICAL_PROOF',
     limbNote: 'an acknowledgement names what was admitted and the root it landed under',
     refuses: [
       'public canonical CRUD - there is no route in this plane that a tenant may call, and none that mutates canonical state through a public path',
@@ -101,7 +101,7 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Kernel, canonical, registry, verification router',
     treatment:
       'Universal reference resolution and proof verification; never direct mutation',
-    role: 'PROOF_VERIFIABLE',
+    role: 'proof_verifiable',
     plane: 'verification',
     presence: 'PARTIAL',
     here: [
@@ -119,8 +119,8 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Journal, closure persistence, PostgreSQL repository',
     treatment:
       'Internal persistence adapters; public API reads only through tenant-bound resolvers',
-    role: 'HOST_ONLY',
-    plane: 'internal-operator',
+    role: 'host_infrastructure',
+    plane: 'internal_operator',
     presence: 'ABSENT',
     here: [],
     absent:
@@ -133,7 +133,7 @@ export const MODULE_FAMILIES = Object.freeze([
     id: 'acquisition',
     family: 'Source policy, acquisition, normalization, capture, archive, retention',
     treatment: 'Read policy/receipt/retention status; writes only through governed ingestion',
-    role: 'PUBLICLY_READABLE',
+    role: 'public_read',
     plane: 'governance',
     presence: 'PARTIAL',
     here: [
@@ -151,8 +151,8 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Corpus build, admission, profiles, identity mapping, diff, corpus release',
     treatment:
       'Corpus catalog, build comparison, membership, provenance, and time-bound read APIs',
-    role: 'PROOF_VERIFIABLE',
-    plane: 'tenant-read',
+    role: 'proof_verifiable',
+    plane: 'tenant_read',
     presence: 'PARTIAL',
     here: [
       'the corpus as a self-describing artifact: its definition, ontology, extraction and validation rules (GET /api/corpus/definition)',
@@ -173,8 +173,8 @@ export const MODULE_FAMILIES = Object.freeze([
     id: 'projections',
     family: 'Lexical / vector / spatial / analytical / graph / coverage / index projections',
     treatment: 'Projection catalog plus bounded query endpoints with exact proof roots',
-    role: 'PROOF_VERIFIABLE',
-    plane: 'tenant-read',
+    role: 'proof_verifiable',
+    plane: 'tenant_read',
     presence: 'PRESENT',
     here: [
       'the spatial projection is what this service IS — the catalog is served at GET /api/capabilities with a probe for each',
@@ -193,7 +193,7 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Context packages, agent execution, authorized search',
     treatment:
       'Tenant-bound agent/API tools; return references and authorization state, not unrestricted data',
-    role: 'PUBLICLY_READABLE',
+    role: 'public_read',
     plane: 'governance',
     presence: 'PARTIAL',
     here: [
@@ -211,7 +211,7 @@ export const MODULE_FAMILIES = Object.freeze([
     id: 'release',
     family: 'Methodology, attestation, trusted signers, market release, activation',
     treatment: 'Release and trust-status endpoints; activation and signing stay operator-only',
-    role: 'GOVERNED_WRITE',
+    role: 'governed_write',
     plane: 'governance',
     presence: 'ABSENT',
     here: [],
@@ -226,7 +226,7 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Release preflight and production readiness',
     treatment:
       'Governance/readiness APIs with typed evidence, exceptions, and explicit non-authorization',
-    role: 'PUBLICLY_READABLE',
+    role: 'public_read',
     plane: 'governance',
     presence: 'ABSENT',
     here: [],
@@ -241,7 +241,7 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Projection workers, checkpoints, telemetry, operational snapshots',
     treatment:
       'Operations APIs for lag, replay state, bounded health, and evidence — not provider control',
-    role: 'PUBLICLY_READABLE',
+    role: 'public_read',
     plane: 'governance',
     presence: 'PARTIAL',
     here: [
@@ -258,7 +258,7 @@ export const MODULE_FAMILIES = Object.freeze([
     id: 'architecture',
     family: 'Ecosystem, apparatus, Control Plane, Security Constellation',
     treatment: 'Architecture/topology APIs with logical views and no raw security details',
-    role: 'PUBLICLY_READABLE',
+    role: 'public_read',
     plane: 'governance',
     presence: 'PRESENT',
     here: [
@@ -276,8 +276,8 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Federation, signatures, replay audit',
     treatment:
       'Internal signed-packet ingestion plus acknowledgements, replay reports, and audit reads',
-    role: 'GOVERNED_WRITE',
-    plane: 'internal-operator',
+    role: 'governed_write',
+    plane: 'internal_operator',
     presence: 'ABSENT',
     here: [],
     absent:
@@ -296,7 +296,7 @@ export const MODULE_FAMILIES = Object.freeze([
     // to reproduce against. A mining run here is named by its inputs plus
     // its program and stamped with the committed build, which is what
     // earns it REPRODUCIBLE rather than PROVENANCE.
-    role: 'PROOF_VERIFIABLE',
+    role: 'proof_verifiable',
     plane: 'governance',
     presence: 'PARTIAL',
     here: [
@@ -315,7 +315,7 @@ export const MODULE_FAMILIES = Object.freeze([
     family: 'Object store, token auth, deployment bindings, HTTP/MCP runtime',
     treatment:
       'Infrastructure modules; expose capability/status only, not storage or credential controls',
-    role: 'HOST_ONLY',
+    role: 'host_infrastructure',
     plane: 'governance',
     presence: 'PARTIAL',
     here: [
@@ -341,31 +341,31 @@ export const MODULE_FAMILIES = Object.freeze([
  */
 export const ROUTE_PLANES = Object.freeze({
   // ---- Tenant Read: the corpus, canonical, proof-rooted
-  '/api/snapshot': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/entities': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/search': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/states': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/state/(?<entityId>[^/]+)': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/deviations/(?<entityId>[^/]+)': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/scenarios': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/scenarios/(?<scenarioId>[^/]+)/impact': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/scenarios/rank': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/scenarios/inject': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/corpus/definition': { plane: 'tenant-read', limb: 'CANONICAL' },
-  '/api/mining/patterns': { plane: 'tenant-read', limb: 'CANONICAL' },
+  '/api/snapshot': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/entities': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/search': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/states': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/state/(?<entityId>[^/]+)': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/deviations/(?<entityId>[^/]+)': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/scenarios': { plane: 'tenant_read', limb: 'VERIFIED_DERIVATION', method: 'scenario projection over the committed build' },
+  '/api/scenarios/(?<scenarioId>[^/]+)/impact': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/scenarios/rank': { plane: 'tenant_read', limb: 'VERIFIED_DERIVATION', method: 'scenario ranking over the committed build' },
+  '/api/scenarios/inject': { plane: 'tenant_read', limb: 'CANONICAL_PROOF' },
+  '/api/corpus/definition': { plane: 'tenant_read', limb: 'VERIFIED_DERIVATION', method: 'corpus definition assembled from the loader declaration' },
+  '/api/mining/patterns': { plane: 'tenant_read', limb: 'VERIFIED_DERIVATION', method: 'payload-miner/0.1 over the committed build' },
 
   // ---- Tenant Read: live captures, operational, no root to carry
-  '/api/live/aircraft': { plane: 'tenant-read', limb: 'OPERATIONAL' },
-  '/api/live/satellites': { plane: 'tenant-read', limb: 'OPERATIONAL' },
-  '/api/live/quakes': { plane: 'tenant-read', limb: 'OPERATIONAL' },
-  '/api/live/fires': { plane: 'tenant-read', limb: 'OPERATIONAL' },
-  '/api/markets/fx': { plane: 'tenant-read', limb: 'OPERATIONAL' },
-  '/api/markets/crypto': { plane: 'tenant-read', limb: 'OPERATIONAL' },
-  '/api/markets/derivatives': { plane: 'tenant-read', limb: 'OPERATIONAL' },
-  '/api/markets/broker': { plane: 'tenant-read', limb: 'OPERATIONAL' },
+  '/api/live/aircraft': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
+  '/api/live/satellites': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
+  '/api/live/quakes': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
+  '/api/live/fires': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
+  '/api/markets/fx': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
+  '/api/markets/crypto': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
+  '/api/markets/derivatives': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
+  '/api/markets/broker': { plane: 'tenant_read', limb: 'OPERATIONAL_OBSERVATION' },
   '/api/operations': {
-    plane: 'tenant-read',
-    limb: 'OPERATIONAL',
+    plane: 'tenant_read',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'the brokerage operations mirror, via the Payload Terminal',
     limitations: [
       'READ-ONLY MIRROR - no order, tender or dispatch capability exists on this surface, and none is implied by anything it shows',
@@ -374,8 +374,8 @@ export const ROUTE_PLANES = Object.freeze({
     ],
   },
   '/api/operations/communications': {
-    plane: 'tenant-read',
-    limb: 'OPERATIONAL',
+    plane: 'tenant_read',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'the brokerage operations mirror, via the Payload Terminal',
     limitations: [
       'READ-ONLY MIRROR - no order, tender or dispatch capability exists on this surface, and none is implied by anything it shows',
@@ -384,8 +384,8 @@ export const ROUTE_PLANES = Object.freeze({
     ],
   },
   '/api/operations/fuel': {
-    plane: 'tenant-read',
-    limb: 'OPERATIONAL',
+    plane: 'tenant_read',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'the brokerage operations mirror, via the Payload Terminal',
     limitations: [
       'READ-ONLY MIRROR - no order, tender or dispatch capability exists on this surface, and none is implied by anything it shows',
@@ -399,7 +399,7 @@ export const ROUTE_PLANES = Object.freeze({
   // other self-report - not a canonical record of what the planes are
   '/api/planes': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'this service, declaring its own contract',
     limitations: [
       'A DECLARATION BY THIS BUILD ABOUT ITSELF - the planes are what this build asserts its contract to be, not an externally verified fact about it',
@@ -410,7 +410,7 @@ export const ROUTE_PLANES = Object.freeze({
 
   '/api/platform': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'this service, declaring its position in the data platform',
     limitations: [
       'A CLAIM BY THIS BUILD ABOUT THE PLATFORM AROUND IT - presence is the state of this tree, not a probe of any deployed infrastructure',
@@ -420,14 +420,14 @@ export const ROUTE_PLANES = Object.freeze({
   },
 
   // ---- Verification: the plane whose purpose IS the root
-  '/api/corpus/commitments': { plane: 'verification', limb: 'CANONICAL' },
-  '/api/notation/resolve': { plane: 'verification', limb: 'CANONICAL' },
-  '/api/notation/space': { plane: 'verification', limb: 'CANONICAL' },
+  '/api/corpus/commitments': { plane: 'verification', limb: 'CANONICAL_PROOF' },
+  '/api/notation/resolve': { plane: 'verification', limb: 'CANONICAL_PROOF' },
+  '/api/notation/space': { plane: 'verification', limb: 'CANONICAL_PROOF' },
 
   // ---- Governance: readiness, policy, architecture, coverage
   '/api/health': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'this service, about itself',
     limitations: [
       'INSTANCE LIVENESS AT A MOMENT - this answers for the process that served it, not for the deployment',
@@ -437,7 +437,7 @@ export const ROUTE_PLANES = Object.freeze({
   },
   '/api/capabilities': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'this service, probing its own declared capabilities',
     limitations: [
       'LATENCY MEASURED NOW, FROM THIS PROCESS - a figure here is one sample from one vantage point, not a service level',
@@ -446,7 +446,7 @@ export const ROUTE_PLANES = Object.freeze({
   },
   '/api/security/posture': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'the gate in this process',
     limitations: [
       'THE POLICY IN FORCE IN THIS PROCESS - not the policy of the deployment, and not a claim about any other instance',
@@ -457,7 +457,7 @@ export const ROUTE_PLANES = Object.freeze({
   },
   '/api/system/topology': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'this service, declaring the ecosystem it participates in',
     limitations: [
       'A DECLARATION ABOUT THE RUNNING INSTANCE - the model is what this build believes the ecosystem to be, not a discovered fact about it',
@@ -467,7 +467,7 @@ export const ROUTE_PLANES = Object.freeze({
   },
   '/api/ecosystem/register': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'this service, probing sibling apparatuses',
     limitations: [
       'PRESENCE IS PROBED AT A MOMENT - an apparatus that did not answer is UNREACHABLE NOW, which is a different fact from absent from the ecosystem',
@@ -477,14 +477,14 @@ export const ROUTE_PLANES = Object.freeze({
   },
   '/api/refusals': {
     plane: 'governance',
-    limb: 'OPERATIONAL',
+    limb: 'OPERATIONAL_OBSERVATION',
     upstream: 'the Payload Terminal refusal digest',
     limitations: [
       'UPSTREAM RECEIPTS AS REPORTED AT A MOMENT - the queue is the upstream state when it was asked, not a durable record held here',
       'a refusal absent from this digest was not necessarily served: it may simply not have been attempted in the window',
     ],
   },
-  '/api/vocabulary/alignment': { plane: 'governance', limb: 'CANONICAL' },
+  '/api/vocabulary/alignment': { plane: 'governance', limb: 'VERIFIED_DERIVATION', method: 'value-provenance census over the served corpus' },
 
   // ---- Internal Ingestion / Operator: declared and empty by design.
   // Nothing here. Every route above is a GET, and SEC-018 refuses every
@@ -506,10 +506,11 @@ export function planeCoverage(patterns) {
     else unassigned.push(p);
   }
   const byPlane = {};
-  const byLimb = { CANONICAL: 0, OPERATIONAL: 0 };
+  const byLimb = { CANONICAL_PROOF: 0, VERIFIED_DERIVATION: 0, OPERATIONAL_OBSERVATION: 0 };
   for (const a of assigned) {
     byPlane[a.plane] = (byPlane[a.plane] ?? 0) + 1;
-    byLimb[a.limb] += 1;
+    // an unknown limb must not create a null column - it is a defect
+    byLimb[a.limb] = (byLimb[a.limb] ?? 0) + 1;
   }
   return {
     total: patterns.length,
@@ -540,6 +541,9 @@ export const LIMBS = Object.freeze({
       'the answer is a reading taken at a moment, from something this service does not own; its limitations are named so a reader does not mistake it for canonical state',
   },
 });
+
+/** API-000, as the ecosystem repo names it (ecosystem/api-planes.json). */
+export const INVARIANT_ID = 'API-000';
 
 export const LIMB_INVARIANT =
   'every ok answer carries exactly one of meta.reference (canonical + proof root) or meta.observation (operational + limitations) - never both, never neither';
