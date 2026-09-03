@@ -369,6 +369,27 @@ with the holder named and what would have to exist first. A resolver
 that returned nothing for them would be useless, and one that pretended
 would be worse — so the refusals are the map.
 
+### Both directions
+
+The resolver turns an address into a record. A desk needs the other
+direction far more often — *what do I paste into the channel so a
+colleague lands on exactly this?* — and without it, precise reference
+degrades to prose: "the big copper mine in Chile" is how two people look
+at different records and agree with each other.
+
+So every record carries its address, shown under its name in the info
+panel and copyable in one click. The property that makes it worth
+anything is **round-trip**: `addressOf(id)` must resolve back to `id`,
+for every record the corpus serves. An address that does not round-trip
+is worse than none, because it looks authoritative and sends the reader
+somewhere else. A test holds that over the whole corpus rather than a
+sample, so a corpus that grows a new id shape fails there before anyone
+pastes a wrong address into a desk channel.
+
+Where an address resolves through a non-primary id shape, the shape is
+**shown**, not smoothed over — the corpus mints more than one, and an
+undocumented relabelling is where provenance goes.
+
 ### The measurement
 
 `GET /api/notation/space` counts the entity id shapes actually present

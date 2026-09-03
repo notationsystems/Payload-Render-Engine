@@ -103,4 +103,33 @@ export function navigateNotation(api: AppApi, raw: string): CommandResult {
   };
 }
 
+/**
+ * The reverse of the resolver: a record's notation:// address.
+ *
+ * The property that matters is ROUND-TRIP — `addressOf(id)` must resolve
+ * back to `id` for every record the corpus serves. An address that does
+ * not round-trip is worse than none, because it looks authoritative and
+ * sends the reader somewhere else.
+ *
+ * This corpus mints more than one id shape, so the shape used is
+ * REPORTED rather than smoothed over, exactly as the resolver reports
+ * which shape answered. A single token with no separator names a type
+ * and nothing else: refusing is better than inventing a segment to make
+ * it parse.
+ */
+export function addressOf(id: string): { uri: string; shape: string } | null {
+  if (typeof id !== 'string' || id === '') return null;
+
+  const ent = /^ent:([^:]+):(.+)$/.exec(id);
+  if (ent) return { uri: `notation://entity/${ent[1]}/${ent[2]}`, shape: 'ent:type:name' };
+
+  const prefixed = /^([^:]+):(.+)$/.exec(id);
+  if (prefixed) return { uri: `notation://entity/${prefixed[1]}/${prefixed[2]}`, shape: 'type:name' };
+
+  const hyphen = /^([^-]+)-(.+)$/.exec(id);
+  if (hyphen) return { uri: `notation://entity/${hyphen[1]}/${hyphen[2]}`, shape: 'bare-hyphenated' };
+
+  return null;
+}
+
 export { locate, notationSpace } from '../../shared/notation.mjs';

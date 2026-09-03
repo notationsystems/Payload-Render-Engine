@@ -7,6 +7,7 @@
  */
 
 import type { AppApi } from '../app/api';
+import { addressOf } from '../intel/notation';
 import type {
   EntityId,
   Facility,
@@ -85,7 +86,50 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     return d;
   }
 
-  function header(kindLabel: string, name: string, opts?: { modeColor?: string }): HTMLElement {
+  /**
+   * The record's notation:// address, as a copyable line.
+   *
+   * A desk needs to point at a record precisely far more often than it
+   * needs to resolve one. Without an address, precise reference degrades
+   * to prose — "the big copper mine in Chile" — which is how two people
+   * look at different records and agree with each other.
+   *
+   * The address round-trips: pasting it into the command bar lands on
+   * this record and no other, and a test holds that property over every
+   * record the corpus serves. Where it resolves through a non-primary id
+   * shape, the shape is SHOWN rather than smoothed over — the corpus
+   * mints more than one, and an undocumented relabelling is where
+   * provenance goes.
+   */
+  function identityRow(id: string): HTMLElement | null {
+    const address = addressOf(id);
+    if (!address) return null;
+    const row = div('pi-address');
+    const uri = div('pi-address-uri', address.uri);
+    uri.title = 'click to copy — paste into the command bar to land here';
+    const shape = div(
+      'pi-address-shape',
+      address.shape === 'ent:type:name' ? 'COPY' : `COPY · ${address.shape}`
+    );
+    row.append(uri, shape);
+    row.addEventListener('click', () => {
+      // clipboard access can be denied; say so rather than appear to work
+      void navigator.clipboard
+        ?.writeText(address.uri)
+        .then(() => {
+          shape.textContent = 'COPIED';
+          window.setTimeout(() => {
+            shape.textContent = address.shape === 'ent:type:name' ? 'COPY' : `COPY · ${address.shape}`;
+          }, 1400);
+        })
+        .catch(() => {
+          shape.textContent = 'CLIPBOARD DENIED';
+        });
+    });
+    return row;
+  }
+
+  function header(kindLabel: string, name: string, opts?: { modeColor?: string; id?: string }): HTMLElement {
     const head = div('pi-head');
     const kind = div('pi-kind');
     if (opts?.modeColor) {
@@ -105,6 +149,10 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
       kind.textContent = kindLabel;
     }
     head.append(kind, div('pi-name', name));
+    if (opts?.id) {
+      const address = identityRow(opts.id);
+      if (address) head.append(address);
+    }
     return head;
   }
 
@@ -272,7 +320,7 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     const simT = api.clock.simTime;
     const s = api.store.stateAt(f.id, simT);
 
-    const head = header(caps(f.kind), f.name);
+    const head = header(caps(f.kind), f.name, { id: f.id });
     head.append(statusChip(s.status));
     content.append(head);
 
@@ -410,7 +458,7 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
     const s = api.store.stateAt(r.id, simT);
     const modeColor = MODE_COLOR[r.mode];
 
-    const head = header(`ROUTE · ${r.mode.toUpperCase()}`, r.name, { modeColor });
+    const head = header(`ROUTE · ${r.mode.toUpperCase()}`, r.name, { modeColor, id: r.id });
     const origin = api.store.node(r.originId);
     const dest = api.store.node(r.destinationId);
     const od = div('pi-od');
@@ -517,7 +565,7 @@ export function createInfoPanel(api: AppApi): { el: HTMLElement } {
   // ---------------------------------------------------------------- flow
 
   function renderFlow(fl: Flow): void {
-    const head = header('LOAD', fl.name);
+    const head = header('LOAD', fl.name, { id: fl.id });
     head.append(statusChip(fl.status));
     content.append(head);
 

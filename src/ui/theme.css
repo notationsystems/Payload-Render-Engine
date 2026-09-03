@@ -2858,3 +2858,36 @@ input {
   letter-spacing: 0.14em;
   padding: 10px 4px;
 }
+
+/* The record's notation:// address — copyable, and quiet.
+   It sits under the name because it IS the name, in the form another
+   apparatus would use. Monospace and dim: an operator reaches for it
+   deliberately, and it must never compete with the record itself. */
+.pi-address {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 3px;
+  cursor: pointer;
+}
+.pi-address-uri {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.01em;
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.pi-address:hover .pi-address-uri { color: var(--text-mid); }
+.pi-address-shape {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.pi-address:hover .pi-address-shape { color: var(--accent); border-color: var(--accent); }

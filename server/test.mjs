@@ -1040,5 +1040,50 @@ console.log('\n— answer envelope, whole surface —');
   );
 }
 
+// --------------------------------------------------------------------
+// Every record is addressable, and every address round-trips
+// --------------------------------------------------------------------
+console.log('\n— addressability —');
+{
+  const { addressOf } = await import('../src/intel/notation.ts');
+  const snap = await call('GET', '/api/snapshot');
+  const records = [
+    ...(snap.data.nodes ?? []),
+    ...(snap.data.routes ?? []),
+    ...(snap.data.flows ?? []),
+  ];
+  check(records.length > 0, `the corpus serves records to address (${records.length})`);
+
+  const unaddressable = [];
+  const broken = [];
+  for (const rec of records) {
+    const a = addressOf(rec.id);
+    if (!a) {
+      unaddressable.push(rec.id);
+      continue;
+    }
+    const back = await call('GET', `/api/notation/resolve?uri=${encodeURIComponent(a.uri)}`);
+    if (back.status !== 'ok' || back.data.canonicalId !== rec.id) {
+      broken.push(`${rec.id} -> ${a.uri} -> ${back.data?.canonicalId ?? back.refusal?.kind}`);
+    }
+  }
+  check(
+    unaddressable.length === 0,
+    `every served record has an address${unaddressable.length ? ` — ${unaddressable.slice(0, 3).join(', ')}` : ''}`
+  );
+  check(
+    broken.length === 0,
+    `every address resolves back to its own record${broken.length ? ` — ${broken.slice(0, 3).join(' · ')}` : ''}`
+  );
+
+  // the shape is reported, never smoothed over
+  const shapes = new Set(records.map((r) => addressOf(r.id)?.shape).filter(Boolean));
+  check(shapes.size >= 1, `the address reports which id shape it used (${[...shapes].join(', ')})`);
+
+  // a bare token names a type and nothing else — refused, not invented
+  check(addressOf('escondida') === null, 'a separator-less id is refused rather than given an invented segment');
+  check(addressOf('') === null && addressOf(undefined) === null, 'empty input yields no address');
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');
 process.exit(failures ? 1 : 0);

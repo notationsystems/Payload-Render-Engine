@@ -248,5 +248,58 @@ export async function run(browser) {
     await page.close();
   }
 
+  // ---- 5. the desk's round trip: point at a record, land on it -------
+  {
+    const page = await browser.newPage({ viewport: { width: 1680, height: 1000 } });
+    await page.goto(`${VITE}/?api=${encodeURIComponent(API)}`, { waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(() => !!window.payloadEarth, null, { timeout: 30000 });
+    await page.waitForTimeout(1800);
+
+    // select a facility the way an operator would, then read the address
+    // off the panel — not out of the module, which would test nothing
+    const picked = await page.evaluate(() => {
+      const api = window.payloadEarth.api;
+      const node = api.store.snapshot.nodes[0];
+      if (!node) return null;
+      api.select(node.id, 'command');
+      return node.id;
+    });
+    if (!picked) {
+      await r.skip('no facility in the loaded corpus to address');
+    } else {
+      await page.waitForTimeout(900);
+      const shown = await page.evaluate(
+        () => document.querySelector('.pi-address-uri')?.textContent ?? ''
+      );
+      r.ok(
+        shown.startsWith('notation://entity/'),
+        `the selected record shows its own address (${shown || 'none shown'})`
+      );
+
+      // clear the selection, then navigate by the address alone — this is
+      // the desk workflow: paste what a colleague sent and land on their
+      // record, not one that merely looks like it
+      await page.evaluate(() => window.payloadEarth.api.select(null, 'command'));
+      await page.waitForTimeout(300);
+      const landed = await page.evaluate((uri) => {
+        const res = window.payloadEarth.api.runCommand(uri);
+        return { ok: res.ok, message: res.message, selection: window.payloadEarth.api.getSelection() };
+      }, shown);
+      r.ok(landed.ok, `the address navigates (${landed.message})`);
+      r.ok(
+        landed.selection === picked,
+        `it lands on the record it names, not one that looks like it (${landed.selection} vs ${picked})`
+      );
+
+      // the shape is shown when it is not the primary one — a relabelling
+      // the operator cannot see is a relabelling nobody wrote down
+      const chip = await page.evaluate(
+        () => document.querySelector('.pi-address-shape')?.textContent ?? ''
+      );
+      r.ok(/COPY/.test(chip), `the address offers a copy affordance (${chip})`);
+    }
+    await page.close();
+  }
+
   return r.done();
 }
