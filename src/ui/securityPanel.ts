@@ -185,7 +185,7 @@ export function createSecurityPanel(_api: AppApi): { el: HTMLElement } {
     // trusted structurally either: a missing or malformed field must
     // degrade one row, never blank the whole security surface.
     const list = (v: unknown, absent = 'not reported'): string =>
-      Array.isArray(v) && v.length ? esc(v.map(String).join(' · ')) : `<span class="pe-sec-hint">${esc(absent)}</span>`;
+      Array.isArray(v) && v.length ? esc(v.map(String).join(' · ')) : `<em class="pe-sec-hint">${esc(absent)}</em>`;
     const auth = (p.authority ?? [])
       .map(
         (a) =>
@@ -206,7 +206,10 @@ export function createSecurityPanel(_api: AppApi): { el: HTMLElement } {
         <div class="pe-corpus-sectitle">IN FORCE AT THE GATE — read from the running service</div>
         ${row('METHODS', `${list(p.policy?.methodsServed)} <span class="pe-sec-hint">a read-only projection answers nothing else</span>`)}
         ${row('ORIGINS', `${list(p.policy?.allowedOrigins)} <span class="pe-sec-hint">${p.policy?.wildcardCors ? 'WILDCARD — this is a defect' : 'allowlist, never a wildcard'}</span>`)}
-        ${row('HOSTS', `${list(p.policy?.allowedHosts)} <span class="pe-sec-hint">${esc(p.policy?.hostPolicy ?? 'policy not reported')} · DNS-rebinding defence</span>`)}
+        ${row(
+          'HOSTS',
+          `${list(p.policy?.allowedHosts)}<div class="pe-sec-note">${esc(p.policy?.hostPolicy ?? 'policy not reported')} · DNS-rebinding defence. These are Host HEADER values the gate answers to, which is a different question from the address it binds — 0.0.0.0 as a header is meaningless and harmless, as a bind address it means every interface and is refused at startup without an explicit policy (SEC-106).</div>`
+        )}
         ${row('PRIVILEGED', `${list(p.policy?.privilegedPrefixes)} <span class="pe-sec-hint">fail closed on an unrecognised origin, before authority is spent</span>`)}
         ${row('RATE LIMIT', esc(limits))}
         ${row('UPSTREAM CAPS', `${caps} <span class="pe-sec-hint">streamed with a byte counter, cancelled at the cap</span>`)}
