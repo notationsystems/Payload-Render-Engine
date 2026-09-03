@@ -11,14 +11,13 @@
  * COMPUTED, NOT OBSERVED. A simulated outcome is not an outcome.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { ScenarioImpact, ScenarioRankingRow, ScenarioRole } from '../data/scenario';
 import type { EntityId } from '../data/contracts';
 import './scenario.css';
 
 /** Corpus strings are synthetic and trusted, but markup-escape anyway. */
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const pct = (x: number): string => `${Math.round(x * 100)}%`;
 

@@ -936,3 +936,53 @@ adapter seeding real capabilities, health signals, data domains, and
 spatial layers into the Control Plane service — fills this contract
 server-side; this panel then reads that instead of the projection
 service's self-declaration, with no UI redesign.
+
+## 23. Security substrate
+
+Security extends the substrate rather than sitting beside it — see
+**docs/SECURITY.md** for the threat model, the trust boundaries, and
+the full invariant list. The engineering shape:
+
+- **`server/security.mjs`** — the request gate. Host allowlist
+  (DNS-rebinding defence), origin allowlist (never a wildcard),
+  privileged routes fail closed on an unrecognised origin, GET-only
+  enforcement, per-client rate limits on routes that spend an
+  upstream's quota, error redaction with correlation ids, and secret
+  scrubbing for logs. Every control answers with the service's own
+  typed refusal shape: a security refusal is an answer, not an
+  exception.
+- **`src/core/escape.ts`** — one escaper, markup-safe in element AND
+  attribute position. The per-module escapers it replaced covered
+  `& < >` only, which is safe in element position and unsafe in
+  `title="…"` — and real sinks rendered upstream refusal text there.
+- **`src/data/sources.ts`** — `?api=` is allowlisted before use. An
+  attacker-chosen backend would otherwise control every claim the OS
+  renders *including its own verification*, so a refused base fails
+  closed to the in-browser corpus and says so.
+- **`scripts/check-security.mjs`** — 11 invariants in `npm run check`:
+  no committed secret, one escaper, quote coverage, no wildcard CORS,
+  TLS never disabled, no user-steerable egress, storage allowlist,
+  API-base validation, GET-only routing, error redaction, pinned
+  lockfile. Each failure names its invariant and its remedy.
+- **`tests/e2e/05-security.spec.mjs`** — attacks, not assertions: a
+  hostile loopback backend serves XSS payloads through the real render
+  chain, and a foreign `?api=` is checked to be refused *and never
+  fetched*.
+
+Two findings from the pass are worth recording because they were
+structural, not incidental:
+
+1. The service answered `Access-Control-Allow-Origin: *` while holding
+   the operations credential — a textbook confused deputy. Any page the
+   operator visited could read the brokerage desk. Closed by SEC-101/
+   103/104, verified by attack.
+2. `esc()` did not escape quotes, so every `title="${esc(x)}"` carrying
+   upstream text was an attribute-injection sink. Closed by the single
+   hardened escaper, verified by driving real payloads through the
+   render chain.
+
+The identity separation in SECURITY.md §5 is the security half of the
+Notation Substrate's `notation://` namespace contract: one canonical
+identity space, many representations — with service and agent identity
+deliberately **not** addressable, because a URI that can name a
+credential is a credential that will eventually be dereferenced.

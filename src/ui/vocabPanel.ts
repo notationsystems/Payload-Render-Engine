@@ -8,10 +8,9 @@
  * nothing aspirational is listed.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const GROUPS: { title: string; rows: [string, string][] }[] = [
   {

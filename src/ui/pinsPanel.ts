@@ -11,11 +11,10 @@
  * shipping lane.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { EntityId } from '../data/contracts';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function createPinsPanel(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');

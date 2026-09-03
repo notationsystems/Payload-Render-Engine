@@ -17,11 +17,10 @@
  *     mixed without their section labels.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import { correlateQuakes, PROXIMITY_THRESHOLDS, type HazardAlert } from '../intel/proximity';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const REFRESH_MS = 30_000;
 

@@ -16,6 +16,7 @@
  *     tracking is unobserved) and never a vehicle marker.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import {
   fetchOperations,
@@ -36,8 +37,6 @@ import { resolveApiBase } from '../data/sources';
 import { recordFeed } from '../core/health';
 import './ops.css';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const POLL_MS = 30_000; // the desk's own cadence
 

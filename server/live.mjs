@@ -209,6 +209,16 @@ export function registerLiveRoutes(get, { ok, refuse, meta }) {
         'get a key at https://firms.modaps.eosdis.nasa.gov/api/map_key/ and set FIRMS_MAP_KEY in the spatial API environment'
       );
     }
+    // SEC-105 — the vendor puts the key in the URL PATH, so a malformed
+    // key is a path-injection primitive against their API. Validate the
+    // shape before it can travel; the refusal never echoes the value.
+    if (!/^[A-Za-z0-9_-]{8,128}$/.test(key.trim())) {
+      return refuse(
+        'LIVE_FEED_MISCONFIGURED',
+        'FIRMS_MAP_KEY is not a well-formed map key (expected 8–128 chars of [A-Za-z0-9_-])',
+        'check the value copied from firms.modaps.eosdis.nasa.gov — the key is never echoed by this service'
+      );
+    }
     try {
       const res = await fetch(
         `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${key}/VIIRS_NOAA20_NRT/world/1`,

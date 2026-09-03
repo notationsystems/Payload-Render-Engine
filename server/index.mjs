@@ -28,36 +28,81 @@
 import { createServer } from 'node:http';
 import { URL } from 'node:url';
 import { registerRoutes } from './api.mjs';
+import {
+  assertSafeBinding,
+  clientKey,
+  guardRequest,
+  isProxied,
+  RateLimiter,
+  redactError,
+  safeRequestLine,
+  securityHeaders,
+  securityRefusal,
+} from './security.mjs';
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1';
 
+// SEC-102 — a service holding operations authority does not silently
+// become world-reachable; binding off-loopback demands an explicit policy
+const bindingRefusal = assertSafeBinding(HOST);
+if (bindingRefusal) {
+  console.error(bindingRefusal);
+  process.exit(2);
+}
+
 const routes = await registerRoutes();
+const limiter = new RateLimiter();
 
 const server = createServer(async (req, res) => {
   const started = Date.now();
-  const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`);
+  // the Host header is attacker-controlled; parse against a fixed
+  // authority so a hostile Host cannot steer URL parsing
+  const url = new URL(req.url, 'http://payload.invalid');
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204).end();
-    return;
-  }
-
-  const send = (code, body) => {
+  const send = (code, body, corsHeaders = {}) => {
     const json = JSON.stringify(body);
     res.writeHead(code, {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store',
       'X-Payload-Twin': 'spatial-api/0.1',
+      ...securityHeaders(),
+      ...corsHeaders,
     });
     res.end(json);
     console.log(
-      `${new Date().toISOString()} ${req.method} ${url.pathname}${url.search} → ${code} ${json.length}B ${Date.now() - started}ms`
+      `${new Date().toISOString()} ${req.method} ${safeRequestLine(url.pathname, url.searchParams)} → ${code} ${json.length}B ${Date.now() - started}ms`
     );
   };
+
+  // ---- the request gate: host, method, origin (fails closed) -------
+  const { refusal, corsHeaders } = guardRequest({
+    method: req.method,
+    headers: req.headers,
+    pathname: url.pathname,
+  });
+  if (refusal) {
+    const { httpStatus, ...body } = refusal;
+    send(httpStatus, body, corsHeaders);
+    return;
+  }
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { ...securityHeaders(), ...corsHeaders }).end();
+    return;
+  }
+
+  // ---- SEC-150 rate limit: proxied routes spend an upstream's quota
+  const rl = limiter.take(clientKey(req), isProxied(url.pathname) ? 'proxied' : 'local');
+  if (!rl.ok) {
+    const { httpStatus, ...body } = securityRefusal(
+      'RATE_LIMITED',
+      'this client has exhausted its request budget for this route class',
+      `retry in ~${rl.retryAfterSec}s — proxied routes are limited because they spend an upstream's quota`,
+      429
+    );
+    res.setHeader('Retry-After', String(rl.retryAfterSec));
+    send(httpStatus, body, corsHeaders);
+    return;
+  }
 
   try {
     for (const route of routes) {
@@ -65,26 +110,32 @@ const server = createServer(async (req, res) => {
       if (!match || req.method !== route.method) continue;
       const result = await route.handler({ params: match.groups ?? {}, query: url.searchParams });
       const { httpStatus, ...body } = result;
-      send(httpStatus ?? (result.status === 'refused' ? 422 : 200), body);
+      send(httpStatus ?? (result.status === 'refused' ? 422 : 200), body, corsHeaders);
       return;
     }
-    send(404, {
-      status: 'refused',
-      refusal: {
-        kind: 'unknown_capability',
-        message: `no route for ${req.method} ${url.pathname}`,
-        remedy: 'GET /api/capabilities lists every route this projection service serves',
+    send(
+      404,
+      {
+        status: 'refused',
+        refusal: {
+          kind: 'unknown_capability',
+          message: 'no route for this request',
+          remedy: 'GET /api/capabilities lists every route this projection service serves',
+        },
       },
-    });
+      corsHeaders
+    );
   } catch (err) {
-    send(500, {
-      status: 'error',
-      error: { message: String(err?.message ?? err) },
-    });
+    // SEC-140 — the client gets a correlation id; the detail stays in
+    // the operator's log, scrubbed of every configured secret
+    const { logLine, body } = redactError(err);
+    console.error(logLine);
+    send(500, body, corsHeaders);
   }
 });
 
 server.listen(PORT, HOST, () => {
   console.log(`payload-earth spatial api listening on http://${HOST}:${PORT}`);
   console.log('projection only — this service never mutates canonical state');
+  console.log('security: host+origin allowlisted · GET only · rate limited · errors redacted (docs/SECURITY.md)');
 });

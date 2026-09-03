@@ -18,6 +18,7 @@
  *     Terminal backend under its own authority model.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import { resolveApiBase } from '../data/sources';
 import {
@@ -36,8 +37,6 @@ import {
 import { drawSparkline } from './sparkline';
 import './markets.css';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 type Desk = 'fx' | 'crypto' | 'derivatives' | 'broker';
 

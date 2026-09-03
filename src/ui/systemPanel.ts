@@ -21,6 +21,7 @@
  * panel controls the system that feeds it.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import { resolveApiBase } from '../data/sources';
 import {
@@ -36,8 +37,6 @@ import { fetchOperations } from '../data/operations';
 import { feedHealth } from '../core/health';
 import { journal, onJournal } from '../core/journal';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const STALE_AFTER_MS = 5 * 60_000;
 

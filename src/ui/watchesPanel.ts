@@ -8,6 +8,7 @@
  * work this panel does not pretend to do.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { InjectionResult } from '../data/injection';
 import { feedHealth, onFeedHealth } from '../core/health';
@@ -24,8 +25,6 @@ import {
   type WatchState,
 } from '../intel/watches';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function createWatchesPanel(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');

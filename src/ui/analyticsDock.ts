@@ -4,6 +4,7 @@
  * the deterministic state resolver; nothing here is decorative.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { EntityId } from '../data/contracts';
 import { drawSparkline } from './sparkline';
@@ -12,8 +13,6 @@ const REFRESH_MS = 1000;
 const SPARK_SAMPLES = 40;
 
 /** Corpus strings are synthetic and trusted, but markup-escape anyway. */
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function createAnalyticsDock(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');

@@ -15,11 +15,10 @@
  * card up top. Esc or CLEAR releases; REGISTRY reopens the list.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { MinedPattern, PatternType } from '../intel/miner';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const TYPE_ORDER: PatternType[] = [
   'SUPPLY_CONCENTRATION',

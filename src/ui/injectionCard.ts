@@ -10,11 +10,10 @@
  * was computed against an observed baseline.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { InjectionImpact, InjectionResult } from '../data/injection';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function createInjectionCard(api: AppApi): { el: HTMLElement } {
   const el = document.createElement('div');

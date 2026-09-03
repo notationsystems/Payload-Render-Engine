@@ -13,6 +13,7 @@
  * never borrows a number, never averages across commodities.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { EntityId, Observation } from '../data/contracts';
 import { drawSparkline } from './sparkline';
@@ -20,8 +21,6 @@ import { fetchFx, type FxSet } from '../live/markets';
 import { resolveApiBase } from '../data/sources';
 import './commodities.css';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const ev = (o: Observation, prefix: string): string | null =>
   o.provenance.evidence?.find((e) => e.startsWith(prefix))?.slice(prefix.length) ?? null;

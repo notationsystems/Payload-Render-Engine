@@ -5,11 +5,10 @@
  * MCP bindings (GeoAgent pattern). Nothing here is a mock feature.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { TwinTool } from '../app/toolSurface';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 export function createAgentsPanel(api: AppApi, tools: TwinTool[]): { el: HTMLElement } {
   const el = document.createElement('div');

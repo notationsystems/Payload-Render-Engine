@@ -12,6 +12,7 @@
  * corpus query > current selection > an explainer.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import type { EntityId } from '../data/contracts';
 import { resolveApiBase } from '../data/sources';
@@ -28,8 +29,6 @@ import {
   type WarrantNode,
 } from '../intel/warrant';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const COLOR: Record<WarrantBasis, string> = {
   observed: '#dbe7f4',

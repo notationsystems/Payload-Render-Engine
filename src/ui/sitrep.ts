@@ -17,6 +17,7 @@
  *     with it.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import { resolveApiBase } from '../data/sources';
 import { fetchOperations, humanizeOpsCode } from '../data/operations';
@@ -25,8 +26,6 @@ import { correlateQuakes, PROXIMITY_THRESHOLDS } from '../intel/proximity';
 import { recordFeed } from '../core/health';
 import type { Observation } from '../data/contracts';
 
-const esc = (s: string): string =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 const fmtT = (t: string): string => `${t.slice(0, 10)} ${t.slice(11, 16)}Z`;
 const signed = (v: number, dp = 2): string => `${v > 0 ? '+' : ''}${(v * 100).toFixed(dp)}%`;

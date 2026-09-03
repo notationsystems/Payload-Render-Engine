@@ -6,6 +6,7 @@
  * animates; it appears, it informs, it leaves.
  */
 
+import { esc } from '../core/escape';
 import type { AppApi } from '../app/api';
 import { MODE_COLORS_CSS } from '../app/palette';
 import type { EntityId, TransportMode } from '../data/contracts';
@@ -36,9 +37,6 @@ export function createTooltip(api: AppApi): { el: HTMLElement } {
     mouseY = e.clientY;
     if (!el.hidden) place();
   });
-
-  const esc = (s: string): string =>
-    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const render = (id: EntityId): void => {
     const node = api.store.node(id);

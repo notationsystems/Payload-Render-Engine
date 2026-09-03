@@ -5,6 +5,7 @@
  * in-process (no port needed) and fails loudly on any violation.
  */
 
+import { randomUUID } from 'node:crypto';
 import { registerRoutes } from './api.mjs';
 import { loadTerminalCorpus, fixtureFetch } from './loaders/terminal.mjs';
 
@@ -481,6 +482,136 @@ const badId = tcall('GET', '/api/state/%ZZ');
 check(badId?.status === 'refused' && badId.refusal.kind === 'UNPARSEABLE_ID', 'invalid percent-encoding → typed refusal, not a crash');
 const badBox = tcall('GET', '/api/entities?bbox=1,2,3,');
 check(badBox?.status === 'refused' && badBox.refusal.kind === 'UNPARSEABLE_BBOX', "bbox with empty component refused (Number('') must not read as 0)");
+
+// ---- security substrate: the request gate, fail-closed everywhere ----
+// (docs/SECURITY.md — each check names the invariant it defends)
+console.log('\n— security gate —');
+const {
+  guardRequest,
+  hostAllowed,
+  originAllowed,
+  redactError,
+  safeRequestLine,
+  scrubSecrets,
+  securityHeaders,
+  RateLimiter,
+  assertSafeBinding,
+} = await import('./security.mjs');
+
+const CANARY = `canary-${randomUUID()}`; // generated, never a literal (SEC-004)
+const ENV = { PAYLOAD_ALLOWED_ORIGINS: 'http://localhost:5173', PAYLOAD_OPERATIONS_TOKEN: CANARY };
+const gate = (over = {}) =>
+  guardRequest({
+    method: 'GET',
+    headers: { host: '127.0.0.1:8788' },
+    pathname: '/api/snapshot',
+    env: ENV,
+    ...over,
+  });
+
+// SEC-102 host allowlist (DNS-rebinding defence)
+check(hostAllowed('127.0.0.1:8788', ENV) && hostAllowed('localhost:5173', ENV), 'SEC-102 loopback hosts allowed');
+check(!hostAllowed('evil.example.com', ENV), 'SEC-102 foreign Host refused (DNS rebinding)');
+check(
+  gate({ headers: { host: 'attacker.test' } }).refusal?.refusal.kind === 'HOST_NOT_ALLOWED',
+  'SEC-102 rebinding attempt → typed HOST_NOT_ALLOWED, before any handler'
+);
+
+// SEC-101/103 origin allowlist, never a wildcard
+check(originAllowed('http://localhost:5173', ENV) === true, 'SEC-101 allowlisted origin recognised');
+check(originAllowed('https://evil.example', ENV) === false, 'SEC-101 foreign origin rejected');
+check(originAllowed(undefined, ENV) === null, 'SEC-101 absent Origin is not a browser cross-origin read');
+{
+  const cors = gate({ headers: { host: '127.0.0.1:8788', origin: 'http://localhost:5173' } }).corsHeaders;
+  check(cors['Access-Control-Allow-Origin'] === 'http://localhost:5173', 'SEC-103 CORS echoes the exact allowlisted origin');
+  const foreign = gate({ headers: { host: '127.0.0.1:8788', origin: 'https://evil.example' } }).corsHeaders;
+  check(
+    foreign['Access-Control-Allow-Origin'] === undefined,
+    'SEC-103 no CORS header for a foreign origin — never a wildcard'
+  );
+}
+
+// SEC-104 privileged routes fail closed on a foreign origin
+check(
+  gate({ pathname: '/api/operations', headers: { host: '127.0.0.1:8788', origin: 'https://evil.example' } }).refusal
+    ?.refusal.kind === 'ORIGIN_NOT_ALLOWED',
+  'SEC-104 privileged route refuses a foreign origin BEFORE spending authority'
+);
+check(
+  gate({ pathname: '/api/operations', headers: { host: '127.0.0.1:8788', origin: 'http://localhost:5173' } }).refusal === null,
+  'SEC-104 privileged route proceeds for an allowlisted origin'
+);
+check(
+  gate({ pathname: '/api/snapshot', headers: { host: '127.0.0.1:8788', origin: 'https://evil.example' } }).refusal === null,
+  'SEC-104 a non-privileged read is not blocked — CORS alone stops the foreign page reading it'
+);
+
+// SEC-018 read-only
+check(
+  gate({ method: 'POST' }).refusal?.refusal.kind === 'METHOD_NOT_ALLOWED',
+  'SEC-018 POST refused at the transport layer'
+);
+check(gate({ method: 'OPTIONS' }).refusal === null, 'SEC-018 OPTIONS preflight allowed');
+
+// SEC-141 secret scrubbing + SEC-140 error redaction
+check(
+  scrubSecrets(`upstream said ${CANARY} failed`, ENV) === 'upstream said «REDACTED» failed',
+  'SEC-141 configured secrets scrubbed from text'
+);
+{
+  const r = redactError(new Error(`connect ECONNREFUSED with token ${CANARY}`), ENV);
+  check(!JSON.stringify(r.body).includes(CANARY), 'SEC-140 the response body carries no secret');
+  check(!JSON.stringify(r.body).includes('ECONNREFUSED'), 'SEC-140 the response body carries no internal detail');
+  check(/^[0-9a-f-]{36}$/.test(r.body.error.correlationId), 'SEC-140 the client gets a correlation id instead');
+  check(!r.logLine.includes(CANARY), 'SEC-141 the server log line is scrubbed too');
+}
+check(
+  safeRequestLine('/api/x', new URLSearchParams({ commodity: 'copper', sneaky: 'value' }), ENV) ===
+    '/api/x?commodity=copper&sneaky=«dropped»',
+  'SEC-141 request log keeps known-safe params and drops the rest'
+);
+
+// security headers
+{
+  const h = securityHeaders();
+  check(h['X-Content-Type-Options'] === 'nosniff' && h['X-Frame-Options'] === 'DENY', 'security headers set nosniff + frame-deny');
+  check(/default-src 'none'/.test(h['Content-Security-Policy']), 'CSP denies by default on a JSON API');
+}
+
+// SEC-150 rate limiting
+{
+  const rl = new RateLimiter({ local: { capacity: 2, refillPerSec: 1 }, proxied: { capacity: 1, refillPerSec: 0.1 } });
+  const t = 1_000_000;
+  check(rl.take('c1', 'local', t).ok && rl.take('c1', 'local', t).ok, 'SEC-150 requests inside the budget pass');
+  const blocked = rl.take('c1', 'local', t);
+  check(blocked.ok === false && blocked.retryAfterSec >= 1, 'SEC-150 over-budget refused with a retry hint');
+  check(rl.take('c2', 'local', t).ok, 'SEC-150 the limit is per client, not global');
+  check(rl.take('c1', 'local', t + 5000).ok, 'SEC-150 the bucket refills over time');
+}
+
+// safe binding: authority-holding service must not silently go world-reachable
+check(assertSafeBinding('127.0.0.1', {}) === null, 'loopback binding permitted');
+check(typeof assertSafeBinding('0.0.0.0', {}) === 'string', 'off-loopback binding refused without an explicit allowlist');
+check(
+  assertSafeBinding('0.0.0.0', { PAYLOAD_ALLOWED_HOSTS: 'twin.internal', PAYLOAD_ALLOWED_ORIGINS: 'https://twin.internal' }) === null,
+  'off-loopback binding permitted once host+origin policy is explicit'
+);
+
+// SEC-013 — no credential value in any served answer (whole-surface sweep)
+{
+  const probeToken = `canary-${randomUUID()}`;
+  const savedTok = process.env.PAYLOAD_OPERATIONS_TOKEN;
+  process.env.PAYLOAD_OPERATIONS_TOKEN = probeToken;
+  const surfaces = ['/api/system/topology', '/api/capabilities', '/api/health', '/api/corpus/definition'];
+  let leaked = null;
+  for (const s of surfaces) {
+    const body = JSON.stringify(await call('GET', s));
+    if (body.includes(probeToken)) leaked = s;
+  }
+  check(leaked === null, `SEC-013 no served surface echoes the operations credential${leaked ? ` (leaked at ${leaked})` : ''}`);
+  if (savedTok === undefined) delete process.env.PAYLOAD_OPERATIONS_TOKEN;
+  else process.env.PAYLOAD_OPERATIONS_TOKEN = savedTok;
+}
 
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');
 process.exit(failures ? 1 : 0);

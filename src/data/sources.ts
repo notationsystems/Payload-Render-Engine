@@ -19,13 +19,57 @@ import type { SpatialDataProvider } from './provider';
 import { SyntheticProvider } from './synthetic/provider.ts';
 import { RemoteSpatialProvider } from './remote/provider.ts';
 
+const DEFAULT_API_BASE = 'http://127.0.0.1:8787';
+
+/**
+ * SEC-110 — hosts the OS will accept as its backend.
+ *
+ * `?api=` is attacker-reachable: whoever writes the link the operator
+ * clicks chooses this value. An unvalidated base lets a hostile host
+ * serve the ENTIRE corpus — including its own provenance, build ids
+ * and verification claims — so the attacker would control not just the
+ * data but the evidence the OS shows for it. Loopback plus an explicit
+ * same-origin allowance is the whole legitimate surface today.
+ */
+const API_HOST_ALLOWLIST = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
+
+/** Non-null when a supplied base was refused — the UI states it. */
+export let apiBaseRefusal: string | null = null;
+
+/** Exported for tests: is this a base the OS may talk to? */
+export function isAllowedApiBase(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw, typeof location !== 'undefined' ? location.href : DEFAULT_API_BASE);
+  } catch {
+    return false;
+  }
+  // no javascript:, data:, file: — only real transport
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  if (API_HOST_ALLOWLIST.has(u.hostname)) return true;
+  // same-origin is legitimate: the OS served from a host may ask that host
+  return typeof location !== 'undefined' && u.origin === location.origin;
+}
+
 /** ?api=<base> (or bare ?api) selects the Spatial API; default local dev port. */
 export function resolveApiBase(): string {
   if (typeof location !== 'undefined') {
     const p = new URLSearchParams(location.search).get('api');
-    if (p && p !== '1') return p.replace(/\/+$/, '');
+    if (p && p !== '1' && p !== 'off') {
+      if (isAllowedApiBase(p)) {
+        apiBaseRefusal = null;
+        return p.replace(/\/+$/, '');
+      }
+      // fail closed, and SAY SO — a silent fallback would leave the
+      // operator believing they are reading the backend they named
+      apiBaseRefusal =
+        `API BASE REFUSED — "${p}" is not an allowlisted backend. ` +
+        'The OS will not fetch its corpus, provenance or verification claims from an unrecognised host. ' +
+        'REMEDY: use a loopback address or serve the OS from the same origin as its API.';
+      return DEFAULT_API_BASE;
+    }
   }
-  return 'http://127.0.0.1:8787';
+  return DEFAULT_API_BASE;
 }
 
 export type Freshness = 'live' | 'delayed' | 'cached' | 'simulated' | 'unavailable';

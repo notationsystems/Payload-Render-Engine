@@ -50,7 +50,7 @@ import { correlateQuakes, greatCircleKm } from '../intel/proximity';
 import { runMiner, type MinedPattern, type MiningRun } from '../intel/miner';
 import { fetchInjection, type InjectionOutcome, type InjectionParams } from '../data/injection';
 import { deadReckon, fetchLiveAircraft, fetchLiveQuakes, fetchLiveSatellites } from '../live/feeds';
-import { resolveApiBase } from '../data/sources';
+import { apiBaseRefusal, resolveApiBase } from '../data/sources';
 import { LabelsLayer } from '../layers/labelsLayer';
 import { SelectionInput, type Pick } from '../interaction/selection';
 import { FollowTheLoad } from '../interaction/followTheLoad';
@@ -143,8 +143,14 @@ export class App implements AppApi {
     };
 
     progress(8, 'LOADING CORPUS');
-    const wantRemote =
-      typeof location !== 'undefined' && new URLSearchParams(location.search).has('api');
+    // SEC-110 — evaluate the requested backend BEFORE trusting it. A
+    // refused base never gets fetched, and the refusal is surfaced
+    // rather than silently degrading into the local corpus.
+    resolveApiBase();
+    const apiParam =
+      typeof location !== 'undefined' ? new URLSearchParams(location.search).get('api') : null;
+    const wantRemote = apiParam !== null && apiParam !== 'off' && apiBaseRefusal === null;
+    if (apiBaseRefusal) this.sourceFallbackNote = apiBaseRefusal;
     let sourceId = wantRemote ? 'payload-spatial-api' : 'synthetic-demo';
     let snapshot;
     try {
