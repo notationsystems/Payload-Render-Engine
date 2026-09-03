@@ -687,5 +687,66 @@ console.log('\n— security posture —');
   );
 }
 
+// --------------------------------------------------------------------
+// The apparatus register — served, and honest about what it is
+// --------------------------------------------------------------------
+console.log('\n— apparatus register —');
+{
+  const answer = await call('GET', '/api/ecosystem/register');
+  check(answer.status === 'ok', 'GET /api/ecosystem/register answers');
+  const d = answer.data;
+
+  check(
+    /provenance-bearing computational corpora/.test(d.organization.declares),
+    'the register states what the organization does'
+  );
+
+  // A scan is not a probe, and the trust level must not claim otherwise.
+  check(
+    answer.meta.verification.level === 'PROVENANCE',
+    'the register is served at PROVENANCE — it was read at a stated time, not probed now'
+  );
+
+  // The honesty properties, held mechanically rather than by review.
+  const unbuilt = d.apparatuses.filter((a) => a.presence === 'DECLARED' || a.presence === 'SCAFFOLD');
+  check(unbuilt.length >= 1, 'unbuilt apparatuses are IN the register, not omitted from it');
+  check(
+    unbuilt.every((a) => a.absence?.reason && a.absence?.unblockedBy),
+    'every unbuilt apparatus carries its reason and what would unblock it'
+  );
+  check(
+    d.apparatuses.every((a) => Array.isArray(a.readFrom) && a.readFrom.length > 0),
+    'every apparatus row names where its claims were read — a register of provenance-bearing systems may not make unsourced claims'
+  );
+  check(
+    d.divergences.every((x) => x.proposal && x.ownedBy),
+    'every divergence carries a proposal and names who owns the decision'
+  );
+  check(
+    d.counts.stagesUnowned.length >= 1,
+    'a lifecycle stage with no built owner is reported, not smoothed over'
+  );
+  check(
+    d.apparatuses.some((a) => a.stages.includes(d.counts.stagesUnowned[0])),
+    'the unowned stage still has an apparatus row, so it cannot vanish from the map'
+  );
+
+  // It is a MAP, not a mirror: no apparatus record may travel in it.
+  const serialized = JSON.stringify(d);
+  check(
+    !/"entities"|"observations"|"loads"|"snapshot"/.test(serialized),
+    'the register carries no record belonging to any apparatus — it is a map, never a mirror'
+  );
+
+  // SEC-013 still applies to a surface that names credentials by variable
+  const canary = `canary-${randomUUID()}`;
+  const savedTok = process.env.PAYLOAD_OPERATIONS_TOKEN;
+  process.env.PAYLOAD_OPERATIONS_TOKEN = canary;
+  const again = JSON.stringify(await call('GET', '/api/ecosystem/register'));
+  check(!again.includes(canary), 'SEC-013 the register echoes no credential value');
+  if (savedTok === undefined) delete process.env.PAYLOAD_OPERATIONS_TOKEN;
+  else process.env.PAYLOAD_OPERATIONS_TOKEN = savedTok;
+}
+
 console.log(failures ? `\n${failures} FAILURES` : '\nSPATIAL API CONTRACT TESTS CLEAN');
 process.exit(failures ? 1 : 0);

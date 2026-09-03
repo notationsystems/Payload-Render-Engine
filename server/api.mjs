@@ -18,6 +18,7 @@ import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { registerMarketRoutes } from './markets.mjs';
 import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
+import { ecosystemRegister } from '../shared/ecosystem.mjs';
 import { readCappedJson, securityPosture, UPSTREAM_CAPS } from './security.mjs';
 
 /** Version of the entity/observation/relationship/event schema this
@@ -393,6 +394,7 @@ export async function registerRoutes(corpus, runtime = {}) {
       { id: 'operations', family: 'OPERATIONS', label: 'brokerage control tower (mirror)', node: 'terminal', routes: ['/api/operations', '/api/operations/communications', '/api/operations/fuel'], probe: '/api/operations', provenance: 'terminal:operations', authority: { required: 'PAYLOAD_OPERATIONS_TOKEN', present: present('PAYLOAD_OPERATIONS_TOKEN') }, ladder: { observed: true, proposed: 'from journal', approved: 'from journal', dispatched: 'from journal', note: 'the desk proposes and authorizes IN THE TERMINAL; this mirror reads the journal — a cell lights only from a recorded fact' }, dataDomains: ['loads', 'carriers', 'communications'], instrument: 'operations' },
       { id: 'live', family: 'LIVE', label: 'live feeds (aircraft · satellites · seismic · fires)', node: 'spatial-api', routes: ['/api/live/aircraft', '/api/live/satellites', '/api/live/quakes', '/api/live/fires'], probe: '/api/live/quakes', provenance: 'external:observed', ladder: observeOnly, dataDomains: ['contacts', 'hazards'], instrument: 'layers' },
       { id: 'markets', family: 'MARKETS', label: 'FX · crypto · derivatives desks', node: 'spatial-api', routes: ['/api/markets/fx', '/api/markets/crypto', '/api/markets/derivatives'], probe: '/api/markets/fx', provenance: 'external:reported', ladder: observeOnly, dataDomains: ['prices'], instrument: 'markets' },
+      { id: 'ecosystem', family: 'CONTROL', label: 'Notation Systems apparatus register', node: 'spatial-api', routes: ['/api/ecosystem/register'], probe: '/api/ecosystem/register', provenance: 'read from each apparatus tree', ladder: observeOnly, dataDomains: ['apparatuses', 'lifecycle', 'vocabulary'], instrument: 'ecosystem' },
       { id: 'security', family: 'CONTROL', label: 'security posture + refusal journal', node: 'spatial-api', routes: ['/api/security/posture'], probe: '/api/security/posture', provenance: 'read from the live gate', ladder: observeOnly, dataDomains: ['policy', 'invariants', 'refusals'], instrument: 'security' },
       { id: 'markets.broker', family: 'MARKETS', label: 'broker session (IBKR)', node: 'ibkr', routes: ['/api/markets/broker'], probe: '/api/markets/broker', provenance: 'broker:session', authority: { required: 'IBKR_GATEWAY_URL', present: present('IBKR_GATEWAY_URL') }, ladder: { observed: true, proposed: false, approved: false, dispatched: false, note: 'no order path exists in this service — observe only, fail-closed' }, dataDomains: ['positions'], instrument: 'markets' },
     ];
@@ -404,6 +406,30 @@ export async function registerRoutes(corpus, runtime = {}) {
       capabilities,
       cost: { status: 'ABSENT', reason: 'no cost meter exists in this projection service — corpus-platform work' },
     });
+  });
+
+  // ---- the Notation Systems apparatus register ----------------------
+  // Notation Systems builds and operates provenance-bearing computational
+  // corpora, through several apparatuses that each own one stage of the
+  // corpus lifecycle and refuse the others. This route serves the map of
+  // those apparatuses.
+  //
+  // It is a MAP, never a mirror: it carries names, stages, boundaries and
+  // vocabularies, and holds no record belonging to any apparatus. The
+  // standing rule that this projection layer must never become the
+  // database applies one level up as well.
+  //
+  // Trust level is PROVENANCE, not REPRODUCIBLE, and deliberately so: the
+  // register was read from each tree at a stated time. It is a scan, not
+  // a probe, and a surface that let it read as live would be claiming an
+  // observation it never made.
+  get('/api/ecosystem/register', () => {
+    const env = ok(ecosystemRegister());
+    env.meta.verification = verification(
+      'PROVENANCE',
+      'read from each apparatus own tree at the stated time; every row carries readFrom - the files the claim came from. A scan, not a probe: presence OBSERVED means this OS reached it, PRESENT means the tree carries source, DECLARED means a repository exists and carries none.'
+    );
+    return env;
   });
 
   // ---- SEC-152: the security model as a served surface --------------

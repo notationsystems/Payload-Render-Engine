@@ -178,6 +178,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'watches', label: 'watches — standing conditions + trip log', hint: 'WATCH' },
   { text: 'system', label: 'system — the control plane', hint: 'CONTROL' },
   { text: 'security', label: 'security — posture, invariant ledger, refusal journal', hint: 'CONTROL' },
+  { text: 'ecosystem', label: 'ecosystem — the Notation Systems apparatus register', hint: 'CONTROL' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -359,6 +360,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
     window.dispatchEvent(new CustomEvent('pe:refusals-toggle'));
     return ok('REFUSALS WORK QUEUE — one mechanism per group, one shared remedy, ranked');
   }
+  // -- the apparatus register: Notation Systems, and where this OS sits
+  if (lower === 'ecosystem' || lower === 'apparatus' || lower === 'notation') {
+    window.dispatchEvent(new CustomEvent('pe:ecosystem-toggle'));
+    return ok('APPARATUS REGISTER — the corpus lifecycle, its owners, and the stage nobody owns');
+  }
+
   // -- security posture: the model as facts, including what is ABSENT
   if (lower === 'security' || lower === 'posture' || lower === 'invariants') {
     window.dispatchEvent(new CustomEvent('pe:security-toggle'));

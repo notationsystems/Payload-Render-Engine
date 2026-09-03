@@ -7,6 +7,7 @@ import { API, VITE, launchBrowser, reachable } from './harness.mjs';
 
 const SPECS = [
   '05-security.spec.mjs',
+  '07-ecosystem.spec.mjs',
   '10-boot.spec.mjs',
   '15-workspace.spec.mjs',
   '20-query.spec.mjs',

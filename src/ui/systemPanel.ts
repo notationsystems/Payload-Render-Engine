@@ -68,6 +68,7 @@ export function createSystemPanel(api: AppApi): { el: HTMLElement } {
       case 'patterns': window.dispatchEvent(new CustomEvent('pe:patterns-toggle')); break;
       case 'refusals': window.dispatchEvent(new CustomEvent('pe:refusals-toggle')); break;
       case 'security': window.dispatchEvent(new CustomEvent('pe:security-toggle')); break;
+      case 'ecosystem': window.dispatchEvent(new CustomEvent('pe:ecosystem-toggle')); break;
       case 'scenarios': api.setPreset('scenarios'); break;
       case 'operations': api.setPreset('operations'); break;
       case 'markets': api.setPreset('markets'); break;
