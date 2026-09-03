@@ -1003,17 +1003,40 @@ console.log('\n— answer envelope, whole surface —');
 {
   const { PROXIED_PREFIXES } = await import('./security.mjs');
   const swept = [];
+  // A route that leaves the sweep must SAY so. This block's whole purpose is
+  // that a route added later inherits the envelope contract instead of
+  // quietly opting out of it - and a bare `continue` behind a floor of
+  // `>= 10` was defeating precisely that. 31 routes are served, 17 reach the
+  // sweep, and the floor sat 7 below the real figure: a new route under a
+  // proxied prefix dropped out in silence and the check still printed
+  // `ok  the sweep covers the served surface`, a message that also claimed
+  // the whole surface while covering a little over half of it.
+  const excluded = [];
   for (const route of routes) {
     const path = route.pattern.source
       .replace(/^\^|\$$/g, '')
       .replace(/\\\//g, '/');
-    // skip parameterised routes (no id to supply) and anything that
-    // would spend an upstream's quota from a test run
-    if (path.includes('(?<')) continue;
-    if (PROXIED_PREFIXES.some((p) => path.startsWith(p))) continue;
+    if (path.includes('(?<')) {
+      excluded.push({ path, why: 'parameterised - the sweep has no id to supply' });
+      continue;
+    }
+    if (PROXIED_PREFIXES.some((p) => path.startsWith(p))) {
+      excluded.push({ path, why: "proxied - a test run must not spend an upstream's quota" });
+      continue;
+    }
     swept.push(path);
   }
-  check(swept.length >= 10, `the sweep covers the served surface (${swept.length} parameterless routes)`);
+  // Conservation, not a floor. Every served route is either swept or
+  // excluded with a reason, so a route cannot leave the contract without
+  // showing up on one side of this identity.
+  check(
+    swept.length + excluded.length === routes.length,
+    `the sweep accounts for every served route (${swept.length} swept + ${excluded.length} excluded = ${routes.length})`
+  );
+  check(
+    excluded.length > 0 && excluded.every((e) => e.why && e.why.length > 10),
+    `every route left out of the sweep states why (${excluded.length}) - a silent exclusion is how a surface stops being covered`
+  );
 
   const noVerification = [];
   const noBuild = [];
