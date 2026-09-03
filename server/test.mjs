@@ -403,10 +403,14 @@ check(
   topo.capabilities.every((c) => !c.authority || typeof c.authority.present === 'boolean'),
   'authority reported as PRESENT/ABSENT only — never a value'
 );
-check(
-  JSON.stringify(topo).includes(process.env.PAYLOAD_OPERATIONS_TOKEN ?? ' never') === false,
-  'the operations token value never appears in the topology'
-);
+// The topology's credential posture is NOT asserted here. It used to be,
+// against `process.env.PAYLOAD_OPERATIONS_TOKEN ?? <sentinel>` — a shape that
+// passes vacuously whenever the variable is unset, which is every run of the
+// check chain. With a real leak planted in this very handler it printed `ok`.
+// A check that reports success on the failure it names is worse than no check,
+// because it reads as coverage. The property is proven under SEC-013 below,
+// where a canary token is injected into the environment and every served
+// surface — this one included — is swept for it. SEC-155 now forbids the shape.
 check(
   topo.capabilities.every((c) => c.ladder && c.ladder.dispatched !== true),
   'no capability claims dispatched=true — this backend stops at approved'

@@ -234,6 +234,22 @@ not documentary.
   at a version with no known advisories (`npm audit` → 0) because a dev
   server with a path-traversal or wildcard-CORS defect is an operator
   compromise, not a build-time inconvenience. **[checked: lockfile]**
+- **SEC-154** *No source file contains a NUL byte.* One NUL is enough to
+  make a file binary to `grep`, which then prints `binary file matches`
+  and stops — and every pipe downstream of it sees nothing.
+  `server/test.mjs` carried one inside a string literal, which silently
+  excluded its ~400 contract assertions from every grep-based review of
+  this tree, including my own. A file no sweep can read is a file whose
+  assertions nobody will notice the loss of. **[checked: no-nul-byte]**
+- **SEC-155** *No assertion takes its expected value from the
+  environment.* An assertion must be able to fail. The shape that cannot
+  is `process.env.X ?? <sentinel>` inside a check: when `X` is unset —
+  the normal state of the check chain — the sentinel makes the
+  comparison trivially true and the check prints `ok` while testing
+  nothing. This is strictly worse than an absent check, because it reads
+  as coverage. Credential assertions inject a canary and restore the
+  environment afterwards, the way the SEC-013 whole-surface sweep does.
+  **[checked: assertions-can-fail]**
 - **SEC-009** *Provenance stays cryptographically bound* — the
   commitment manifest and inclusion proofs (§Verification Envelope,
   ARCHITECTURE §21) are the tamper-evidence layer; a tampered record
@@ -375,5 +391,43 @@ The dates matter more than the table. A security claim with no date is a
 claim about the past pretending to be about the present, so the sweep
 runs again on every pass that touches the substrate, and what it finds
 goes in the commit that made the change.
+
+### Attacking the verification chain itself
+
+The sweep above attacks the service. The pass on 2026-09-03 attacked the
+*checks*, on the principle that a control is only as good as the thing
+that proves it, and found one that was actively lying.
+
+`server/test.mjs` asserted that the control-plane topology never echoes
+the operations credential, comparing against
+`process.env.PAYLOAD_OPERATIONS_TOKEN ?? <sentinel>`. With the variable
+unset — every run of `npm run check` — the sentinel made the comparison
+trivially true. Planting a real credential leak in the topology handler
+settled it:
+
+| check | on a real planted leak |
+| --- | --- |
+| `the operations token value never appears in the topology` | **`ok`** — reported success on the exact failure it names |
+| `SEC-013 no served surface echoes the operations credential` (canary sweep) | **`FAIL`**, and named the leaking surface |
+
+The property was never uncovered — the SEC-013 sweep injects a canary
+token, sweeps every served surface, and restores the environment. The
+defect was the *second*, weaker assertion sitting 200 lines earlier and
+printing a green line that read as coverage. It has been removed rather
+than repaired, and SEC-155 now makes the shape unwritable.
+
+The same line carried a raw NUL byte in its sentinel literal, which had
+been classifying the whole file as binary to `grep` — silently excluding
+~400 contract assertions from every text sweep of this tree, including
+the ones in this document's own preparation. SEC-154 closes that.
+
+Both new invariants were confirmed to bite by planting a violation and
+watching them fail by name: a NUL byte added to `src/core/health.ts`
+(SEC-154 → FAIL, named the file) and the removed shape restored
+verbatim (SEC-155 → FAIL, quoted the offending span). SEC-155 does not
+fire on the note in `server/test.mjs` that documents it, which quotes
+the forbidden shape verbatim — comments are stripped before the scan,
+because reading prose as code is a mistake this checker has made twice
+before.
 
 ---

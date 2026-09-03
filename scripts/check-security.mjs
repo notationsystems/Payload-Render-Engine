@@ -423,6 +423,82 @@ console.log('— security invariants —');
   );
 }
 
+// ---------------------------------------------------------------- SEC-154
+// A source file that tooling classifies as binary is a file nobody
+// sweeps. One NUL byte is enough: grep prints "binary file matches" and
+// stops, and every downstream pipe sees nothing. server/test.mjs carried
+// one inside a string literal, which quietly excluded ~400 contract
+// assertions from every grep-based review of this tree.
+{
+  const scanned = [
+    ...walk(join(ROOT, 'src')),
+    ...walk(join(ROOT, 'server')),
+    ...walk(join(ROOT, 'scripts')),
+    ...walk(join(ROOT, 'shared')),
+    ...walk(join(ROOT, 'tests')),
+  ];
+  const binary = scanned.filter((f) => read(f).includes('\u0000')).map(rel);
+  check(
+    'SEC-154',
+    'no source file contains a NUL byte',
+    binary.length === 0,
+    binary.join(' \u00b7 '),
+    'remove the NUL - a file grep calls binary is invisible to every sweep, and a security assertion nobody can grep for is one nobody will notice the loss of'
+  );
+}
+
+// ---------------------------------------------------------------- SEC-155
+// An assertion must be able to fail. The shape that cannot is one whose
+// expected value comes from the environment with a fallback: when the
+// variable is unset - the normal state of the check chain - the sentinel
+// makes the comparison trivially true and the check reports ok while
+// testing nothing. That is worse than an absent check, because it reads
+// as coverage. Credential assertions inject a canary instead and restore
+// the environment afterwards (see SEC-013 in server/test.mjs).
+{
+  const ASSERT = /(?<![\w.])(?:check|assert)\s*\(/g;
+  const ENV_FALLBACK = /process\.env\.[A-Za-z_][A-Za-z0-9_]*\s*(?:\?\?|\|\|)/;
+  const assertionFiles = [
+    join(ROOT, 'server/test.mjs'),
+    ...walk(join(ROOT, 'scripts')).filter((f) => /(check|test)-[^/]*\.mjs$/.test(f)),
+    ...walk(join(ROOT, 'tests')).filter((f) => /\.spec\.mjs$/.test(f)),
+  ];
+  const offenders = [];
+  for (const f of assertionFiles) {
+    // strip comments first. The note in server/test.mjs that explains this
+    // very invariant quotes the forbidden shape verbatim, so a checker that
+    // read prose as code would fire on its own documentation - the mistake
+    // this file has already made twice.
+    const code = read(f)
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    for (const m of code.matchAll(ASSERT)) {
+      // the assertion own span, to the matching close paren. Capped: an
+      // unbalanced paren inside a string literal must not let one match
+      // swallow the rest of the file and report a false positive.
+      let depth = 0;
+      let i = m.index + m[0].length - 1;
+      const limit = Math.min(code.length, m.index + 400);
+      for (; i < limit; i += 1) {
+        if (code[i] === '(') depth += 1;
+        else if (code[i] === ')') {
+          depth -= 1;
+          if (depth === 0) break;
+        }
+      }
+      const span = code.slice(m.index, Math.min(i + 1, limit));
+      if (ENV_FALLBACK.test(span)) offenders.push(`${rel(f)}: ${span.replace(/\s+/g, ' ').slice(0, 90)}`);
+    }
+  }
+  check(
+    'SEC-155',
+    'no assertion takes its expected value from the environment',
+    offenders.length === 0,
+    [...new Set(offenders)].join(' \u00b7 '),
+    'inject a canary and restore the environment afterwards, the way SEC-013 does - process.env.X with a fallback sentinel inside an assertion passes vacuously on every run where X is unset, which is every run of this chain'
+  );
+}
+
 // ---------------------------------------------------------------- SEC-152
 // The served invariant ledger is the security model an operator reads.
 // A row claiming ENFORCED with no check named, or a check named that no
