@@ -17,6 +17,7 @@
  */
 
 import { readCapped, readCappedJson, UPSTREAM_CAPS } from './security.mjs';
+import { operationalBasis } from '../shared/envelope.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -140,7 +141,30 @@ function parseTle(text) {
 export function registerLiveRoutes(get, { ok, refuse, meta }) {
   // a live public feed is NOT corpus-derived: the corpus-build identity
   // must never ride on it (undefined keys drop in JSON serialization)
-  const liveMeta = (base, over) => ({ ...base, corpusBuild: undefined, ...over });
+  // THE ONE PATH. Two of the four feeds used to build meta inline and
+  // skip this helper, so they inherited the corpus build id - and, once
+  // the canonical limb landed, would have inherited a canonical
+  // reference naming a dataset their own disclaimer says they are not
+  // part of. The rule was written in the comment above and two routes
+  // did not follow it, which is what an unenforced rule does. Every
+  // feed now goes through here, and SEC-156 holds it.
+  const liveMeta = (base, { upstream, observedAt, limitations, ...over } = {}) => ({
+    ...base,
+    corpusBuild: undefined,
+    // limb 1 is inherited from meta() and must not survive here
+    reference: undefined,
+    ...operationalBasis({
+      upstream: upstream ?? over.upstream ?? 'UNDECLARED',
+      observedAt: observedAt ?? over.knownAt ?? null,
+      limitations: limitations ?? [
+        'LIVE PUBLIC FEED - reported by the named upstream, proxied and cached by this service; not part of the loaded corpus',
+        'no proof root - nothing binds this reading to a committed build, so it cannot be verified offline',
+      ],
+      notCanonical:
+        'a live feed is a reading taken at a moment from a source this service does not own; it is context for the corpus, never a record in it',
+    }),
+    ...over,
+  });
 
   // observed air traffic around a point — gods-eye-view's adsb.lol
   // fallback pattern: regional observed context, never claimed as
@@ -283,18 +307,22 @@ export function registerLiveRoutes(get, { ok, refuse, meta }) {
         failures: r.failures ?? [],
         note: 'TLE element sets only — positions must be COMPUTED by SGP4 client-side and labeled as computed, with the TLE age stated',
       }),
-      meta: {
-        ...meta(r.fetchedAt, 'best_known'),
+      meta: liveMeta(meta(r.fetchedAt, 'best_known'), {
+        upstream: 'celestrak.org (keyless, cached 6h)',
+        observedAt: r.fetchedAt,
+        limitations: [
+          'LIVE PUBLIC FEED - reported by the named upstream, proxied and cached by this service; not part of the loaded corpus',
+          'TLE ELEMENT SETS ONLY - no position is served here. A position must be COMPUTED by SGP4 on the client and labelled computed, with the element-set age stated',
+          'no proof root - nothing binds this reading to a committed build',
+        ],
         sourceClass: FEEDS.satellites.sourceClass,
         valueKind: 'reported',
         admissible: true,
         admissibleBasis: 'reported_disinterested',
         knownAt: r.fetchedAt,
-        upstream: 'celestrak.org (keyless, cached 6h)',
-        // a live public feed is NOT the loaded corpus — its own disclaimer
         disclaimer:
-          'LIVE PUBLIC FEED — reported by the named upstream, proxied and cached by the spatial API; not part of the loaded corpus',
-      },
+          'LIVE PUBLIC FEED - reported by the named upstream, proxied and cached by the spatial API; not part of the loaded corpus',
+      }),
     };
   });
 
@@ -324,17 +352,22 @@ export function registerLiveRoutes(get, { ok, refuse, meta }) {
     }));
     return {
       ...ok({ quakes, fetchedAt: r.fetchedAt, cacheState: r.cacheState, cacheAgeMs: r.ageMs }),
-      meta: {
-        ...meta(r.fetchedAt, 'best_known'),
+      meta: liveMeta(meta(r.fetchedAt, 'best_known'), {
+        upstream: 'earthquake.usgs.gov M2.5+ past day (keyless, cached 5min)',
+        observedAt: r.fetchedAt,
+        limitations: [
+          'LIVE PUBLIC FEED - reported by the named upstream, proxied and cached by this service; not part of the loaded corpus',
+          'MAGNITUDE FLOOR M2.5 - an event below the floor is absent from this reading, which is not the same fact as no event having occurred',
+          'no proof root - nothing binds this reading to a committed build',
+        ],
         sourceClass: FEEDS.quakes.sourceClass,
         valueKind: 'reported',
         admissible: true,
         admissibleBasis: 'reported_disinterested',
         knownAt: r.fetchedAt,
-        upstream: 'earthquake.usgs.gov M2.5+ past day (keyless, cached 5min)',
         disclaimer:
-          'LIVE PUBLIC FEED — reported by the named upstream, proxied and cached by the spatial API; not part of the loaded corpus',
-      },
+          'LIVE PUBLIC FEED - reported by the named upstream, proxied and cached by the spatial API; not part of the loaded corpus',
+      }),
     };
   });
 }

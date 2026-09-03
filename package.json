@@ -2,19 +2,20 @@
   "name": "payload-earth",
   "private": true,
   "version": "0.1.0",
-  "description": "PayLoad OS \u2014 interactive digital twin of the physical economy",
+  "description": "PayLoad OS — interactive digital twin of the physical economy",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "npm run check && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "check": "node scripts/check-seam.mjs && node scripts/check-security.mjs && node scripts/check-ecosystem.mjs && node scripts/validate-provenance.mjs && node scripts/check-sea-lanes.mjs && node scripts/test-miner.mjs && node server/test.mjs && tsc --noEmit",
+    "check": "node scripts/check-seam.mjs && node scripts/check-security.mjs && node scripts/check-ecosystem.mjs && node scripts/check-planes.mjs && node scripts/validate-provenance.mjs && node scripts/check-sea-lanes.mjs && node scripts/test-miner.mjs && node server/test.mjs && tsc --noEmit",
     "server": "node server/index.mjs",
     "server:terminal": "CORPUS=terminal node server/index.mjs",
     "e2e": "node tests/e2e/run.mjs",
     "security": "node scripts/check-security.mjs",
-    "ecosystem": "node scripts/check-ecosystem.mjs"
+    "ecosystem": "node scripts/check-ecosystem.mjs",
+    "planes": "node scripts/check-planes.mjs"
   },
   "dependencies": {
     "satellite.js": "^6.0.2",

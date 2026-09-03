@@ -32,6 +32,7 @@ import { readCappedJson, UPSTREAM_CAPS } from './security.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { operationalBasis } from '../shared/envelope.mjs';
 
 const CACHE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../.live-cache');
 
@@ -251,13 +252,38 @@ async function fetchDerivatives() {
 // ------------------------------------------------------------------ routes
 
 export function registerMarketRoutes(get, { ok, refuse, meta }) {
-  const mktMeta = (fetchedAt, over) => ({
+  // A venue or central-bank answer is NOT corpus-derived, and this
+  // helper already knew it - it dropped the build id and said why. What
+  // it did not do was say what the answer IS. The result answered
+  // `status: ok` with `verification.level: PROVENANCE` and no build, no
+  // root and no declaration: canonical-looking to any client that
+  // checks for a level. The limitation was stated in a disclaimer
+  // string, and prose is not a contract - a client cannot branch on it
+  // and a checker cannot hold it. Now the declaration is structural.
+  const mktMeta = (fetchedAt, { limitations, upstream, ...over } = {}) => ({
     ...meta(fetchedAt, 'best_known'),
     valueKind: 'reported',
     admissible: true,
     knownAt: fetchedAt,
-    // a venue/central-bank answer is NOT corpus-derived — no build id
     corpusBuild: undefined,
+    // limb 1 is inherited from meta() and must not survive here
+    reference: undefined,
+    ...operationalBasis({
+      upstream: upstream ?? 'UNDECLARED',
+      observedAt: fetchedAt,
+      // the route's own disclaimer IS its first limitation. Deriving it
+      // rather than restating it means a market route added later
+      // carries a real limitation instead of a generic one, and the two
+      // can never drift apart into different sentences.
+      limitations: limitations ?? [
+        ...(typeof over.disclaimer === 'string' && over.disclaimer.trim() ? [over.disclaimer] : []),
+        'NO PROOF ROOT - nothing binds this reading to a committed build, so it cannot be verified offline',
+        'NOT PART OF THE LOADED CORPUS - context for the desk, never a record the corpus depends on',
+      ],
+      notCanonical:
+        'a market reading is a quote or a published fix observed at a moment; it is not canonical state and no record in the corpus depends on it',
+    }),
+    ...(upstream ? { upstream } : {}),
     ...over,
   });
 

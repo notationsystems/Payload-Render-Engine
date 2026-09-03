@@ -16,6 +16,8 @@
 import { createHash } from 'node:crypto';
 import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
+import { canonicalBasis, operationalBasis } from '../shared/envelope.mjs';
+import { apiConstitution, planeCoverage, planeOf } from '../shared/planes.mjs';
 import { registerMarketRoutes } from './markets.mjs';
 import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
 import { applyProbes, ecosystemRegister } from '../shared/ecosystem.mjs';
@@ -205,6 +207,13 @@ export async function registerRoutes(corpus, runtime = {}) {
       'PROVENANCE',
       'per-record provenance (source, knownAt, valueKind, admissibility) travels on the records themselves'
     ),
+    // THE KEY INVARIANT, limb 1. Every corpus answer names the dataset
+    // it was drawn from and the root that binds it, so a reader can
+    // verify any record offline rather than trusting this service. If
+    // the corpus carries no root, canonicalBasis returns the
+    // OPERATIONAL limb instead - a canonical reference with nothing to
+    // check it against is the one claim this envelope will not make.
+    ...canonicalBasis({ corpusBuildId: corpusBuild.id, proofRoot: merkleRoot }),
     disclaimer: snapshot.meta.disclaimer,
   });
 
@@ -212,6 +221,37 @@ export async function registerRoutes(corpus, runtime = {}) {
     status: 'ok',
     data,
     meta: meta(asOf, knowledge, frame),
+  });
+
+  /**
+   * An OPERATIONAL answer - limb 2.
+   *
+   * A health check, a capability probe, a gate posture or an upstream
+   * mirror is a reading about a running instance, not a record in the
+   * corpus. Left alone these went through ok() and would now name
+   * `notation://dataset/corpus/<build>` as their canonical reference,
+   * which is false: no inclusion proof will ever fold a health answer
+   * to that root.
+   *
+   * corpusBuild is deliberately KEPT. On these answers it is not a
+   * claim of membership - it says which corpus this instance has
+   * loaded, which is an operational fact about the instance and one an
+   * operator needs. Only the canonical limb is stripped.
+   */
+  const observed = (envelope, { upstream, limitations, notCanonical, observedAt } = {}) => ({
+    ...envelope,
+    meta: {
+      ...envelope.meta,
+      reference: undefined,
+      ...operationalBasis({
+        upstream: upstream ?? 'this service, about itself',
+        observedAt: observedAt ?? new Date().toISOString(),
+        limitations,
+        notCanonical:
+          notCanonical ??
+          'a reading about this running instance at a moment. It is not a record in the corpus and no inclusion proof folds it to the commitment root; the build id it carries says which corpus this instance loaded, not that this answer belongs to it.',
+      }),
+    },
   });
 
   // Unanswerable is not a protocol error: refusals travel as HTTP 200
@@ -301,7 +341,39 @@ export async function registerRoutes(corpus, runtime = {}) {
     const pattern = new RegExp(
       '^' + path.replace(/:([a-zA-Z]+)/g, (_, name) => `(?<${name}>[^/]+)`) + '$'
     );
-    routes.push({ method: 'GET', pattern, handler });
+    // THE DECLARATION ENFORCES ITSELF.
+    //
+    // ROUTE_PLANES says which plane a route belongs to and which limb
+    // its answer must carry. Rather than trust nine handlers to
+    // remember, the registration reads that declaration and holds the
+    // route to it: a route declared OPERATIONAL cannot return a
+    // canonical reference, because the wrapper removes it and puts the
+    // operational limb in its place.
+    //
+    // Idempotent by design. live.mjs and markets.mjs already declare
+    // their own, far more specific, limitations - a live feed knows its
+    // magnitude floor and a venue knows it is one venue - so the
+    // wrapper leaves an answer that already carries limb 2 alone. It
+    // only acts where a handler said nothing.
+    const declared = planeOf(pattern.source.replace(/^\^|\$$/g, '').replace(/\\\//g, '/'));
+    const wrapped =
+      declared?.limb !== 'OPERATIONAL'
+        ? handler
+        : (ctx) => {
+            // sync-preserving on purpose. Making the wrapper async would
+            // turn every synchronous handler into a promise-returning
+            // one and quietly break every caller that does not await -
+            // which is exactly what it did, and what the contract tests
+            // caught. A wrapper must not change the shape of the thing
+            // it wraps.
+            const finish = (out) =>
+              !out || out.status !== 'ok' || out.meta?.observation
+                ? out
+                : observed(out, { upstream: declared.upstream, limitations: declared.limitations });
+            const out = handler(ctx);
+            return out && typeof out.then === 'function' ? out.then(finish) : finish(out);
+          };
+    routes.push({ method: 'GET', pattern, handler: wrapped });
   };
 
   get('/api/health', () =>
@@ -325,6 +397,28 @@ export async function registerRoutes(corpus, runtime = {}) {
       ...(corpus.mappingReport ? { mappingReport: corpus.mappingReport } : {}),
     })
   );
+
+  // The API's own constitution, served. A system that declares four
+  // planes in a document and cannot answer which plane a route belongs
+  // to has a document, not a constitution.
+  get('/api/planes', () => {
+    const served = routes.map((r) => r.pattern.source.replace(/^\^|\$$/g, '').replace(/\\\//g, '/'));
+    const coverage = planeCoverage(served);
+    return ok({
+      ...apiConstitution(),
+      coverage: {
+        ...coverage,
+        // stated, not implied: a reader can see the assignment is total
+        note:
+          coverage.unassigned.length === 0
+            ? 'every served route is assigned a plane; the assignment is conserved, not defaulted'
+            : `${coverage.unassigned.length} served route(s) carry no plane assignment, which is a defect this surface is reporting rather than hiding`,
+      },
+      routeAssignments: Object.fromEntries(
+        served.map((pattern) => [pattern, planeOf(pattern) ?? { plane: null, limb: null }])
+      ),
+    });
+  });
 
   get('/api/capabilities', () =>
     ok(
