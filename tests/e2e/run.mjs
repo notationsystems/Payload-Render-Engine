@@ -15,6 +15,7 @@ const SPECS = [
   '60-injection.spec.mjs',
   '70-refusals.spec.mjs',
   '80-warrant.spec.mjs',
+  '85-watches.spec.mjs',
   '90-ops.spec.mjs',
 ];
 

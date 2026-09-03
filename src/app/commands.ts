@@ -175,6 +175,7 @@ const VERB_SUGGESTIONS: Suggestion[] = [
   { text: 'compiler', label: 'compiler — build + conservation report', hint: 'BUILD' },
   { text: 'refusals', label: 'refusals — the refused:* work queue', hint: 'QUEUE' },
   { text: 'warrant', label: 'warrant — why do we believe this?', hint: 'WARRANT' },
+  { text: 'watches', label: 'watches — standing conditions + trip log', hint: 'WATCH' },
   { text: 'network', label: 'network', hint: 'PRESET' },
   { text: 'intelligence', label: 'intelligence', hint: 'PRESET' },
   { text: 'operations', label: 'operations', hint: 'VIEW' },
@@ -331,6 +332,12 @@ export function executeCommand(api: AppApi, input: string): CommandResult {
   if (lower === 'warrant' || lower === 'why') {
     window.dispatchEvent(new CustomEvent('pe:warrant-toggle'));
     return ok('WARRANT GRAPH — claim → computation → records → sources → build; no score, a chain');
+  }
+
+  // -- watches: standing conditions with stated bases
+  if (lower === 'watch' || lower === 'watches') {
+    window.dispatchEvent(new CustomEvent('pe:watches-toggle'));
+    return ok('WATCHES — standing conditions, evaluated in-browser, every trip with its basis');
   }
 
   // -- vocabulary overlay: the OS learnable in thirty seconds

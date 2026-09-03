@@ -1574,6 +1574,20 @@ input {
   display: inline-block;
 }
 
+/* watches — standing conditions; ok-green identity (armed instrument) */
+.pe-watches { border-top-color: var(--ok); }
+.pe-watches .pe-corpus-kicker { color: var(--ok); border-color: var(--ok); }
+.pe-watches .pe-corpus-banner { color: var(--ok); border-color: rgba(67, 209, 124, 0.4); }
+.pe-watch-chips { display: flex; gap: 6px; margin: 8px 0 2px; }
+.pe-watch-x {
+  margin-left: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+}
+.pe-watch-x:hover { color: var(--alert); }
+.pe-watch-basis { font-family: var(--font-mono); font-size: 8px; color: var(--text-dim); }
+
 /* the vocabulary overlay — wider keys column for command templates */
 .pe-vocab .pe-vocab-k { width: 300px; color: var(--text-mid); }
 

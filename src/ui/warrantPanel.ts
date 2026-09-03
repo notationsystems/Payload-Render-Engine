@@ -14,6 +14,7 @@
 
 import type { AppApi } from '../app/api';
 import type { EntityId } from '../data/contracts';
+import { resolveApiBase } from '../data/sources';
 import type { InjectionResult } from '../data/injection';
 import type { MinedPattern } from '../intel/miner';
 import {
@@ -176,9 +177,10 @@ export function createWarrantPanel(api: AppApi): { el: HTMLElement } {
       <div class="pe-warrant-banner">Trust is a chain you can walk, not a number we assign. Dashed = not an observation. A thin chain looks thin; a hypothetical terminates at an engine, not at evidence.</div>
       <div class="pe-corpus-body pe-warrant-body">${svgFor(doc)}
         ${doc.notes.map((n) => `<div class="pe-corpus-census">· ${esc(n)}</div>`).join('')}
-        <div class="pe-warrant-legend">${LEGEND.map(([b, l]) => `<span class="pe-w-leg"><i style="background:${COLOR[b]}"></i>${l}</span>`).join('')}</div>
+        <div class="pe-warrant-legend">${LEGEND.map(([b, l]) => `<span class="pe-w-leg"><i style="background:${COLOR[b]}"></i>${l}</span>`).join('')}<button type="button" class="pe-query-chip pe-warrant-export" title="Copy the chain as a JSON audit object — with offline-verifiable inclusion proofs when the spatial API serves them">EXPORT AUDIT JSON</button></div>
       </div>`;
     el.querySelector('.pe-patterns-x')!.addEventListener('click', () => setOpen(false));
+    el.querySelector('.pe-warrant-export')!.addEventListener('click', () => void exportAudit(doc));
     for (const g of el.querySelectorAll('.pe-w-click')) {
       g.addEventListener('click', () => {
         const id = (g as HTMLElement).dataset.entity;
@@ -187,6 +189,54 @@ export function createWarrantPanel(api: AppApi): { el: HTMLElement } {
         api.focus(id);
       });
     }
+  };
+
+  /** The chain as a portable audit object: the graph, its notes, the
+   *  build, and — when the spatial API serves a commitment manifest —
+   *  per-record inclusion proofs an auditor verifies OFFLINE with
+   *  scripts/verify-inclusion.mjs. Copied to the clipboard and exposed
+   *  at window.peLastWarrantExport for agents and tests. */
+  const exportAudit = async (doc: WarrantGraphDoc): Promise<void> => {
+    const audit: Record<string, unknown> = {
+      exportedAt: new Date().toISOString(),
+      title: doc.title,
+      subjectKind: doc.subjectKind,
+      graph: { layers: WARRANT_LAYER_TITLES, nodes: doc.nodes, edges: doc.edges },
+      notes: doc.notes,
+      corpusBuild: api.store.snapshot.meta.corpusBuild ?? null,
+    };
+    const proofs: Record<string, unknown> = {};
+    if (api.getDataSourceId() === 'payload-spatial-api') {
+      const ids = [...new Set(doc.nodes.map((n) => n.entityRef).filter((x): x is EntityId => !!x))].slice(0, 12);
+      for (const id of ids) {
+        try {
+          const res = await fetch(`${resolveApiBase()}/api/corpus/commitments?record=${encodeURIComponent(id)}`);
+          const body = (await res.json()) as { status?: string; data?: unknown };
+          if (body.status === 'ok' && body.data) proofs[id] = body.data;
+        } catch {
+          // an unreachable proof is simply absent from the export
+        }
+      }
+      audit.inclusionProofs = proofs;
+      audit.proofNote =
+        'each inclusion proof verifies OFFLINE via scripts/verify-inclusion.mjs — membership in the build, not truth of the record';
+    } else {
+      audit.inclusionProofs = {};
+      audit.proofNote = 'no inclusion proofs — the in-browser corpus serves no commitment manifest';
+    }
+    (window as unknown as Record<string, unknown>).peLastWarrantExport = audit;
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(audit, null, 2));
+      copied = true;
+    } catch {
+      // clipboard blocked — the object still lives on the window handle
+    }
+    api.events.emit('toast', {
+      title: 'WARRANT EXPORTED',
+      body: `${Object.keys(proofs).length} inclusion proof(s) attached · ${copied ? 'copied to clipboard' : 'clipboard blocked — available at window.peLastWarrantExport'}`,
+      tone: 'info',
+    });
   };
 
   const setOpen = (open: boolean): void => {
