@@ -163,6 +163,13 @@ export const APPARATUSES = Object.freeze([
       'the refused:* queue',
       'operations authority (authorize, dispatch, tender)',
       'attestation and the notary',
+      'a transparency log, and a written argument for why it is not a blockchain',
+      // the apparatus ships as TWO services, which the probe above cannot
+      // see: the Next.js app, and osiris-intel on :4000, a 776-line
+      // ontology engine every other service queries via GET /resolve.
+      // Apparatus and service are different granularities, and a register
+      // that conflates them undercounts the ecosystem it maps.
+      'entity resolution (osiris-intel): an ontology engine over OpenSanctions OFAC SDN and Wikidata, with an outbound allowlist, SPARQL injection sanitization and per-IP rate limiting',
     ],
     refuses: [
       'execution without authorization — the gate is deterministic and blocking, on the critical path, and nothing executes without it',
@@ -179,6 +186,9 @@ export const APPARATUSES = Object.freeze([
       'notationsystems/payload-terminal-v0/docs/ARCHITECTURE_LEDGER.md',
       'notationsystems/payload-terminal-v0/src/lib/economy/authorization.ts',
       'notationsystems/payload-terminal-v0/src/lib/economy/',
+      'notationsystems/payload-terminal-v0/intel/server.js',
+      'notationsystems/payload-terminal-v0/docker-compose.yml',
+      'notationsystems/payload-terminal-v0/src/lib/economy/transparencyLog.ts',
     ],
   },
   {
@@ -309,9 +319,15 @@ export const CONVERGENCES = Object.freeze([
   {
     id: 'projection-cannot-write',
     statement: 'A derived representation may not mutate the state it derives from.',
-    seenIn: ['daf', 'ocr', 'render-engine'],
+    // the widest convergence in the register: all four apparatuses, and
+    // the two that state it most explicitly stand at OPPOSITE ends of
+    // the system - the Terminal owns the canonical state and says a
+    // projection over it may never write it; the Render Engine owns the
+    // rendering and says the renderer is never authoritative. Neither
+    // was written from the other.
+    seenIn: ['daf', 'ocr', 'terminal', 'render-engine'],
     evidence:
-      'OCR: no canonical writer exists in the package, audited over its own source tree. Render Engine: INV-6, mechanically checked by scripts/check-seam.mjs. DAF: the projection chain and the evidence chain do not import each other.',
+      'Terminal (from the CANONICAL side, by the apparatus that owns the state): corpusTable.ts frames itself as "A PROJECTION over canonical state: no new number ... Never authoritative, never editable, never re-importable". Render Engine (from the RENDERING side): INV-6, mechanically checked by scripts/check-seam.mjs, and SEC-017 in the invariant ledger. OCR: no canonical writer exists in the package, audited over its own source tree. DAF: the projection chain and the evidence chain do not import each other. The data-platform doctrine states it a fourth time as "no serving projection writes canonical truth" - and none of the four was copied from another.',
   },
   {
     id: 'prove-the-check',
@@ -334,6 +350,22 @@ export const CONVERGENCES = Object.freeze([
     seenIn: ['daf', 'render-engine'],
     evidence:
       "DAF generates docs/generated/DOCTRINE.md from architecture/*.yaml and diffs it as a gate. The Render Engine's invariant ledger is declared once in code, served, and checked for drift.",
+  },
+  {
+    id: 'not-a-blockchain',
+    statement:
+      'Tamper-evidence is not consensus. A private chain cannot prove its owner did not rewrite it.',
+    seenIn: ['terminal', 'render-engine'],
+    evidence:
+      'Terminal: transparencyLog.ts argues it in its own header - "A blockchain solves CONSENSUS AMONG MUTUALLY DISTRUSTING WRITERS. Internally there is one writer, so consensus is free and its machinery is pure overhead ... a private chain where you control every node CANNOT PROVE YOU DID NOT REWRITE IT. The chain says so means we say so". Render Engine: the commitment manifest states on its own surface that it is tamper-evidence and NOT attestation, and that binding the root to a time or an identity requires a signature this projection cannot make. Both refuse the same shortcut, and both say why on the surface rather than in a design note.',
+  },
+  {
+    id: 'fail-closed-on-a-broken-chain',
+    statement:
+      'A verification that cannot complete fails closed. Nothing is truncated, softened, or silently repaired.',
+    seenIn: ['terminal', 'render-engine'],
+    evidence:
+      'Terminal: loadOperationsStore.ts persists workflow events as hash-linked JSONL and, on restart, "replays and verifies the entire chain. A partial or conflicting line refuses recovery instead of truncating history" - the failure mode chosen is refusing to start, not starting with less history. Render Engine: SEC-014 requires a cryptographic verification failure to fail closed, and the offline verifier proves it by failing a tampered record rather than reporting a warning.',
   },
 ]);
 

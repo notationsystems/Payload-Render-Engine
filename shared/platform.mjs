@@ -23,6 +23,24 @@
  * The build order matters and is not this file's to choose. What this
  * file can do is stop the layers being claimed before they exist, and
  * name what each one would plug into.
+ *
+ * TWO SCOPES, NEVER COLLAPSED.
+ *
+ *   presence  - the state IN THIS SERVICE, a read-only projection
+ *   ecosystem - who in the PROGRAM holds this layer, with the files the
+ *               claim was read from
+ *
+ * They are different questions and the first alone is misleading. Every
+ * layer below the projection is ABSENT here, and four of the six are
+ * held by the Terminal: it has an archive manifest with per-file content
+ * hashes, a canonical state assembly, a carrier outbox with a dispatch
+ * gateway behind it, flow vintages, a notary whose SP1 program is
+ * written and whose equivalence to its reference implementation is
+ * asserted by test, and a transparency log. A register that reported
+ * only the first scope would read as "the program has none of this",
+ * which is the same scale error the control plane and the apparatus
+ * register made when one said Payload and the other said Notation
+ * Systems. Both were true; together they were incoherent.
  */
 
 /** The six layers, in the order they are built. */
@@ -42,6 +60,24 @@ export const PLATFORM_LAYERS = Object.freeze([
       'the capture already carries three of the five required object attributes (content, source, capture instant); it carries no content hash, rights, retention or access scope',
     unblockedBy:
       'an S3-compatible store with the four zones, and a capture writer that records the remaining attributes per object. The loader seam is already shaped for it: a transport declares the instant of the capture it replays, and the build prefers that over the clock',
+    // WHO HOLDS IT IN THE ECOSYSTEM. `presence` above is this service
+    // only; without this field a reader scanning "1. Object storage -
+    // ABSENT" concludes the program has none, which would be this
+    // register telling the systems engineer his work does not exist.
+    ecosystem: {
+      holder: 'terminal',
+      holds: [
+        'an archive manifest generator that walks the archive roots and writes data-archive/MANIFEST.json - every file with its sha256, byte count and DURABILITY CLASS',
+        'the manifest is verified against the tree by its own test, so it cannot drift from what is actually stored',
+        'dated capture directories (data-archive/comtrade/2026-08-27) - captures archived under the day they were taken',
+      ],
+      readFrom: [
+        'notationsystems/payload-terminal-v0/scripts/archive-manifest.mjs',
+        'notationsystems/payload-terminal-v0/data-archive/MANIFEST.json',
+        'notationsystems/payload-terminal-v0/src/lib/economy/flowVintages.ts',
+      ],
+      note: 'the manifest half of this layer without the storage half: content hashes, byte counts, a durability class and dated partitions, on a committed tree rather than in an object store. The zones are not separated and there is no rights or access-scope attribute.',
+    },
     owner: 'SYSTEMS_ENGINEER',
   },
   {
@@ -59,6 +95,20 @@ export const PLATFORM_LAYERS = Object.freeze([
       'two loaders already implement that interface, so the seam is exercised rather than theoretical. The bitemporal half is partly modelled here already - answers carry asOf, knownAt and a knowledge mode, and refuse as_known_then where the corpus cannot honestly replay it',
     unblockedBy:
       'the database itself. Note the row-level-security caveat: privileged roles bypass RLS unless explicitly constrained, so tenant isolation is a property of the role grants and not of the policy alone',
+    ecosystem: {
+      holder: 'terminal',
+      holds: [
+        'canonical economy state assembly: adapter payloads merged into one validated EconomyState per commodity, with the relationships that are mechanical consequences of the data derived rather than restated',
+        'append-only persistence for workflow events as hash-linked JSONL records; restart replays and VERIFIES the whole chain, and a partial or conflicting line refuses recovery instead of truncating history',
+        'ENTITY RESOLUTION, as a second service: osiris-intel on :4000, an ontology engine that ingests, indexes and correlates entities across open-source feeds (OpenSanctions OFAC SDN, Wikidata) and answers GET /resolve for every other service',
+      ],
+      readFrom: [
+        'notationsystems/payload-terminal-v0/src/lib/economy/store.ts',
+        'notationsystems/payload-terminal-v0/src/lib/economy/loadOperationsStore.ts',
+        'notationsystems/payload-terminal-v0/intel/server.js',
+      ],
+      note: 'the apparatus register already records the Terminal as owning the canonical stage. It is assembled in process from adapters and persisted as hash-linked JSONL, not held in a database - PostgreSQL and PostGIS would replace the mechanism, not the ownership. The fail-closed recovery is the same rule as SEC-014, reached from the storage side.',
+    },
     owner: 'SYSTEMS_ENGINEER',
   },
   {
@@ -77,6 +127,21 @@ export const PLATFORM_LAYERS = Object.freeze([
       'the plane is declared with its refusals stated, so the shape of what would arrive is already written down: signed federation packets, acknowledgements, replay reports, audit reads - and never public canonical CRUD',
     unblockedBy:
       'the canonical store existing first. An outbox is a consequence of transactional writes, and there are none until layer 2',
+    ecosystem: {
+      holder: 'terminal',
+      holds: [
+        'a carrier communication OUTBOX with its own store, and a dispatch gateway behind it',
+        'a persistent load-operations workflow with an event store and outcome capture, surviving restart by replaying its hash-linked chain',
+        'a deterministic blocking authorization gate on the critical path - nothing executes without it',
+      ],
+      readFrom: [
+        'notationsystems/payload-terminal-v0/src/lib/economy/carrierCommunicationsStore.ts',
+        'notationsystems/payload-terminal-v0/src/lib/economy/loadOperations.ts',
+        'notationsystems/payload-terminal-v0/src/lib/economy/carrierDispatchGateway.ts',
+        'notationsystems/payload-terminal-v0/src/lib/economy/authorization.ts',
+      ],
+      note: 'the pattern exists and the transaction does not: the outbox is store-backed rather than a PostgreSQL transactional outbox, and there is no durable workflow engine behind it. This is the layer where the two apparatuses are most easily confused - the Terminal HAS an outbox, and this service has none and must not grow one.',
+    },
     owner: 'SYSTEMS_ENGINEER',
   },
   {
@@ -98,6 +163,18 @@ export const PLATFORM_LAYERS = Object.freeze([
       'this was not true until it was measured: three builds a second apart produced three different merkle roots with identical record counts, because knownAt on the four projected collections was stamped from the wall clock. One value governs it, and the contract tests now hold it',
     unblockedBy:
       'a table format with snapshots to write the builds into. The reproducibility property it depends on is now proven at this end',
+    ecosystem: {
+      holder: 'terminal',
+      holds: [
+        'historical facts carried as VINTAGES: reporter-declared bilateral flows become one vintage per (reporter, year), captured live and archived under the capture date',
+        'a corpus table and export surface, explicitly framed as a projection over canonical state - never authoritative, never editable, never re-importable',
+      ],
+      readFrom: [
+        'notationsystems/payload-terminal-v0/src/lib/economy/flowVintages.ts',
+        'notationsystems/payload-terminal-v0/src/lib/economy/corpusTable.ts',
+      ],
+      note: 'vintages and dated archives are the reproducibility idea this layer needs, without the table format. No Parquet, no Iceberg, no snapshot isolation or schema evolution anywhere in the program.',
+    },
     owner: 'SYSTEMS_ENGINEER',
   },
   {
@@ -119,7 +196,20 @@ export const PLATFORM_LAYERS = Object.freeze([
     evidence:
       'the no-write property is enforced twice, from both ends: scripts/check-seam.mjs holds INV-6 in the renderer, and SEC-018 refuses non-GET methods at the transport layer',
     unblockedBy:
-      'for semantic: canonical ids from layer 2, then a measured latency/scale case for pgvector versus a dedicated store. For graph: a measured traversal limit, not an anticipated one',
+      'for semantic: canonical ids to key to. That blocker now has a concrete seam rather than a wish - osiris-intel already answers GET /resolve as the ecosystem entity-resolution engine, so the question is whether this projection keys to ITS ids or mints its own, which is a decision the substrate owns and not one to take here. Then a measured latency/scale case for pgvector versus a dedicated store. For graph: a measured traversal limit, not an anticipated one',
+    ecosystem: {
+      holder: 'render-engine',
+      holds: [
+        'this service is the ecosystem serving projection - the spatial, graph and lexical surfaces the desk actually reads',
+        'the Terminal holds a second projection of its own (the corpus table and export surface) under the same rule',
+        "gods-eye-view is a third observation surface, built independently and not read by this service",
+      ],
+      readFrom: [
+        'notationsystems/payload-terminal-v0/src/lib/economy/corpusTable.ts',
+        'notationsystems/gods-eye-view/README.md',
+      ],
+      note: 'the no-write rule holds in both apparatuses and was reached independently: corpusTable.ts states never authoritative, never editable, never re-importable, which is INV-6 and SEC-017 arrived at from the canonical side rather than the rendering side.',
+    },
     owner: 'SHARED',
   },
   {
@@ -142,6 +232,24 @@ export const PLATFORM_LAYERS = Object.freeze([
       'the ladder is enforced, not decorative: every ok answer states its level AND the basis for it, and the contract tests fail a route that claims a level without a basis',
     unblockedBy:
       'signing the commitment root is the single act that unblocks ATTESTED, trusted signers and a real rotation path. SP1 needs a deterministic computation worth proving - the mining run is the candidate, since it is already named by inputs plus program',
+    ecosystem: {
+      holder: 'terminal',
+      holds: [
+        'a notary engine - deterministic, prover-agnostic, and honest about what it cannot evaluate',
+        'AN SP1 PROGRAM THAT ALREADY EXISTS: docs/notary.program.md computes exactly the predicate the reference implementation evaluates, and the equivalence between circuit and reference is asserted by test',
+        'a transparency log, with a written argument for why it is NOT a blockchain',
+        'process observability: what the process did, how often it failed, and what its outbound behaviour looked like',
+        'a credit governor for metered providers',
+      ],
+      readFrom: [
+        'notationsystems/payload-terminal-v0/src/lib/economy/notary.ts',
+        'notationsystems/payload-terminal-v0/docs/notary.program.md',
+        'notationsystems/payload-terminal-v0/src/lib/economy/transparencyLog.ts',
+        'notationsystems/payload-terminal-v0/src/lib/economy/observability.ts',
+        'notationsystems/payload-terminal-v0/src/lib/economy/spendGovernor.ts',
+      ],
+      note: 'SP1 is NOT a future item for the program - it is written, and its equivalence to the reference implementation is tested. What is absent is a path from that notary to THIS service verification ladder: nothing here can currently consume a notary attestation, which is why ATTESTED is unreached here rather than unreached everywhere.',
+    },
     owner: 'SYSTEMS_ENGINEER',
   },
 ]);

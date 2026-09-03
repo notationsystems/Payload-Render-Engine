@@ -19,6 +19,8 @@
  * Every failure names the plane rule it breaks and the remedy.
  */
 
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { registerRoutes } from '../server/api.mjs';
 import { limbOf } from '../shared/envelope.mjs';
 import {
@@ -30,6 +32,9 @@ import {
   countPresence,
 } from '../shared/planes.mjs';
 import { PLATFORM_LAYERS } from '../shared/platform.mjs';
+
+// the workspace root: this repo's parent, where the sibling apparatuses live
+const WORKSPACE = resolve(new URL('../..', import.meta.url).pathname);
 
 const failures = [];
 let checks = 0;
@@ -293,6 +298,66 @@ check(
     emptyPresent.length === 0,
     emptyPresent.map((l) => l.id).join(' - '),
     'mark it ABSENT with its reason, which is the honest state, rather than PARTIAL with an empty list'
+  );
+}
+
+// ---------------------------------------------------------- PLANE-011
+// TWO SCOPES, NEVER COLLAPSED.
+//
+// `presence` is this service; `ecosystem` is who in the program holds
+// the layer. Reporting only the first is how a register tells the
+// systems engineer his work does not exist: four of the six layers are
+// ABSENT here and held by the Terminal, which has an archive manifest
+// with per-file content hashes, a canonical state assembly, a carrier
+// outbox with a dispatch gateway, flow vintages, and a notary whose SP1
+// program is written and tested against its reference implementation.
+{
+  const noScope = PLATFORM_LAYERS.filter((l) => !l.ecosystem);
+  check(
+    'PLANE-011',
+    `every layer states BOTH scopes - here, and who holds it in the program (${PLATFORM_LAYERS.length} layers)`,
+    noScope.length === 0,
+    noScope.map((l) => l.id).join(' - '),
+    'add an ecosystem block naming the holder, what it holds and where that was read from - or holder: null with the reason nobody holds it. A layer reporting only this service reads as "the program has none of this"'
+  );
+
+  const claimsNothing = PLATFORM_LAYERS.filter(
+    (l) => l.ecosystem?.holder && (l.ecosystem.holds ?? []).length === 0
+  );
+  check(
+    'PLANE-011',
+    'a named ecosystem holder names what it actually holds',
+    claimsNothing.length === 0,
+    claimsNothing.map((l) => l.id).join(' - '),
+    'naming a holder without naming what it holds is an attribution, not a finding'
+  );
+
+  // the phantom-route lesson, applied to the platform register: a claim
+  // about another apparatus must cite a file that exists, or the
+  // register is describing a program that does not
+  const missing = [];
+  for (const l of PLATFORM_LAYERS) {
+    for (const r of l.ecosystem?.readFrom ?? []) {
+      if (!existsSync(join(WORKSPACE, r))) missing.push(`${l.id}: ${r}`);
+    }
+  }
+  check(
+    'PLANE-011',
+    `every ecosystem claim cites a file that exists (${PLATFORM_LAYERS.reduce((n, l) => n + (l.ecosystem?.readFrom ?? []).length, 0)} sources)`,
+    missing.length === 0,
+    missing.join(' - '),
+    'a claim about a sibling apparatus read from a path that is not there is the register describing a program that does not exist. Read it again, or drop the claim'
+  );
+
+  const unsourced = PLATFORM_LAYERS.filter(
+    (l) => l.ecosystem?.holder && (l.ecosystem.readFrom ?? []).length === 0
+  );
+  check(
+    'PLANE-011',
+    'every ecosystem claim says where it was read',
+    unsourced.length === 0,
+    unsourced.map((l) => l.id).join(' - '),
+    'the apparatus register makes every row carry its readFrom for the same reason: a claim about another team work is worth exactly what its source is'
   );
 }
 
