@@ -20,10 +20,16 @@ export async function run() {
   const proof = (
     await (await fetch(`${API}/api/corpus/commitments?record=${encodeURIComponent(anyNode)}`)).json()
   )?.data;
-  const verdict = verifyInclusion(proof);
-  r.ok(verdict.ok === true, `inclusion proof for ${anyNode} verifies offline`);
+  // SEC-182: fetch the root from the MANIFEST in its own request. A proof
+  // verified against the root it carries proves only self-consistency.
+  // the manifest was already fetched above, in its OWN request - that is
+  // exactly the independence SEC-182 requires
+  const trustedRoot = manifest?.merkleRoot;
+  const verdict = verifyInclusion(proof, trustedRoot);
+  r.ok(verdict.ok === true, `inclusion proof for ${anyNode} verifies offline against the manifest root`);
   const tampered = { ...proof, record: { ...proof.record, name: 'Tampered Name' } };
-  r.ok(verifyInclusion(tampered).ok === false, 'a tampered record fails offline verification');
+  r.ok(verifyInclusion(tampered, trustedRoot).ok === false, 'a tampered record fails offline verification');
+  r.ok(verifyInclusion(proof, undefined).ok === false, 'SEC-182 no independent root -> refused, never verified');
 
   return r.done();
 }

@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { loadSyntheticCorpus } from './loaders/synthetic.mjs';
 import { registerLiveRoutes } from './live.mjs';
 import { canonicalBasis, derivedBasis, operationalBasis } from '../shared/envelope.mjs';
+import { leafHash as sharedLeafHash } from '../shared/commitment.mjs';
 import { apiConstitution, planeCoverage, planeOf } from '../shared/planes.mjs';
 import { platformPosition } from '../shared/platform.mjs';
 import { apiRegister } from '../shared/apis.mjs';
@@ -99,7 +100,9 @@ export async function registerRoutes(corpus, runtime = {}) {
   // nodes - which is a `sha256-merkle/0.2` migration rather than a
   // patch, because it changes the root of every build ever committed.
   // The algorithm is already versioned for exactly that reason.
-  const leafHash = (collection, rec) => sha256(`${collection}:${rec.id}\n${JSON.stringify(rec)}`);
+  // the rule itself lives in shared/commitment.mjs so the test calls the
+  // SAME function rather than a copy of its format (SEC-181)
+  const leafHash = sharedLeafHash;
   const COMMIT_COLLECTIONS = ['nodes', 'routes', 'flows', 'commodities', 'events', 'assertions', 'observations'];
   const commitLeaves = [];
   const commitIndex = new Map(); // record id → { index, collection, record }

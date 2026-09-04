@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { leafPreimage, internalPreimage, INTERNAL_PREIMAGE_SHAPE } from '../shared/commitment.mjs';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { registerRoutes } from './api.mjs';
@@ -377,10 +378,34 @@ const tRoot = (await tcall('GET', '/api/corpus/commitments'))?.data?.merkleRoot;
 check(!!tRoot && tRoot !== rootA, 'different corpora ⇒ different roots');
 const proof = (await call('GET', '/api/corpus/commitments?record=node%3Aport-shanghai'))?.data;
 check(!!proof?.path?.length && proof.root === manifest.merkleRoot, 'inclusion proof served with a path to the manifest root');
-const verdict = verifyInclusion(proof);
-check(verdict.ok === true, 'inclusion proof verifies OFFLINE (scripts/verify-inclusion.mjs)');
+// SEC-182: the root is supplied from the MANIFEST, fetched in its own
+// request, never from the proof document. Verifying a proof against the
+// root it carries is circular and always passes.
+const verdict = verifyInclusion(proof, manifest.merkleRoot);
+check(verdict.ok === true, 'inclusion proof verifies OFFLINE against the manifest root (scripts/verify-inclusion.mjs)');
 const tampered = { ...proof, record: { ...proof.record, name: 'Port of Somewhere Else' } };
-check(verifyInclusion(tampered).ok === false, 'a tampered record FAILS offline verification');
+check(verifyInclusion(tampered, manifest.merkleRoot).ok === false, 'a tampered record FAILS offline verification');
+check(
+  verifyInclusion(proof, undefined).ok === false,
+  'SEC-182 verification with NO independent root REFUSES rather than verifying'
+);
+{
+  // the forgery that used to pass: a record in no build, with an empty
+  // path so root === leaf. Self-consistent, and therefore accepted by
+  // any verifier that checks a document against itself.
+  const forgedRec = { id: 'node:port-shanghai', name: 'Port of Nowhere', status: 'CLOSED - FABRICATED' };
+  const forgedLeaf = createHash('sha256').update(`nodes:${forgedRec.id}\n${JSON.stringify(forgedRec)}`).digest('hex');
+  const forged = { algorithm: 'sha256-merkle/0.1', collection: 'nodes', record: forgedRec, leaf: forgedLeaf, path: [], root: forgedLeaf };
+  check(
+    verifyInclusion(forged, undefined).ok === false,
+    'SEC-182 a self-referential forgery is refused when no root is supplied'
+  );
+  const againstReal = verifyInclusion(forged, manifest.merkleRoot);
+  check(
+    againstReal.ok === false && /DIFFERENT root/.test(againstReal.reason),
+    'SEC-182 a self-referential forgery FAILS against a real build root, naming why'
+  );
+}
 const badRec = await call('GET', '/api/corpus/commitments?record=node%3Adoes-not-exist');
 check(
   badRec?.status === 'refused' && badRec.refusal.kind === 'UNKNOWN_RECORD',
@@ -1026,21 +1051,31 @@ console.log('\n— vocabulary alignment —');
 // --------------------------------------------------------------------
 console.log('\n- merkle domain separation -');
 {
-  const INTERNAL_SHAPE = /^[0-9a-f]{128}$/;
   const corpus = await loadTerminalCorpus({ fetchImpl: fixtureFetch });
   const COLS = ['nodes', 'routes', 'flows', 'commodities', 'events', 'assertions', 'observations'];
   let checked = 0;
   let confusable = null;
   for (const c of COLS) {
     for (const rec of corpus.snapshot[c] ?? []) {
-      const preimage = `${c}:${rec.id}\n${JSON.stringify(rec)}`;
+      const preimage = leafPreimage(c, rec);
       checked += 1;
-      if (INTERNAL_SHAPE.test(preimage)) confusable = `${c}:${rec.id}`;
+      if (INTERNAL_PREIMAGE_SHAPE.test(preimage)) confusable = `${c}:${rec.id}`;
     }
   }
   check(
     checked > 100,
     `domain separation tested over the real corpus (${checked} leaf preimages)`
+  );
+  // POSITIVE CONTROL. Without one, a broken INTERNAL_SHAPE that never
+  // matches anything would make the whole block pass vacuously - which
+  // is what an audit found in the first version of this check.
+  check(
+    INTERNAL_PREIMAGE_SHAPE.test(internalPreimage('a'.repeat(64), 'b'.repeat(64))),
+    'the internal-node shape MATCHES a real internal preimage (positive control)'
+  );
+  check(
+    !INTERNAL_PREIMAGE_SHAPE.test(leafPreimage('nodes', corpus.snapshot.nodes[0])),
+    'and does NOT match a real leaf preimage (negative control)'
   );
   check(
     confusable === null,
@@ -1049,7 +1084,7 @@ console.log('\n- merkle domain separation -');
 
   // the separator characters are what make it true - assert them rather
   // than assuming the format
-  const sample = `nodes:${corpus.snapshot.nodes[0].id}\n${JSON.stringify(corpus.snapshot.nodes[0])}`;
+  const sample = leafPreimage('nodes', corpus.snapshot.nodes[0]);
   check(
     sample.includes(':') && sample.includes('\n'),
     'the leaf format carries the separators the separation depends on'

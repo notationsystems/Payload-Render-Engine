@@ -552,6 +552,8 @@ export const SECURITY_INVARIANTS = Object.freeze([
     statement: 'No assertion takes its expected value from the environment - a check that cannot fail is not coverage.' },
   { id: 'SEC-180', domain: 'integrity', state: 'ENFORCED', check: 'disclosure-allowlist',
     statement: 'A served provenance citation names only a repository cleared for disclosure - never a private one.' },
+  { id: 'SEC-182', domain: 'integrity', state: 'ENFORCED', check: 'independent-root',
+    statement: 'An inclusion proof is verified against a root supplied independently of the proof - a proof checked against the root it carries proves only that it agrees with itself.' },
   { id: 'SEC-181', domain: 'integrity', state: 'ENFORCED', check: 'merkle-domain-separation',
     statement: 'No Merkle leaf preimage can be confused with an internal node - the fold promotes odd nodes, so the structure is ambiguous without it.' },
   { id: 'SEC-160', domain: 'integrity', state: 'ENFORCED', check: 'lockfile',
