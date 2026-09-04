@@ -72,6 +72,33 @@ export async function registerRoutes(corpus, runtime = {}) {
   // no signing capability exists in this projection service.
   const COMMIT_ALGORITHM = 'sha256-merkle/0.1';
   const sha256 = (s) => createHash('sha256').update(s).digest('hex');
+  // SEC-181 - DOMAIN SEPARATION BETWEEN LEAF AND INTERNAL NODES.
+  //
+  // This fold promotes an odd node unchanged, which makes the TREE
+  // STRUCTURE ambiguous. Demonstrated, not theorised:
+  //
+  //   fold([A, B, C])           === fold([sha256(A + B), C])
+  //
+  // Both produce one root, so an internal node can be presented as a
+  // leaf. That is the second-preimage shape, and in a construction with
+  // attacker-chosen leaves it would be exploitable.
+  //
+  // It is NOT exploitable here, for a reason worth writing down because
+  // it was an accident before it was a decision: a LEAF preimage is
+  // `collection:id\nJSON`, which always contains a colon and a newline,
+  // while an INTERNAL preimage is exactly 128 hex characters. No record
+  // can serialize to 128 hex characters, so no leaf can ever be mistaken
+  // for an internal node. SEC-181 now enforces that property instead of
+  // relying on it holding by luck - change this format to something
+  // pure-hex and the check fails.
+  //
+  // (The Bitcoin CVE-2012-2459 duplicate-last-leaf collision does not
+  // apply: the odd node is PROMOTED, not duplicated. Verified.)
+  //
+  // The clean fix is tagged hashing - 0x00 for leaves, 0x01 for internal
+  // nodes - which is a `sha256-merkle/0.2` migration rather than a
+  // patch, because it changes the root of every build ever committed.
+  // The algorithm is already versioned for exactly that reason.
   const leafHash = (collection, rec) => sha256(`${collection}:${rec.id}\n${JSON.stringify(rec)}`);
   const COMMIT_COLLECTIONS = ['nodes', 'routes', 'flows', 'commodities', 'events', 'assertions', 'observations'];
   const commitLeaves = [];

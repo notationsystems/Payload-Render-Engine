@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { registerRoutes } from './api.mjs';
 import { loadTerminalCorpus, fixtureFetch } from './loaders/terminal.mjs';
@@ -1013,6 +1014,55 @@ console.log('\n— vocabulary alignment —');
 // instead of quietly opting out of it. Five routes were added in one
 // pass recently; that is exactly when an envelope contract drifts.
 // --------------------------------------------------------------------
+// --------------------------------------------------------------------
+// SEC-181 - the Merkle fold's domain separation, enforced.
+//
+// fold([A,B,C]) === fold([H(A|B),C]) - the structure is ambiguous, so a
+// leaf that could also be an internal node would be a second preimage.
+// A leaf preimage is `collection:id\nJSON`; an internal preimage is 128
+// hex characters. The separation holds only while no record can
+// serialize to pure hex of that length. That was luck; this makes it a
+// property.
+// --------------------------------------------------------------------
+console.log('\n- merkle domain separation -');
+{
+  const INTERNAL_SHAPE = /^[0-9a-f]{128}$/;
+  const corpus = await loadTerminalCorpus({ fetchImpl: fixtureFetch });
+  const COLS = ['nodes', 'routes', 'flows', 'commodities', 'events', 'assertions', 'observations'];
+  let checked = 0;
+  let confusable = null;
+  for (const c of COLS) {
+    for (const rec of corpus.snapshot[c] ?? []) {
+      const preimage = `${c}:${rec.id}\n${JSON.stringify(rec)}`;
+      checked += 1;
+      if (INTERNAL_SHAPE.test(preimage)) confusable = `${c}:${rec.id}`;
+    }
+  }
+  check(
+    checked > 100,
+    `domain separation tested over the real corpus (${checked} leaf preimages)`
+  );
+  check(
+    confusable === null,
+    `no leaf preimage can be confused with an internal node${confusable ? ` (${confusable})` : ''} - an internal preimage is 128 hex chars; a leaf carries a colon and a newline`
+  );
+
+  // the separator characters are what make it true - assert them rather
+  // than assuming the format
+  const sample = `nodes:${corpus.snapshot.nodes[0].id}\n${JSON.stringify(corpus.snapshot.nodes[0])}`;
+  check(
+    sample.includes(':') && sample.includes('\n'),
+    'the leaf format carries the separators the separation depends on'
+  );
+
+  // and the promotion is a promotion, not a duplication (CVE-2012-2459)
+  const src = readFileSync(new URL('./api.mjs', import.meta.url), 'utf8');
+  check(
+    /next\.push\(i \+ 1 < prev\.length \? sha256\(prev\[i\] \+ prev\[i \+ 1\]\) : prev\[i\]\)/.test(src),
+    'the odd node is PROMOTED unchanged, not duplicated - duplication is the Bitcoin collision'
+  );
+}
+
 // --------------------------------------------------------------------
 // REPRODUCIBLE CORPUS BUILDS - measured, never assumed.
 //
