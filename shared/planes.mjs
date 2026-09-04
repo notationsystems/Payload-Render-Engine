@@ -557,7 +557,33 @@ export const LIMBS = Object.freeze({
 export const INVARIANT_ID = 'API-000';
 
 export const LIMB_INVARIANT =
-  'every ok answer carries exactly one of meta.reference (canonical + proof root) or meta.observation (operational + limitations) - never both, never neither';
+  'every ok answer carries exactly one of meta.reference (canonical + proof root), meta.derivation (derived from a build by a named method) or meta.observation (operational + limitations) - never more than one, never none';
+
+/**
+ * API-000 as the ecosystem repo states it has TWO limbs: a canonical
+ * reference with a proof root, or an operational observation with its
+ * limitations. This twin implements THREE, and the third is a
+ * refinement rather than a disagreement.
+ *
+ * Under the two-limb reading, a mined pattern had to take the canonical
+ * limb - whose text promises membership of the committed build and an
+ * inclusion proof - and that promise is false for anything the service
+ * computed rather than read. VERIFIED_DERIVATION splits the canonical
+ * limb in two so the promise stays true: a reference certifies
+ * MEMBERSHIP, a derivation binds INPUTS.
+ *
+ * Recorded here rather than by quietly rewriting a shared invariant id,
+ * because API-000 is the ecosystem's and not this surface's to redefine.
+ */
+export const INVARIANT_EXTENSION = Object.freeze({
+  base: 'API-000',
+  baseLimbs: ['CANONICAL_PROOF', 'OPERATIONAL_OBSERVATION'],
+  addedHere: 'VERIFIED_DERIVATION',
+  why:
+    'the canonical limb promises membership of the committed build; a value the service COMPUTED from that build is not a member of it, and no inclusion proof will ever be produced for one. Splitting the limb keeps the promise true rather than weakening it.',
+  proposeUpstream:
+    'if the bundle adopts it, API-000 gains a third limb and the ecosystem/api-planes.json statement widens. Until then this twin is a superset and says so.',
+});
 
 /** Presence, derived from the rows rather than carried alongside them. */
 export function countPresence(families = MODULE_FAMILIES, planes = PLANES) {
