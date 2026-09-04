@@ -723,9 +723,22 @@ console.log('\n— apparatus register —');
     unbuilt.every((a) => a.absence?.reason && a.absence?.unblockedBy),
     'every unbuilt apparatus carries its reason and what would unblock it'
   );
+  // SEC-180: a row whose source lives in a PRIVATE repository may not
+  // cite it, because this register is served to anonymous callers. Such
+  // a row states basisWithheld instead - sourced and redacted, not
+  // unsourced. Silence still fails.
   check(
-    d.apparatuses.every((a) => Array.isArray(a.readFrom) && a.readFrom.length > 0),
-    'every apparatus row names where its claims were read — a register of provenance-bearing systems may not make unsourced claims'
+    d.apparatuses.every(
+      (a) =>
+        (Array.isArray(a.readFrom) && a.readFrom.length > 0) ||
+        (typeof a.basisWithheld === 'string' && a.basisWithheld.length > 20)
+    ),
+    'every apparatus row names where its claims were read, or why it cannot — a register of provenance-bearing systems may not make unsourced claims'
+  );
+  const withheld = d.apparatuses.filter((a) => a.basisWithheld);
+  check(
+    withheld.every((a) => !(a.readFrom ?? []).length),
+    `a row that withholds its basis cites nothing (${withheld.length} withheld) — withholding and citing at once would mean the citation was safe after all`
   );
   check(
     d.divergences.every((x) => x.proposal && x.ownedBy),

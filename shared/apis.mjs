@@ -52,11 +52,19 @@ export const PRODUCT_HIERARCHY = Object.freeze({
     id: 'payload-os',
     label: 'Payload OS',
     isPublicApi: false,
+    // NOT a fourth API - and not a mere layer either. Payload OS is the
+    // TWIN: the environment this repository is, used to visualize,
+    // manage, track, index, log and mine the physical economy. The three
+    // APIs are derived FROM it; it is not assembled from them.
+    is: 'the twin - the operating environment over the physical economy',
+    does: 'visualize, manage, track, index, log and mine physical-economy data',
     holds:
-      'the shared operating, evidence, provenance, identity, corpus, release, policy, access and verification layer',
-    rule: 'Payload OS is not a fourth public API and must never be offered as one. Its surfaces are the substrate the three products stand on.',
-    legacyNames:
-      'the `Payload` corpus/profile and `payload-*` workflow identifiers in this tree are internal or legacy compatibility names. They are not a product offer, and a view that renders one as a product is a defect.',
+      'the shared operating, evidence, provenance, identity, corpus, release, policy, access and verification layer beneath all three products',
+    rule: 'Payload OS is not one of the three public APIs and is not offered as a fourth. That is a statement about the API bundle, not a demotion: the OS is the twin the APIs are derived from.',
+    naming:
+      'the `Payload` corpus, profile and `payload-*` identifiers in this tree name the OS itself and are correct. They are not legacy compatibility names and must not be renamed away; what must never happen is Payload OS appearing in the product list beside Caravan, Tradewind and Landshark.',
+    derivation:
+      'the physical economy is the subject; the twin holds it as canonical state; each API is a DERIVATION over that state, scoped to one industry. This is the same relation the envelope names VERIFIED_DERIVATION - bound to the build it was derived from, not a member of it.',
   },
   apis: Object.freeze(['caravan', 'tradewind', 'landshark']),
 });
@@ -65,6 +73,9 @@ export const APIS = Object.freeze([
   {
     id: 'caravan',
     label: 'Caravan API',
+    sector: 'Logistics · Freight · Cargo · Maritime supply chain',
+    derivedFrom:
+      'the movement half of the physical economy the twin holds: corridors, chokepoints, ports, facilities and the flows over them',
     task: 'Inspect a bounded logistics slice: party/site/shipment resolution, movement lineage, changes, and exceptions.',
     objectClasses: ['shipment', 'load', 'container', 'voyage', 'party', 'node', 'milestone'],
     job: 'move physical goods',
@@ -80,8 +91,13 @@ export const APIS = Object.freeze([
   {
     id: 'tradewind',
     label: 'Tradewind API',
+    sector: 'Commodities markets · Derivatives markets · Prediction markets',
+    derivedFrom:
+      'the pricing half of the same physical economy: what a cargo is worth, what its risk costs, and what a market believes about an event that would move it',
     task: 'Inspect market state, price/risk context, and its governed connection to a relevant movement.',
-    objectClasses: ['instrument', 'contract', 'curve', 'print', 'position', 'event market'],
+    objectClasses: ['instrument', 'contract', 'curve', 'print', 'position', 'event market', 'venue'],
+    venueClasses:
+      'three source classes under one product, each with its own rights profile: listed derivatives, physical commodity assessments, and prediction-market venues. A prediction market is a third venue class here, never a separate product and never a venue clone.',
     job: 'price and risk',
     notTheJob: 'track a truck',
     status: 'SHELL',
@@ -95,8 +111,11 @@ export const APIS = Object.freeze([
   {
     id: 'landshark',
     label: 'Landshark API',
+    sector: 'AEC - zoning, surveying, planning, development, and buy/sell/lease',
+    derivedFrom:
+      'the ground the physical economy stands on: the parcels facilities occupy, what may lawfully be built on them, and the process by which that changes',
     task: 'Inspect legal parcel, zoning, entitlement, and development context.',
-    objectClasses: ['parcel', 'zone', 'survey', 'plan', 'entitlement', 'listing/lease'],
+    objectClasses: ['parcel', 'zone', 'survey', 'plan', 'entitlement', 'listing/lease', 'application', 'permit'],
     job: 'land as a legal and development object',
     notTheJob: 'clash detection in a BIM authoring tool',
     status: 'ABSENT',

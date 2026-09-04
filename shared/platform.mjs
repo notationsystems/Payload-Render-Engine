@@ -274,6 +274,57 @@ export const DEFERRED_BY_DECISION = Object.freeze([
   { id: 'kubernetes', why: 'a large estate is infrastructure sprawl before workload evidence demands it' },
 ]);
 
+/**
+ * SEC-180 - PROVENANCE DISCLOSURE IS ALLOWLISTED.
+ *
+ * Every claim this service makes about a sibling apparatus cites the
+ * file it was read from, and those citations are served to any
+ * unauthenticated client: GET /api/platform alone discloses 19
+ * repo-relative source paths. That is deliberate - provenance without a
+ * source is worthless, and these are the paths that make a claim
+ * checkable rather than asserted.
+ *
+ * But it is only defensible while every cited repository is one whose
+ * internal layout may be public. Found by attacking the surface: the
+ * paths are fine TODAY because every repo cited is public. Nothing
+ * stopped a future row citing `tradewind-scm-nextjs`, which is private
+ * in the same organization - and a private repository's file layout,
+ * disclosed to anonymous callers, is a map of an estate an attacker
+ * cannot otherwise see.
+ *
+ * So the disclosure is now a declared decision with a boundary, rather
+ * than a habit that happens to be safe. A path outside this list fails
+ * the check; adding a repo here is an explicit act that says its layout
+ * may be published.
+ */
+export const DISCLOSABLE_REPOS = Object.freeze([
+  { prefix: 'notationsystems/payload-terminal-v0/', why: 'public repository; its layout is already visible on GitHub' },
+  { prefix: 'notationsystems/payload-ocr-agent/', why: 'public repository' },
+  { prefix: 'notationsystems/data-acquisition-channel/', why: 'public repository' },
+  { prefix: 'notationsystems/gods-eye-view/', why: 'public repository' },
+  { prefix: 'notationsystems/payload-corpus-graph/', why: 'public repository (currently empty)' },
+]);
+
+/** Repos known to exist whose paths must NOT be cited in a served answer. */
+export const NON_DISCLOSABLE_REPOS = Object.freeze([
+  { prefix: 'tradewind-scm-nextjs/', why: 'PRIVATE repository - citing its internal layout would publish the structure of a repo nobody outside the org can see' },
+  { prefix: 'notationsystems/tradewind-scm-nextjs/', why: 'PRIVATE repository - same, under its org-qualified name' },
+]);
+
+/** Is this citation safe to serve? Returns the reason when it is not. */
+export function disclosureDefect(path) {
+  // A citation into THIS repository is not third-party disclosure: the
+  // service is already serving from it, and the tree is public. The rule
+  // is about publishing someone else's layout.
+  if (!path.includes('/') || /^(src|server|shared|scripts|tests|docs)\//.test(path)) return null;
+  const banned = NON_DISCLOSABLE_REPOS.find((r) => path.startsWith(r.prefix));
+  if (banned) return `cites ${banned.prefix} - ${banned.why}`;
+  if (!DISCLOSABLE_REPOS.some((r) => path.startsWith(r.prefix))) {
+    return 'cites a repository that is not on the disclosable list; a served citation publishes that repository layout to anonymous callers';
+  }
+  return null;
+}
+
 export const PLATFORM_INVARIANT =
   'no serving projection writes canonical truth - the same rule this service reached from the rendering side as INV-6 and SEC-017';
 

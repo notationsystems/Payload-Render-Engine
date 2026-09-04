@@ -19,7 +19,11 @@ generator so there is still one source.
 
 ## AUTHORED - what it is and is not
 
+**Sector:** Logistics · Freight · Cargo · Maritime supply chain.
+
 **Job:** move physical goods. **Not the job:** the price of a commodity; the zoning of a lot.
+
+**Derived from:** the movement half of the physical economy the twin holds: corridors, chokepoints, ports, facilities and the flows over them.
 
 Object classes: `shipment`, `load`, `container`, `voyage`, `party`, `node`, `milestone`.
 

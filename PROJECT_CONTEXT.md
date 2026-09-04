@@ -20,13 +20,24 @@ generator so there is still one source.
 ## MEASURED - the product bundle today
 
 Notation Systems Ecosystem
-- **Payload OS** - 14 shared streams. Public API: `false`.
+- **Payload OS** is the twin - the operating environment over the physical economy. It exists to visualize, manage, track, index, log and mine physical-economy data. 14 shared streams; one of the three public APIs: `false`.
 
-| Product | Streams | Core | Context | Status |
-| --- | --- | --- | --- | --- |
-| **Caravan API** | 18 | 14 | 4 | `FIRST_SLICE` |
-| **Tradewind API** | 4 | 4 | 0 | `SHELL` |
-| **Landshark API** | 0 | 0 | 0 | `ABSENT` |
+> Payload OS is not one of the three public APIs and is not offered as a fourth. That is a statement about the API bundle, not a demotion: the OS is the twin the APIs are derived from.
+>
+> **Naming.** the `Payload` corpus, profile and `payload-*` identifiers in this tree name the OS itself and are correct. They are not legacy compatibility names and must not be renamed away; what must never happen is Payload OS appearing in the product list beside Caravan, Tradewind and Landshark.
+
+| Product | Sector | Streams | Status |
+| --- | --- | --- | --- |
+| **Caravan API** | Logistics · Freight · Cargo · Maritime supply chain | 18 (14 core, 4 context) | `FIRST_SLICE` |
+| **Tradewind API** | Commodities markets · Derivatives markets · Prediction markets | 4 (4 core, 0 context) | `SHELL` |
+| **Landshark API** | AEC - zoning, surveying, planning, development, and buy/sell/lease | 0 (0 core, 0 context) | `ABSENT` |
+
+Each API is a **derivation** over the twin's canonical state, scoped to
+one industry - not a separate corpus:
+
+- **Caravan API** - the movement half of the physical economy the twin holds: corridors, chokepoints, ports, facilities and the flows over them
+- **Tradewind API** - the pricing half of the same physical economy: what a cargo is worth, what its risk costs, and what a market believes about an event that would move it
+- **Landshark API** - the ground the physical economy stands on: the parcels facilities occupy, what may lawfully be built on them, and the process by which that changes
 
 Every served stream is assigned: **36/36**, with
 0 unassigned and 0 stale.

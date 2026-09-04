@@ -110,13 +110,28 @@ console.log('\nAPPARATUS REGISTER — checked against the trees it describes\n')
     'state why it is not built and what would unblock it — an absence with a reason is a decision, an absence without one is a gap'
   );
 
-  const unsourced = APPARATUSES.filter((a) => !Array.isArray(a.readFrom) || a.readFrom.length === 0);
+  // ECO-003 and SEC-180 collided, and the collision is resolved here
+  // rather than by letting one silently win.
+  //
+  // SEC-180 forbids citing a path inside a private repository, because
+  // this register is served to anonymous callers. The tradewind row cited
+  // two such paths and had to stop. ECO-003 then failed it as unsourced.
+  //
+  // But ECO-003's intent is "no UNSOURCED claim", and a row that states
+  // WHY its basis cannot be shown is not unsourced - it is sourced and
+  // redacted, which is the same ABSENT-with-reason discipline used
+  // everywhere else. Silence would fail; a stated withholding passes.
+  const unsourced = APPARATUSES.filter(
+    (a) =>
+      (!Array.isArray(a.readFrom) || a.readFrom.length === 0) &&
+      !(typeof a.basisWithheld === 'string' && a.basisWithheld.trim().length > 20)
+  );
   check(
     'ECO-003',
-    'every apparatus row names where its claims were read',
+    'every apparatus row names where its claims were read, or why it cannot',
     unsourced.length === 0,
     unsourced.map((a) => a.id).join(' · '),
-    'add readFrom — a register row without provenance is exactly the unsourced assertion this ecosystem refuses everywhere else'
+    'add readFrom — a register row without provenance is exactly the unsourced assertion this ecosystem refuses everywhere else. If the source cannot be cited (SEC-180: it lives in a private repository), say so in basisWithheld rather than going quiet'
   );
 
   const badConv = CONVERGENCES.filter(

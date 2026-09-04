@@ -282,7 +282,18 @@ export const APPARATUSES = Object.freeze([
         'a starter tree that has not yet been made into anything. It is listed because a register that showed only the built apparatuses would misrepresent what is actually in the workspace.',
       unblockedBy: 'the first commit that makes it something other than the Webflow template',
     },
-    readFrom: ['tradewind-scm-nextjs/package.json', 'tradewind-scm-nextjs/ (git log)'],
+    // SEC-180. This row used to cite tradewind-scm-nextjs/package.json and
+    // its git log. That repository is PRIVATE, and this register is served
+    // to anonymous callers by GET /api/ecosystem/register - so those two
+    // citations published the internal layout of a repository nobody
+    // outside the organization can see. Found by attacking the surface,
+    // not by reading the file.
+    //
+    // The basis is withheld rather than faked: the row still says what it
+    // observed, and now says why it cannot show its working.
+    readFrom: [],
+    basisWithheld:
+      'the repository is private. Its paths are not cited because a served citation would publish the layout of a repository that is not public; the presence claim above was read from the tree directly by someone with access.',
   },
 ]);
 

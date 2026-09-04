@@ -31,7 +31,8 @@ import {
   planeOf,
   countPresence,
 } from '../shared/planes.mjs';
-import { PLATFORM_LAYERS } from '../shared/platform.mjs';
+import { PLATFORM_LAYERS, disclosureDefect } from '../shared/platform.mjs';
+import { APPARATUSES } from '../shared/ecosystem.mjs';
 import { APIS, PRODUCT_HIERARCHY, STREAM_OWNERS, ownerOf, streamCoverage } from '../shared/apis.mjs';
 
 // the workspace root: this repo's parent, where the sibling apparatuses live
@@ -498,6 +499,25 @@ check(
     noStream.length === 0,
     noStream.map(([k]) => k).join(' - '),
     'role separates a product record from context that merely informs it - an aircraft track is not a shipment, and without the distinction a view can promote one into the other'
+  );
+}
+
+// ----------------------------------------------------------- SEC-180
+// Provenance citations are SERVED. GET /api/platform discloses every
+// readFrom path to any unauthenticated caller, so the set of
+// repositories whose layout may appear there is a security decision.
+{
+  const cited = [
+    ...PLATFORM_LAYERS.flatMap((l) => (l.ecosystem?.readFrom ?? []).map((p2) => ({ where: `platform:${l.id}`, path: p2 }))),
+    ...APPARATUSES.flatMap((a2) => (a2.readFrom ?? []).map((p2) => ({ where: `apparatus:${a2.id}`, path: p2 }))),
+  ];
+  const offenders = cited.map((c) => ({ ...c, defect: disclosureDefect(c.path) })).filter((c) => c.defect);
+  check(
+    'SEC-180',
+    `every served provenance citation names a repository cleared for disclosure (${cited.length} citations)`,
+    offenders.length === 0,
+    offenders.map((o) => `${o.where}: ${o.path} - ${o.defect}`).join(' · '),
+    'these paths are served to anonymous callers by GET /api/platform and GET /api/ecosystem/register. Cite only repositories on DISCLOSABLE_REPOS, or add the repository there as an explicit decision that its layout may be published. A private repository must never appear'
   );
 }
 

@@ -130,15 +130,24 @@ files['PROJECT_CONTEXT.md'] = `${HEAD(
 ## MEASURED - the product bundle today
 
 ${PRODUCT_HIERARCHY.ecosystem}
-- **${PRODUCT_HIERARCHY.bundle.label}** - ${streams.byApi['payload-os'].total} shared streams. Public API: \`${PRODUCT_HIERARCHY.bundle.isPublicApi}\`.
+- **${PRODUCT_HIERARCHY.bundle.label}** is ${PRODUCT_HIERARCHY.bundle.is}. It exists to ${PRODUCT_HIERARCHY.bundle.does}. ${streams.byApi['payload-os'].total} shared streams; one of the three public APIs: \`${PRODUCT_HIERARCHY.bundle.isPublicApi}\`.
+
+> ${PRODUCT_HIERARCHY.bundle.rule}
+>
+> **Naming.** ${PRODUCT_HIERARCHY.bundle.naming}
 
 ${table(
-  ['Product', 'Streams', 'Core', 'Context', 'Status'],
+  ['Product', 'Sector', 'Streams', 'Status'],
   APIS.map((a) => {
     const c = streams.byApi[a.id];
-    return [`**${a.label}**`, String(c.total), String(c.core), String(c.context), `\`${a.status}\``];
+    return [`**${a.label}**`, a.sector, `${c.total} (${c.core} core, ${c.context} context)`, `\`${a.status}\``];
   })
 )}
+
+Each API is a **derivation** over the twin's canonical state, scoped to
+one industry - not a separate corpus:
+
+${APIS.map((a) => `- **${a.label}** - ${a.derivedFrom}`).join('\n')}
 
 Every served stream is assigned: **${streams.assigned}/${streams.total}**, with
 ${streams.unassigned.length} unassigned and ${streams.stale.length} stale.
@@ -182,7 +191,9 @@ ${PRODUCT_HIERARCHY.bundle.rule}
 
 ${PRODUCT_HIERARCHY.bundle.holds.replace(/^the /, 'It holds the ')}.
 
-**Legacy names.** ${PRODUCT_HIERARCHY.bundle.legacyNames}
+**Naming.** ${PRODUCT_HIERARCHY.bundle.naming}
+
+**Derivation.** ${PRODUCT_HIERARCHY.bundle.derivation}
 
 ## MEASURED - the shared streams
 
@@ -214,7 +225,11 @@ ${table(
   )}
 ## AUTHORED - what it is and is not
 
+**Sector:** ${caravan.sector}.
+
 **Job:** ${caravan.job}. **Not the job:** ${caravan.notTheJob}.
+
+**Derived from:** ${caravan.derivedFrom}.
 
 Object classes: ${caravan.objectClasses.map((c) => `\`${c}\``).join(', ')}.
 

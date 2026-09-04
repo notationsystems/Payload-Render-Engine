@@ -19,11 +19,13 @@ generator so there is still one source.
 
 ## AUTHORED - the boundary
 
-Payload OS is not a fourth public API and must never be offered as one. Its surfaces are the substrate the three products stand on.
+Payload OS is not one of the three public APIs and is not offered as a fourth. That is a statement about the API bundle, not a demotion: the OS is the twin the APIs are derived from.
 
-It holds the shared operating, evidence, provenance, identity, corpus, release, policy, access and verification layer.
+It holds the shared operating, evidence, provenance, identity, corpus, release, policy, access and verification layer beneath all three products.
 
-**Legacy names.** the `Payload` corpus/profile and `payload-*` workflow identifiers in this tree are internal or legacy compatibility names. They are not a product offer, and a view that renders one as a product is a defect.
+**Naming.** the `Payload` corpus, profile and `payload-*` identifiers in this tree name the OS itself and are correct. They are not legacy compatibility names and must not be renamed away; what must never happen is Payload OS appearing in the product list beside Caravan, Tradewind and Landshark.
+
+**Derivation.** the physical economy is the subject; the twin holds it as canonical state; each API is a DERIVATION over that state, scoped to one industry. This is the same relation the envelope names VERIFIED_DERIVATION - bound to the build it was derived from, not a member of it.
 
 ## MEASURED - the shared streams
 
