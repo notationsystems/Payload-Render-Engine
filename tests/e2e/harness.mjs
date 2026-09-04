@@ -17,6 +17,25 @@ import { chromium } from 'playwright';
 export const VITE = process.env.E2E_VITE ?? 'http://localhost:5173';
 export const API = process.env.E2E_API ?? 'http://127.0.0.1:8788';
 
+/**
+ * How long to wait on a panel whose content arrives through a bounded
+ * client fetch.
+ *
+ * The client is allowed DEFAULT_TIMEOUT_MS (10s, SEC-153) before it
+ * gives up and states a refusal. A spec that waits LESS than that is
+ * not testing the system - it is testing the machine's speed, and it
+ * can fail while the panel is still inside its own budget. Worse, it
+ * can never observe the system's actual failure mode, which is the
+ * stated refusal the client produces at 10s.
+ *
+ * 70-refusals waited 8000ms and crashed the suite under load while
+ * /api/refusals was answering in 11ms. The wait must outlast the
+ * client, so that a timeout here means the panel genuinely never
+ * rendered.
+ */
+export const CLIENT_FETCH_BUDGET_MS = 10_000;
+export const FETCH_BACKED_MS = CLIENT_FETCH_BUDGET_MS + 5_000;
+
 const CHROMIUM = process.env.PLAYWRIGHT_CHROMIUM ?? '/opt/pw-browsers/chromium';
 
 export async function reachable(url) {

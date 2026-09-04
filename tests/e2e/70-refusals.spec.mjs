@@ -1,5 +1,5 @@
 /** Refusals work queue: grouped by mechanism, one shared remedy, ranked. */
-import { API, bootedPage, makeRecorder } from './harness.mjs';
+import { API, bootedPage, makeRecorder, FETCH_BACKED_MS } from './harness.mjs';
 
 export async function run(browser) {
   const r = makeRecorder('70-refusals');
@@ -11,11 +11,11 @@ export async function run(browser) {
 
   const { page } = await bootedPage(browser);
   await page.evaluate(() => window.payloadEarth.api.runCommand('refusals'));
-  await page.waitForSelector('.pe-refusals:not([hidden])', { timeout: 6000 });
+  await page.waitForSelector('.pe-refusals:not([hidden])', { timeout: FETCH_BACKED_MS });
   await page.waitForFunction(
     () => !!document.querySelector('.pe-refusals .pe-refusals-head, .pe-refusals .pe-corpus-absent'),
     null,
-    { timeout: 8000 }
+    { timeout: FETCH_BACKED_MS }
   );
   const doc = await page.evaluate(() => ({
     heads: [...document.querySelectorAll('.pe-refusals-head')].map((h) => h.textContent ?? ''),

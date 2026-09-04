@@ -32,6 +32,7 @@ import {
   countPresence,
 } from '../shared/planes.mjs';
 import { PLATFORM_LAYERS } from '../shared/platform.mjs';
+import { APIS, PRODUCT_HIERARCHY, STREAM_OWNERS, ownerOf, streamCoverage } from '../shared/apis.mjs';
 
 // the workspace root: this repo's parent, where the sibling apparatuses live
 const WORKSPACE = resolve(new URL('../..', import.meta.url).pathname);
@@ -395,6 +396,110 @@ check(
     noMethod.map(([k]) => k).join(' - '),
     'a derivation whose method is unnamed cannot be reproduced or argued with, which is the only thing that makes it VERIFIED rather than merely computed'
   );
+
+// ----------------------------------------------------------- API-001
+// Which of the three products each stream powers. A third axis, and the
+// conservation rule is the same: a stream absent from the map is a
+// defect, never a default.
+{
+  const cov = streamCoverage(patterns);
+  check(
+    'API-001',
+    `every served stream names the product it powers (${cov.assigned}/${cov.total})`,
+    cov.unassigned.length === 0,
+    cov.unassigned.join(' - '),
+    'add the route to STREAM_OWNERS in shared/apis.mjs with its api and role. A stream nobody assigned is a stream whose product boundary nobody decided'
+  );
+  check(
+    'API-001',
+    'no stream assignment names a route that is no longer served',
+    cov.stale.length === 0,
+    cov.stale.join(' - '),
+    'remove the stale key - a product map describing routes the service does not serve has stopped describing the service'
+  );
+
+  // ------------------------------------------------------------- API-002
+  // An empty product is a fact, not a gap. Landshark has zero streams and
+  // the register must SAY so, with the reason and the four gates it has
+  // not passed - because the alternative is padding it with whatever
+  // geographic data is lying around, which is the false coverage this
+  // whole system refuses.
+  const emptyUnexplained = APIS.filter(
+    (a2) => cov.byApi[a2.id]?.total === 0 && (!a2.reason || !a2.unblockedBy)
+  );
+  check(
+    'API-002',
+    `every product with no streams states why, and what would unblock it (${cov.empty.length} empty)`,
+    emptyUnexplained.length === 0,
+    emptyUnexplained.map((a2) => a2.id).join(' - '),
+    'an absence with a reason is a decision; an absence without one is a gap someone will later fill with anything to hand'
+  );
+  const wrongStatus = APIS.filter((a2) => cov.byApi[a2.id]?.total === 0 && a2.status !== 'ABSENT');
+  check(
+    'API-002',
+    'no product claims a status its stream count does not support',
+    wrongStatus.length === 0,
+    wrongStatus.map((a2) => `${a2.id} claims ${a2.status} with 0 streams`).join(' - '),
+    'a product with no streams is ABSENT. Any other status is a claim the twin cannot back'
+  );
+
+  // ------------------------------------------------------------- API-003
+  // Payload OS is a layer. The moment it renders as a fourth product row
+  // the hierarchy the charter fixes has been broken.
+  check(
+    'API-003',
+    'Payload OS is declared a layer, never a fourth public API',
+    PRODUCT_HIERARCHY.bundle.isPublicApi === false && !PRODUCT_HIERARCHY.apis.includes('payload-os'),
+    `isPublicApi=${PRODUCT_HIERARCHY.bundle.isPublicApi}, apis=[${PRODUCT_HIERARCHY.apis.join(', ')}]`,
+    'the hierarchy is Ecosystem -> Payload OS -> {Caravan, Tradewind, Landshark}. Payload OS is the shared layer the three stand on and is not offered as a product'
+  );
+
+  // ------------------------------------------------------------- API-004
+  // THE ORTHOGONALITY THE DESIGN CLAIMS.
+  //
+  // Plane, limb and owning API are asserted to be three independent
+  // facts. That is a claim, so it is measured: if API ownership were
+  // derivable from plane or limb, some plane would hold exactly one
+  // product and some product exactly one limb, and the third axis would
+  // be decoration. This fails the moment the axes collapse.
+  const planeApis = new Map();
+  const apiLimbs = new Map();
+  for (const pat of patterns) {
+    const owner = ownerOf(pat);
+    const plane = planeOf(pat);
+    if (!owner || !plane) continue;
+    if (!planeApis.has(plane.plane)) planeApis.set(plane.plane, new Set());
+    planeApis.get(plane.plane).add(owner.api);
+    if (!apiLimbs.has(owner.api)) apiLimbs.set(owner.api, new Set());
+    apiLimbs.get(owner.api).add(plane.limb);
+  }
+  const mixedPlane = [...planeApis.entries()].find(([, v]) => v.size > 1);
+  const mixedApi = [...apiLimbs.entries()].find(([, v]) => v.size > 1);
+  check(
+    'API-004',
+    `owning-API is not derivable from plane (${mixedPlane ? `${mixedPlane[0]} holds ${mixedPlane[1].size} products` : 'no plane holds more than one'})`,
+    Boolean(mixedPlane),
+    'every plane maps to exactly one product',
+    'if each plane held one product, plane and product would be the same fact under two names and one of them should go. The axes are only worth keeping separate while they actually differ'
+  );
+  check(
+    'API-004',
+    `owning-API is not derivable from limb (${mixedApi ? `${mixedApi[0]} spans ${mixedApi[1].size} limbs` : 'no product spans more than one'})`,
+    Boolean(mixedApi),
+    'every product carries exactly one limb',
+    'if each product carried one limb, product and limb would be the same fact under two names'
+  );
+
+  // ------------------------------------------------------------- API-005
+  const noStream = Object.entries(STREAM_OWNERS).filter(([, v]) => !v.stream || !v.role);
+  check(
+    'API-005',
+    `every stream says what it carries and in what role (${Object.keys(STREAM_OWNERS).length} streams)`,
+    noStream.length === 0,
+    noStream.map(([k]) => k).join(' - '),
+    'role separates a product record from context that merely informs it - an aircraft track is not a shipment, and without the distinction a view can promote one into the other'
+  );
+}
 
 // -------------------------------------------------------------- verdict
 console.log('');

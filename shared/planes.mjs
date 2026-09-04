@@ -408,6 +408,17 @@ export const ROUTE_PLANES = Object.freeze({
     ],
   },
 
+  '/api/products': {
+    plane: 'governance',
+    limb: 'OPERATIONAL_OBSERVATION',
+    upstream: 'this service, declaring which product each of its streams powers',
+    limitations: [
+      'A CLAIM BY THIS BUILD ABOUT ITS OWN STREAMS - the assignment is what this twin serves, not the product boundary of any deployed API',
+      'LANDSHARK HAS ZERO STREAMS HERE and is reported as such; that is a fact about this twin, not a statement that the product cannot exist',
+      'a stream marked `context` informs a product without being one of its records - an aircraft track is not a shipment, and this surface must never be read as though it were',
+    ],
+  },
+
   '/api/platform': {
     plane: 'governance',
     limb: 'OPERATIONAL_OBSERVATION',

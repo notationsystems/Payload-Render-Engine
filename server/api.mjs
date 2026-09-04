@@ -19,6 +19,7 @@ import { registerLiveRoutes } from './live.mjs';
 import { canonicalBasis, derivedBasis, operationalBasis } from '../shared/envelope.mjs';
 import { apiConstitution, planeCoverage, planeOf } from '../shared/planes.mjs';
 import { platformPosition } from '../shared/platform.mjs';
+import { apiRegister } from '../shared/apis.mjs';
 import { registerMarketRoutes } from './markets.mjs';
 import { MINING_PROGRAMS, runMiner } from '../shared/miner.mjs';
 import { applyProbes, ecosystemRegister } from '../shared/ecosystem.mjs';
@@ -432,6 +433,15 @@ export async function registerRoutes(corpus, runtime = {}) {
       ...(corpus.mappingReport ? { mappingReport: corpus.mappingReport } : {}),
     })
   );
+
+  // Which of the three products each stream powers. A third axis: a
+  // stream's plane says who may read it, its limb says what kind of
+  // answer it is, and this says which product owns it. None of the
+  // three is derivable from the others, and API-004 measures that.
+  get('/api/products', () => {
+    const served = routes.map((r) => r.pattern.source.replace(/^\^|\$$/g, '').replace(/\\\//g, '/'));
+    return ok(apiRegister(served));
+  });
 
   // Where this service sits in the data platform, and what is not built
   // yet. A layer claimed before it exists is how an architecture diagram
